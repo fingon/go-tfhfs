@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 11:00:14 2017 mstenber
- * Last modified: Fri Aug 11 16:06:44 2017 mstenber
- * Edit time:     228 min
+ * Last modified: Sat Aug 12 16:05:48 2017 mstenber
+ * Edit time:     231 min
  *
  */
 
@@ -75,6 +75,8 @@ type LeafNode struct {
 	Value interface{}
 }
 
+var _ Node = &LeafNode{} // Ensure pointer of it it fulfills the Node interface
+
 func NewLeafNode(name []byte, value interface{}) *LeafNode {
 	n := new(LeafNode)
 	n.name = name
@@ -97,7 +99,9 @@ type TreeNode struct {
 	msize      int // maximum size
 }
 
-func (self TreeNode) Size() int {
+var _ Node = &TreeNode{} // Ensure pointer of it fulfills the Node interface
+
+func (self *TreeNode) Size() int {
 	return hash_size + name_max_size // TBD: why?
 }
 

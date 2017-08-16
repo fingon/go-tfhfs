@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 11:00:14 2017 mstenber
- * Last modified: Wed Aug 16 14:34:27 2017 mstenber
- * Edit time:     309 min
+ * Last modified: Wed Aug 16 14:36:58 2017 mstenber
+ * Edit time:     310 min
  *
  */
 
@@ -67,19 +67,19 @@ func (self *NodeBase) SetParent(tn *TreeNode) {
 	self.parent = tn
 }
 
-// LeafNode is a node which contains concrete data
+// LeafNode is a node which contains concrete data; containing struct
+// should actually _HAVE_ the data, this LeafNode just provides
+// concept of name storage + key hashing out of it.
 type LeafNode struct {
 	NodeBase
-	name  []byte // actual name of the node
-	Value interface{}
+	name []byte // actual name of the node
 }
 
 var _ Node = &LeafNode{} // Ensure pointer of it it fulfills the Node interface
 
-func NewLeafNode(name []byte, value interface{}) *LeafNode {
+func NewLeafNode(name []byte) *LeafNode {
 	n := new(LeafNode)
 	n.name = name
-	n.Value = value
 	h := fnv.New64a()
 	h.Write(name)
 	n.key = append(h.Sum([]byte("")), name...)

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 13:06:15 2017 mstenber
- * Last modified: Wed Aug 16 14:35:10 2017 mstenber
- * Edit time:     53 min
+ * Last modified: Wed Aug 16 14:37:11 2017 mstenber
+ * Edit time:     54 min
  *
  */
 
@@ -58,9 +58,9 @@ func TestSimple(t *testing.T) {
 	tt := NewTree(64, nil, NewTreeNode)
 	tn := tt.root
 	assert.Equal(t, tn.firstLeaf(), (*LeafNode)(nil))
-	n1 := NewLeafNode([]byte("foo.txt"), nil)
-	n2 := NewLeafNode([]byte("bar.txt"), nil)
-	n3 := NewLeafNode([]byte("baz.txt"), nil)
+	n1 := NewLeafNode([]byte("foo.txt"))
+	n2 := NewLeafNode([]byte("bar.txt"))
+	n3 := NewLeafNode([]byte("baz.txt"))
 	tn.AddChild(n1)
 	tn.AddChild(n2)
 	cnt := 0
@@ -108,7 +108,7 @@ func TestBig(t *testing.T) {
 		for i := 0; i < 1000; i++ {
 			// fmt.Printf("%s: %d\n", m, i)
 			name := []byte(fmt.Sprintf("%04d", i))
-			ln := NewLeafNode(name, nil)
+			ln := NewLeafNode(name)
 			if !m.hash {
 				ln.key = ln.name
 			}

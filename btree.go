@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 11:00:14 2017 mstenber
- * Last modified: Wed Aug 16 14:36:58 2017 mstenber
- * Edit time:     310 min
+ * Last modified: Wed Aug 16 15:05:46 2017 mstenber
+ * Edit time:     333 min
  *
  */
 
@@ -27,8 +27,15 @@ const hash_size = 8
 const name_max_size = 256
 const paranoid = true
 
+type Dirty interface {
+	IsDirty() bool
+	SetDirty()
+}
+
 // Node is interface fulfilled by all btree nodes, both leaf and non-leaf.
 type Node interface {
+	Dirty
+
 	// Size returns estimated encoded size of the node
 	Size() int
 
@@ -42,6 +49,11 @@ type Node interface {
 type NodeBase struct {
 	parent *TreeNode
 	key    []byte
+	dirty  bool
+}
+
+func (self *NodeBase) IsDirty() bool {
+	return self.dirty
 }
 
 func (self *NodeBase) Key() []byte {
@@ -50,6 +62,10 @@ func (self *NodeBase) Key() []byte {
 
 func (self *NodeBase) Parent() *TreeNode {
 	return self.parent
+}
+
+func (self *NodeBase) SetDirty() {
+	self.dirty = true
 }
 
 func (self *NodeBase) SetParent(tn *TreeNode) {
@@ -199,7 +215,6 @@ func (self *Tree) Remove(n Node) {
 			root.AddChildNoCheck(c2, -1)
 		}
 	}
-
 }
 
 type TreeNode struct {
@@ -262,8 +277,14 @@ func (self *TreeNode) AddChildNoCheck(n Node, index int) int {
 	return index
 }
 
-func (self *TreeNode) MarkDirty() {
-	// TBD
+func (self *TreeNode) SetDirty() {
+	if self.dirty {
+		return
+	}
+	self.dirty = true
+	if self.parent != nil {
+		self.parent.SetDirty()
+	}
 }
 
 func NewTreeNode(tree *Tree) *TreeNode {
@@ -276,7 +297,7 @@ func (self *TreeNode) AddChild(n Node) {
 	if idx == 0 {
 		self.updateKey(false)
 	}
-	self.MarkDirty()
+	self.SetDirty()
 	if self.childSize <= self.tree.maximumSize {
 		return
 	}
@@ -288,7 +309,7 @@ func (self *TreeNode) AddChild(n Node) {
 	if self.parent != nil {
 		// fmt.Println("recursed to parent to add")
 		self.parent.AddChild(tn)
-		tn.MarkDirty()
+		tn.SetDirty()
 		return
 	}
 	// fmt.Printf("root - spawning children - idx was:%d\n", idx)
@@ -302,8 +323,8 @@ func (self *TreeNode) AddChild(n Node) {
 	self.AddChildNoCheck(tn2, 0)
 	self.AddChildNoCheck(tn, 1)
 	// fmt.Printf("post split %d / %d\n", len(tn2.children), len(tn.children))
-	tn2.MarkDirty()
-	tn.MarkDirty()
+	tn2.SetDirty()
+	tn.SetDirty()
 }
 
 // RemoveChildNoCheck removes child from the TreeNode at index (if >= 0)
@@ -362,6 +383,7 @@ func (self *TreeNode) getSib(ofs int) *TreeNode {
 }
 
 func (self *TreeNode) RemoveChild(n Node) {
+	self.SetDirty()
 	self.RemoveChildNoCheck(n, -1)
 	if self.childSize >= self.tree.smallSize {
 		return
@@ -380,6 +402,7 @@ func (self *TreeNode) RemoveChild(n Node) {
 			// Moved stuff from right to us
 			sib.updateKey(true)
 		}
+		sib.SetDirty()
 		return true
 	}
 	sib := self.getSib(-1)
@@ -408,6 +431,7 @@ func (self *TreeNode) RemoveChild(n Node) {
 		sib.AddChildNoCheck(self.popChild(0), -1)
 	}
 	sib.updateKey(false)
+	sib.SetDirty()
 	self.parent.RemoveChild(self)
 }
 

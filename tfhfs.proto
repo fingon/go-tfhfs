@@ -1,0 +1,61 @@
+// Protocol buffers for encoding the trees.
+
+syntax = "proto3";
+
+package tfhfs;
+
+message PBINodeReference {
+  int64 from_inode = 1;
+  bytes with_name = 2;
+}
+
+message PBINode {
+  int64 st_ino = 1;
+  int32 st_mode = 2;
+  int32 st_uid = 3;
+  int32 st_gid = 4;
+  int64 st_atime_ns = 5;
+  int64 st_ctime_ns = 6;
+  int64 st_mtime_ns = 7;
+  // dynamic: st_size, st_rdev, st_nlink,
+  // static but from elsewhere: st_blksize
+
+  // In-place data
+  oneof data_or_tree_root {
+    bytes data = 10;
+    PBTreeNode data_root = 11;
+  }
+
+  repeated PBINodeReference references = 15;
+  // ^ => st_nlinks
+
+  map<string, bytes> xattr = 100;
+
+}
+
+message PBTreeNodeChild {
+  bytes key = 1;
+  oneof inode_or_block_ids {
+    int64 inode = 2; // direntry
+    bytes file_block_id = 3; // filenode
+    bytes node_block_id = 4; // further PBTreeNode
+  }
+}
+
+message PBTreeNode {
+  bytes key = 1;
+  repeated PBTreeNodeChild children = 2;
+}
+
+// Header of encrypted block on disk; iv is used for AES GCM
+message PBBlock {
+  int32 magic = 1;
+  bytes iv = 2;
+  bytes data = 3;
+}
+
+message PBPlainBlock {
+  int32 type = 1;
+  int32 compressed = 2;
+  bytes data = 3;
+}

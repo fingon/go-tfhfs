@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 11:00:14 2017 mstenber
- * Last modified: Sat Aug 12 16:05:48 2017 mstenber
- * Edit time:     231 min
+ * Last modified: Wed Aug 16 14:13:23 2017 mstenber
+ * Edit time:     295 min
  *
  */
 
@@ -19,7 +19,6 @@ package btree
 
 import (
 	"bytes"
-	"fmt"
 	"hash/fnv"
 	"sort"
 )
@@ -87,16 +86,125 @@ func NewLeafNode(name []byte, value interface{}) *LeafNode {
 	return n
 }
 
+func (self *LeafNode) nextLeaf(ofs int) (*LeafNode, int) {
+	// Fast common case - handle the 'has more leaves' first
+	p := self.parent
+	n := self
+	if ofs < 0 {
+		ofs = p.childIndexGE(n)
+	}
+	nofs := ofs + 1
+	if nofs < len(p.children) {
+		return p.children[nofs].(*LeafNode), nofs
+	}
+
+	// There were no leaves. So we have to recursively try to find
+	// the parent node which has next sibling.
+	for p.parent != nil {
+		sib := p.getSib(1)
+		if sib != nil {
+			return sib.firstLeaf(), 0
+		}
+		p = p.parent
+	}
+	return nil, -1
+}
+
 func (self *LeafNode) Size() int {
 	return len(self.key)
 }
 
+type NodeToTreeNodeCallback func(n Node) *TreeNode
+
+type Tree struct {
+	maximumSize            int // maximum size
+	halfSize               int // half of maximum size
+	smallSize              int // the size below which we try not to get smaller
+	root                   *TreeNode
+	nodeToTreeNodeCallback NodeToTreeNodeCallback
+}
+
+func NewTree(maximumSize int, n2tn NodeToTreeNodeCallback) *Tree {
+	if n2tn == nil {
+		n2tn = func(n Node) *TreeNode {
+			v, _ := n.(*TreeNode)
+			// ok is ignored for now
+			return v
+		}
+	}
+	t := &Tree{maximumSize,
+		maximumSize / 2,
+		maximumSize / 4,
+		nil,
+		n2tn}
+	t.root = NewTreeNode(t)
+	return t
+}
+
+func (self *Tree) Add(n Node) {
+	n2 := self.root.searchPrevOrEq(n)
+	if n2 != nil {
+		n2.Parent().AddChild(n)
+	} else {
+		self.root.AddChild(n)
+	}
+}
+
+type LeafNodeCallback func(ln *LeafNode) bool
+
+func (self *Tree) IterateLeaves(startAt *LeafNode, it LeafNodeCallback) {
+	ln := startAt
+	i := 0
+	if ln == nil {
+		ln = self.root.firstLeaf()
+	} else {
+		ln, i = ln.nextLeaf(-1)
+	}
+	for ln != nil {
+		if !it(ln) {
+			return
+		}
+		ln, i = ln.nextLeaf(i)
+	}
+}
+
+func (self *Tree) Remove(n Node) {
+	root := self.root
+	n2 := root.searchEq(n)
+	n2.Parent().RemoveChild(n2)
+	if root.isLeafy() {
+		return
+	}
+	ts := 0
+	for i := range root.children {
+		ts += root.getChildTreeNode(i).childSize
+		if ts >= self.smallSize {
+			return
+		}
+	}
+
+	// Out of children -> should remove everything from the children
+	// and add it to us
+	original_children := make([]Node, len(root.children))
+	copy(original_children, root.children)
+
+	for _, c := range original_children {
+		root.RemoveChildNoCheck(c, 0)
+		ct := self.nodeToTreeNodeCallback(c)
+		for _, c2 := range ct.children {
+			ct.RemoveChildNoCheck(c2, -1)
+			root.AddChildNoCheck(c2, -1)
+		}
+	}
+
+}
+
 type TreeNode struct {
 	NodeBase
+	tree       *Tree // tree we belong to
 	children   []Node
 	child_keys [][]byte
-	csize      int // (current) child size
-	msize      int // maximum size
+	childSize  int // how big are the children
 }
 
 var _ Node = &TreeNode{} // Ensure pointer of it fulfills the Node interface
@@ -108,6 +216,13 @@ func (self *TreeNode) Size() int {
 func (self *TreeNode) childIndex(n Node, fun func(int) bool) int {
 	index := sort.Search(len(self.children), fun)
 	return index
+}
+
+func (self *TreeNode) getChildTreeNode(ofs int) *TreeNode {
+	if ofs < 0 || ofs >= len(self.children) {
+		return nil
+	}
+	return self.tree.nodeToTreeNodeCallback(self.children[ofs])
 }
 
 func (self *TreeNode) childIndexGT(n Node) int {
@@ -127,7 +242,7 @@ func (self *TreeNode) childIndexGE(n Node) int {
 // AddChildNoCheck adds child to the TreeNode at index (if >= 0)
 func (self *TreeNode) AddChildNoCheck(n Node, index int) int {
 	s := n.Size()
-	self.csize += s
+	self.childSize += s
 	if index < 0 {
 		index = self.childIndexGE(n)
 	}
@@ -148,12 +263,12 @@ func (self *TreeNode) MarkDirty() {
 	// TBD
 }
 
-func NewTreeNode(msize int) *TreeNode {
-	return &TreeNode{msize: msize}
+func NewTreeNode(tree *Tree) *TreeNode {
+	return &TreeNode{tree: tree}
 }
 
 func (self *TreeNode) new() *TreeNode {
-	return NewTreeNode(self.msize)
+	return NewTreeNode(self.tree)
 }
 
 // AddChild adds child to TreeNode and updates keys/splits as needed
@@ -163,11 +278,11 @@ func (self *TreeNode) AddChild(n Node) {
 		self.updateKey(false)
 	}
 	self.MarkDirty()
-	if self.csize <= self.msize {
+	if self.childSize <= self.tree.maximumSize {
 		return
 	}
 	tn := self.new()
-	for tn.csize < self.csize {
+	for tn.childSize < self.childSize {
 		tn.AddChildNoCheck(self.popChild(-1), 0)
 	}
 	tn.key = tn.child_keys[0]
@@ -197,7 +312,7 @@ func (self *TreeNode) RemoveChildNoCheck(n Node, index int) {
 	if index < 0 {
 		index = self.childIndexGE(n)
 	}
-	self.csize -= n.Size()
+	self.childSize -= n.Size()
 	if index == 0 {
 		self.children = self.children[1:]
 		self.child_keys = self.child_keys[1:]
@@ -239,36 +354,24 @@ func (self *TreeNode) popChild(index int) Node {
 	return n
 }
 
-func (self *TreeNode) AddToTree(n Node) {
-	n2 := self.searchPrevOrEq(n)
-	if n2 != nil {
-		n2.Parent().AddChild(n)
-	} else {
-		self.AddChild(n)
-	}
-}
-
 func (self *TreeNode) getSib(ofs int) *TreeNode {
 	if self.parent == nil {
 		return nil
 	}
 	idx := self.parent.childIndexGE(self) + ofs
-	if idx >= 0 && idx < len(self.parent.children) {
-		return self.parent.children[idx].(*TreeNode)
-	}
-	return nil
+	return self.parent.getChildTreeNode(idx)
 }
 
 func (self *TreeNode) RemoveChild(n Node) {
 	self.RemoveChildNoCheck(n, -1)
-	if self.csize >= self.msize/4 {
+	if self.childSize >= self.tree.smallSize {
 		return
 	}
 	equalize := func(sib *TreeNode, idx int) bool {
-		if sib.csize < self.msize/2 {
+		if sib.childSize < self.tree.halfSize {
 			return false
 		}
-		for sib.csize >= self.csize {
+		for sib.childSize >= self.childSize {
 			self.AddChildNoCheck(sib.popChild(idx), -1)
 		}
 		if idx == -1 {
@@ -294,7 +397,7 @@ func (self *TreeNode) RemoveChild(n Node) {
 		return
 	}
 	if sib != nil && sib2 != nil {
-		if sib.csize > sib2.csize {
+		if sib.childSize > sib2.childSize {
 			sib = sib2
 		}
 	} else if sib2 != nil {
@@ -309,36 +412,6 @@ func (self *TreeNode) RemoveChild(n Node) {
 	self.parent.RemoveChild(self)
 }
 
-func (self *TreeNode) RemoveFromTree(n Node) {
-	n2 := self.searchEq(n)
-	n2.Parent().RemoveChild(n2)
-	if self.isLeafy() {
-		return
-	}
-	ts := 0
-	for _, c := range self.children {
-		ts += c.(*TreeNode).csize
-	}
-	if ts >= self.msize/4 {
-		return
-	}
-
-	// Out of children -> should remove everything from the children
-	// and add it to us
-	original_children := make([]Node, len(self.children))
-	copy(original_children, self.children)
-
-	for _, c := range original_children {
-		self.RemoveChildNoCheck(c, 0)
-		ct := c.(*TreeNode)
-		for _, c2 := range ct.children {
-			ct.RemoveChildNoCheck(c2, -1)
-			self.AddChildNoCheck(c2, -1)
-		}
-	}
-
-}
-
 func (self *TreeNode) searchPrevOrEq(n Node) Node {
 	if len(self.children) == 0 {
 		return nil
@@ -348,11 +421,11 @@ func (self *TreeNode) searchPrevOrEq(n Node) Node {
 		idx -= 1
 	}
 	cn := self.children[idx]
-	tcn, ok := cn.(*TreeNode)
-	if !ok {
+	tn := self.tree.nodeToTreeNodeCallback(cn)
+	if tn == nil {
 		return cn
 	}
-	return tcn.searchPrevOrEq(n)
+	return tn.searchPrevOrEq(n)
 }
 
 func (self *TreeNode) searchEq(n Node) Node {
@@ -361,41 +434,6 @@ func (self *TreeNode) searchEq(n Node) Node {
 		return sc
 	}
 	return nil
-}
-
-func (self *TreeNode) ensureSane() {
-	// Make sure this particular tree node seems sane; to the point:
-	if len(self.children) == 0 {
-		return
-	}
-	if self.parent != nil {
-		idx := self.parent.childIndexGE(self)
-		if self.parent.children[idx] != self {
-			panic("unable to find self in parent")
-		}
-	}
-	if bytes.Compare(self.key, self.child_keys[0]) > 0 {
-		panic("broken own key")
-	}
-	for i, k := range self.child_keys {
-		if !bytes.Equal(k, self.children[i].Key()) {
-			panic(fmt.Sprintf("broken child key %d - cache:%v <> Key():%v",
-				i, k, self.children[i].Key()))
-		}
-	}
-	// all children are sane (if they are TreeNodes)
-	for _, n := range self.children {
-		if n.Parent() != self {
-			panic("broken parent relation")
-		}
-		tn2, ok := n.(*TreeNode)
-		if ok {
-			tn2.ensureSane()
-		} else {
-			//ln := n.(*LeafNode)
-			//fmt.Printf("%s\n", ln.name)
-		}
-	}
 }
 
 func (self *TreeNode) isLeafy() bool {
@@ -417,14 +455,15 @@ func (self *TreeNode) depth() int {
 	return 1 + self.children[0].(*TreeNode).depth()
 }
 
-func (self *TreeNode) firstLeaf() Node {
+func (self *TreeNode) firstLeaf() *LeafNode {
 	if len(self.children) == 0 {
 		return nil
 	}
 	cn := self.children[0]
-	tcn, ok := cn.(*TreeNode)
-	if !ok {
-		return cn
+	tn := self.tree.nodeToTreeNodeCallback(cn)
+	if tn == nil {
+		ret := cn.(*LeafNode)
+		return ret
 	}
-	return tcn.firstLeaf()
+	return tn.firstLeaf()
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 13:06:15 2017 mstenber
- * Last modified: Wed Aug 16 14:17:01 2017 mstenber
- * Edit time:     49 min
+ * Last modified: Wed Aug 16 14:23:06 2017 mstenber
+ * Edit time:     52 min
  *
  */
 
@@ -55,7 +55,7 @@ func ensureSane(self *TreeNode) {
 }
 
 func TestSimple(t *testing.T) {
-	tt := NewTree(64, nil)
+	tt := NewTree(64, nil, NewTreeNode)
 	tn := tt.root
 	assert.Equal(t, tn.firstLeaf(), (*LeafNode)(nil))
 	n1 := NewLeafNode([]byte("foo.txt"), nil)
@@ -101,7 +101,7 @@ func TestBig(t *testing.T) {
 		hash bool
 	}{{false}, {true}}
 	for _, m := range tests {
-		tt := NewTree(2000, nil)
+		tt := NewTree(2000, nil, NewTreeNode)
 		tn := tt.root
 		leaves := []*LeafNode{}
 		assert.True(t, tn.depth() == 1)

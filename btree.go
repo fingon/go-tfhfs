@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 11:00:14 2017 mstenber
- * Last modified: Wed Aug 16 14:13:23 2017 mstenber
- * Edit time:     295 min
+ * Last modified: Wed Aug 16 14:27:29 2017 mstenber
+ * Edit time:     302 min
  *
  */
 
@@ -115,16 +115,20 @@ func (self *LeafNode) Size() int {
 }
 
 type NodeToTreeNodeCallback func(n Node) *TreeNode
+type NewTreeNodeCallback func(t *Tree) *TreeNode
 
 type Tree struct {
 	maximumSize            int // maximum size
 	halfSize               int // half of maximum size
 	smallSize              int // the size below which we try not to get smaller
-	root                   *TreeNode
 	nodeToTreeNodeCallback NodeToTreeNodeCallback
+	newTreeNodeCallback    NewTreeNodeCallback
+	root                   *TreeNode
 }
 
-func NewTree(maximumSize int, n2tn NodeToTreeNodeCallback) *Tree {
+func NewTree(maximumSize int,
+	n2tn NodeToTreeNodeCallback,
+	ntn NewTreeNodeCallback) *Tree {
 	if n2tn == nil {
 		n2tn = func(n Node) *TreeNode {
 			v, _ := n.(*TreeNode)
@@ -135,9 +139,9 @@ func NewTree(maximumSize int, n2tn NodeToTreeNodeCallback) *Tree {
 	t := &Tree{maximumSize,
 		maximumSize / 2,
 		maximumSize / 4,
-		nil,
-		n2tn}
-	t.root = NewTreeNode(t)
+		n2tn, ntn,
+		nil}
+	t.root = ntn(t)
 	return t
 }
 
@@ -267,10 +271,6 @@ func NewTreeNode(tree *Tree) *TreeNode {
 	return &TreeNode{tree: tree}
 }
 
-func (self *TreeNode) new() *TreeNode {
-	return NewTreeNode(self.tree)
-}
-
 // AddChild adds child to TreeNode and updates keys/splits as needed
 func (self *TreeNode) AddChild(n Node) {
 	idx := self.AddChildNoCheck(n, -1)
@@ -281,7 +281,7 @@ func (self *TreeNode) AddChild(n Node) {
 	if self.childSize <= self.tree.maximumSize {
 		return
 	}
-	tn := self.new()
+	tn := self.tree.newTreeNodeCallback(self.tree)
 	for tn.childSize < self.childSize {
 		tn.AddChildNoCheck(self.popChild(-1), 0)
 	}
@@ -295,7 +295,7 @@ func (self *TreeNode) AddChild(n Node) {
 	// fmt.Printf("root - spawning children - idx was:%d\n", idx)
 	// We're root, we have to just have two new children and no
 	// content of our own
-	tn2 := self.new()
+	tn2 := self.tree.newTreeNodeCallback(self.tree)
 	for len(self.children) > 0 {
 		tn2.AddChildNoCheck(self.popChild(-1), 0)
 	}
@@ -437,22 +437,17 @@ func (self *TreeNode) searchEq(n Node) Node {
 }
 
 func (self *TreeNode) isLeafy() bool {
-	if len(self.children) == 0 {
-		return true
-	}
-	cn := self.children[0]
-	_, ok := cn.(*TreeNode)
-	if !ok {
-		return true
-	}
-	return false
+	// empty node by definition is leafy, but otherwise,
+	// if it has (first) child which is a TreeNode, it is not leafy
+	return len(self.children) == 0 || self.getChildTreeNode(0) == nil
 }
 
 func (self *TreeNode) depth() int {
-	if self.isLeafy() {
+	tn := self.getChildTreeNode(0)
+	if tn == nil {
 		return 1
 	}
-	return 1 + self.children[0].(*TreeNode).depth()
+	return 1 + tn.depth()
 }
 
 func (self *TreeNode) firstLeaf() *LeafNode {

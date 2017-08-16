@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 13:06:15 2017 mstenber
- * Last modified: Wed Aug 16 14:23:06 2017 mstenber
- * Edit time:     52 min
+ * Last modified: Wed Aug 16 14:35:10 2017 mstenber
+ * Edit time:     53 min
  *
  */
 
@@ -64,18 +64,18 @@ func TestSimple(t *testing.T) {
 	tn.AddChild(n1)
 	tn.AddChild(n2)
 	cnt := 0
-	tt.IterateLeaves(nil, func(ln *LeafNode) bool {
+	tt.IterateLeaves(nil, func(n Node) bool {
 		cnt++
 		return true
 	})
 	assert.Equal(t, cnt, 2)
 	// Iteration should stop if we return false -> just 1
-	tt.IterateLeaves(nil, func(ln *LeafNode) bool {
+	tt.IterateLeaves(nil, func(ln Node) bool {
 		assert.Equal(t, ln, tn.firstLeaf())
 		return false
 	})
 	// We should get _one_ result if we iterate non-first
-	tt.IterateLeaves(tn.firstLeaf(), func(ln *LeafNode) bool {
+	tt.IterateLeaves(tn.firstLeaf(), func(ln Node) bool {
 		assert.True(t, ln != tn.firstLeaf())
 		cnt++
 		return true

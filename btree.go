@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Aug 11 11:00:14 2017 mstenber
- * Last modified: Wed Aug 16 14:27:29 2017 mstenber
- * Edit time:     302 min
+ * Last modified: Wed Aug 16 14:34:27 2017 mstenber
+ * Edit time:     309 min
  *
  */
 
@@ -86,30 +86,6 @@ func NewLeafNode(name []byte, value interface{}) *LeafNode {
 	return n
 }
 
-func (self *LeafNode) nextLeaf(ofs int) (*LeafNode, int) {
-	// Fast common case - handle the 'has more leaves' first
-	p := self.parent
-	n := self
-	if ofs < 0 {
-		ofs = p.childIndexGE(n)
-	}
-	nofs := ofs + 1
-	if nofs < len(p.children) {
-		return p.children[nofs].(*LeafNode), nofs
-	}
-
-	// There were no leaves. So we have to recursively try to find
-	// the parent node which has next sibling.
-	for p.parent != nil {
-		sib := p.getSib(1)
-		if sib != nil {
-			return sib.firstLeaf(), 0
-		}
-		p = p.parent
-	}
-	return nil, -1
-}
-
 func (self *LeafNode) Size() int {
 	return len(self.key)
 }
@@ -154,21 +130,44 @@ func (self *Tree) Add(n Node) {
 	}
 }
 
-type LeafNodeCallback func(ln *LeafNode) bool
+type NodeCallback func(n Node) bool
 
-func (self *Tree) IterateLeaves(startAt *LeafNode, it LeafNodeCallback) {
+func (self *Tree) nextLeaf(n Node, ofs int) (Node, int) {
+	// Fast common case - handle the 'has more leaves' first
+	p := n.Parent()
+	if ofs < 0 {
+		ofs = p.childIndexGE(n)
+	}
+	nofs := ofs + 1
+	if nofs < len(p.children) {
+		return p.children[nofs], nofs
+	}
+
+	// There were no leaves. So we have to recursively try to find
+	// the parent node which has next sibling.
+	for p.parent != nil {
+		sib := p.getSib(1)
+		if sib != nil {
+			return sib.firstLeaf(), 0
+		}
+		p = p.parent
+	}
+	return nil, -1
+}
+
+func (self *Tree) IterateLeaves(startAt Node, it NodeCallback) {
 	ln := startAt
 	i := 0
 	if ln == nil {
 		ln = self.root.firstLeaf()
 	} else {
-		ln, i = ln.nextLeaf(-1)
+		ln, i = self.nextLeaf(ln, -1)
 	}
 	for ln != nil {
 		if !it(ln) {
 			return
 		}
-		ln, i = ln.nextLeaf(i)
+		ln, i = self.nextLeaf(ln, i)
 	}
 }
 
@@ -450,15 +449,14 @@ func (self *TreeNode) depth() int {
 	return 1 + tn.depth()
 }
 
-func (self *TreeNode) firstLeaf() *LeafNode {
+func (self *TreeNode) firstLeaf() Node {
 	if len(self.children) == 0 {
 		return nil
 	}
 	cn := self.children[0]
 	tn := self.tree.nodeToTreeNodeCallback(cn)
 	if tn == nil {
-		ret := cn.(*LeafNode)
-		return ret
+		return cn
 	}
 	return tn.firstLeaf()
 }

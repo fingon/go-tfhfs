@@ -4,58 +4,96 @@ syntax = "proto3";
 
 package tfhfs;
 
-message PBINodeReference {
-  int64 from_inode = 1;
-  bytes with_name = 2;
-}
+/////////////////////////////////////////////////////////////////////////////
 
-message PBINode {
-  int64 st_ino = 1;
-  int32 st_mode = 2;
-  int32 st_uid = 3;
-  int32 st_gid = 4;
-  int64 st_atime_ns = 5;
-  int64 st_ctime_ns = 6;
-  int64 st_mtime_ns = 7;
-  // dynamic: st_size, st_rdev, st_nlink,
-  // static but from elsewhere: st_blksize
+// Block layer
 
-  // In-place data
-  oneof data_or_tree_root {
-    bytes data = 10;
-    PBTreeNode data_root = 11;
-  }
+// Stored outside the raw block itself (in e.g. name)
+// - block id (= index)
+// - status
 
-  repeated PBINodeReference references = 15;
-  // ^ => st_nlinks
-
-  map<string, bytes> xattr = 100;
-
-}
-
-message PBTreeNodeChild {
-  bytes key = 1;
-  oneof inode_or_block_ids {
-    int64 inode = 2; // direntry
-    bytes file_block_id = 3; // filenode
-    bytes node_block_id = 4; // further PBTreeNode
-  }
-}
-
-message PBTreeNode {
-  bytes key = 1;
-  repeated PBTreeNodeChild children = 2;
+enum PBBlockStatus {
+  NORMAL=0; // sub-references in system, has data
+  MISSING=1; // sub-references exist, data is not
+  WANT_NORMAL=2; // no sub-references, no data
+  WEAK=3; // no sub-references in system, has data
+  WANT_WEAK=4; // no sub-references in the system, no data
 }
 
 // Header of encrypted block on disk; iv is used for AES GCM
 message PBBlock {
   int32 magic = 1;
   bytes iv = 2;
-  bytes data = 3;
+  bytes encrypted_data = 3;
 }
 
+// This is what lies inside encrypted_data
 message PBPlainBlock {
-  int32 type = 1;
-  int32 compressed = 2;
-  bytes data = 3;
+  enum Type {
+    UNSET = 0;
+    NODE = 1; // tree entry in directory/file (content) tree
+    FILE_DATA = 2; // stand-alone file data
+  }
+  Type type = 1;
+
+  enum Compressed {
+    PLAIN = 0;
+    LZ4 = 1;
+  }
+  Compressed compressed = 2;
+  bytes raw_data = 15; // either compressed or not;
+  // if type=FILE_DATA, contains raw file data
+  // if type=NODE, contains PBTreeNode (see below)
 }
+
+/////////////////////////////////////////////////////////////////////////////
+
+// Inode layer;
+
+// it consists of btree of inodes
+
+message PBINodeReference {
+  int64 from_inode = 1;
+  bytes from_key = 2; // which particular key it is (in directory)
+}
+
+message PBINode {
+  // int64 st_ino = 1;
+  // ^should be implicit; e.g. key that points to this value in the tree
+  int32 st_mode = 2;
+  int32 st_uid = 3;
+  int32 st_gid = 4;
+  int64 st_atime_ns = 5;
+  int64 st_ctime_ns = 6;
+  int64 st_mtime_ns = 7;
+  int64 st_size = 8; // moderately expensive to calculate from tree
+
+  // In-place data (small file) or nested tree (dir/larger file)
+  oneof data_or_tree_root {
+    bytes file_data = 11;
+    PBTreeNode tree_root = 12;
+  }
+
+  repeated PBINodeReference references = 15;
+  // ^ => st_nlinks: who refers to us
+
+  map<string, bytes> xattr = 100;
+
+  // dynamic: st_rdev, st_nlink,
+  // static but from elsewhere: st_blksize
+}
+
+message PBTreeNodeEntry {
+  bytes key = 1;
+  oneof inode_or_block_ids {
+    int64 inode = 2; // file in directory entry tree
+    bytes file_block_id = 3; // file data block reference
+    bytes node_block_id = 4; // subtree with given key lives here
+  }
+}
+
+message PBTreeNode {
+  // key itself is not part of node, but instead
+  // 'outside' in the entry referring to the node
+  repeated PBTreeNodeEntry entries = 1;
+};

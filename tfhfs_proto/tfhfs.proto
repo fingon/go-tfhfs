@@ -1,0 +1,111 @@
+// Protocol buffers for encoding the trees.
+
+syntax = "proto3";
+
+package tfhfs_proto;
+
+/////////////////////////////////////////////////////////////////////////////
+
+// Block layer
+
+// Stored outside the raw block itself (in e.g. name)
+// - block id (= index)
+// - status
+
+enum BlockStatus {
+  NORMAL = 0; // sub-references in system, has data
+  MISSING = 1; // sub-references exist, data is not
+  WANT_NORMAL = 2; // no sub-references, no data
+  WEAK = 3; // no sub-references in system, has data
+  WANT_WEAK = 4; // no sub-references in the system, no data
+}
+
+// Header of encrypted block on disk; iv is used for AES GCM
+message Block {
+  bytes iv = 1;
+  bytes encrypted_data = 2;
+}
+
+enum BlockType {
+  TREE_NODE = 0; // tree entry the megatree
+  FILE_EXTENT = 1; // file extent
+}
+
+enum CompressionType {
+  PLAIN = 0;
+  LZ4 = 1;
+}
+
+
+// This is what lies inside encrypted_data
+message PlainBlock {
+  BlockType block_type = 1;
+  CompressionType compression_type = 2;
+  bytes raw_data = 15; // either compressed or not;
+  // if type=FILE_EXTENT, contains raw file data
+  // if type=NODE, contains TreeNode (see below)
+}
+
+/////////////////////////////////////////////////////////////////////////////
+
+// Tree layer
+
+// It consists of btree of leaf/non-leaf nodes; each inode has one or
+// more nodes..  The design is somewhat btrfs-inspired, as it has 8
+// byte oid + 1 byte type + type-specific variable length extra bytes
+// if needed.
+
+enum NodeType {
+  // key: none, value: INodeMeta protobuf
+  META = 0;
+
+  // key: k (string->bytes), value: data (bytes)
+  XATTR = 1;
+
+  /// Directory-related data that needs to support variable length stuff
+
+  // key: teahash.name, value: 8 byte inode
+  DIR_NAME2INODE = 5;
+
+  /// Directory-related data that needs to support variable length stuff
+
+  // key: inode (dir it is in) . filename
+  FILE_INODEFILENAME = 10;
+
+  // key: 8 byte offset, value: data block id (for data @ offset)
+  FILE_OFFSET2EXTENT = 11;
+};
+
+
+message INodeMeta {
+  // int64 st_ino = 1;
+  // ^ part of key, not data
+  int32 st_mode = 2;
+  int32 st_uid = 3;
+  int32 st_gid = 4;
+  int64 st_atime_ns = 5;
+  int64 st_ctime_ns = 6;
+  int64 st_mtime_ns = 7;
+  int64 st_size = 8; // moderately expensive to calculate from tree
+  int32 st_nlink = 9;
+
+  // dynamic: st_rdev
+  // static but from elsewhere: st_blksize
+  bytes data = 15; // in-place data; max size =~ symlink size
+}
+
+message TreeNodeEntry {
+  // key of the particular entry
+  bytes key = 1;
+
+  // in leaf TreeNode, type-based content (see above). in non-leaf,
+  // subtree block referernces.
+  bytes value = 2;
+}
+
+message TreeNode {
+  // key itself is not part of node, but instead
+  // 'outside' in the entry referring to the node
+  bool leaf = 1;
+  repeated TreeNodeEntry entries = 2;
+};

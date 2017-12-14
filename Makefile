@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Aug 16 17:07:32 2017 mstenber
-# Edit time:     8 min
+# Last modified: Thu Dec 14 19:36:09 2017 mstenber
+# Edit time:     9 min
 #
 #
 
@@ -30,6 +30,6 @@ protoc: .done.protoc
 	for LINE in `cat go-get-deps.txt`; do go get -u $$LINE; done
 	touch $@
 
-.done.protoc: .done.get $(wildcard *.proto)
-	protoc --go_out=. *.proto
+.done.protoc: .done.get tfhfs_proto/$(wildcard *.proto)
+	(cd tfhfs_proto && protoc --go_out=. *.proto )
 	touch $@

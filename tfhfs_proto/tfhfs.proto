@@ -9,8 +9,19 @@ package tfhfs_proto;
 // Block layer
 
 // Stored outside the raw block itself (in e.g. name)
-// - block id (= index)
+// - block id (= index; sha256 hash of raw_data)
 // - status
+
+// need index by both as well was the raw data, so need at least:
+//
+// - 0-refcnt block ids (in key)
+//
+// - status -> block id (both in kv db key, no value)
+//
+// - block id (key) -> status + refcnt (value)
+//
+// - block id (key) ->  actual content (value = EncryptedBlock message)
+// (Simpler versions may simply be value = Block message).
 
 enum BlockStatus {
   NORMAL = 0; // sub-references in system, has data
@@ -20,10 +31,10 @@ enum BlockStatus {
   WANT_WEAK = 4; // no sub-references in the system, no data
 }
 
-// Header of encrypted block on disk; iv is used for AES GCM
-message Block {
-  bytes iv = 1;
-  bytes encrypted_data = 2;
+// Actual encrypted block on disk
+message EncryptedBlock {
+  bytes iv = 1; // used for AES GCM
+  bytes encrypted_data = 2; // AES GCM encrypted PlainBlock
 }
 
 enum BlockType {
@@ -38,7 +49,7 @@ enum CompressionType {
 
 
 // This is what lies inside encrypted_data
-message PlainBlock {
+message Block {
   BlockType block_type = 1;
   CompressionType compression_type = 2;
   bytes raw_data = 15; // either compressed or not;
@@ -56,7 +67,7 @@ message PlainBlock {
 // if needed.
 
 enum NodeType {
-  // key: none, value: INodeMeta protobuf
+  // value: INodeMeta protobuf
   META = 0;
 
   // key: k (string->bytes), value: data (bytes)

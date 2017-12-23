@@ -4,15 +4,17 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sat Dec 23 14:56:34 2017 mstenber
- * Edit time:     35 min
+ * Last modified: Sat Dec 23 21:34:31 2017 mstenber
+ * Edit time:     75 min
  *
  */
 
 package storage
 
 import (
+	"io/ioutil"
 	"log"
+	"os"
 	"testing"
 
 	"github.com/fingon/go-tfhfs/tfhfs_proto"
@@ -36,38 +38,67 @@ func TestProto(t *testing.T) {
 }
 
 func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
-	bs := factory()
-	b1 := &Block{Id: "foo", Data: "data"}
-	bs.SetNameToBlockId("name", "foo")
-	bs.StoreBlock(b1)
+	func() {
+		bs := factory()
+		log.Printf("ProdBlockBackend %v", bs)
+		defer bs.Close()
 
-	b2 := bs.GetBlockById("foo")
-	assert.Equal(t, b1, b2)
-	assert.Equal(t, b2.GetData(), "data")
-	assert.Equal(t, b2.Status, tfhfs_proto.BlockStatus_NORMAL)
+		b1 := &Block{Id: "foo", Data: "data"}
+		bs.SetInFlush(true) // enable r-w mode
+		bs.SetNameToBlockId("name", "foo")
+		bs.StoreBlock(b1)
+		bs.SetInFlush(false)
 
-	//bs.UpdateBlockStatus(b1, tfhfs_proto.BlockStatus_MISSING)
-	//assert.Equal(t, b2.Status, tfhfs_proto.BlockStatus_MISSING)
+		log.Print(" initial set")
+		b2 := bs.GetBlockById("foo")
+		log.Print(" got")
+		assert.Equal(t, b2.GetData(), "data")
+		log.Print(" data ok")
+		// ^ has to be called before the next one, as .Data isn't
+		// populated by default.
+		//assert.Equal(t, b1, b2)
+		assert.Equal(t, b2.Status, tfhfs_proto.BlockStatus_NORMAL)
 
-	bn := bs.GetBlockIdByName("name")
-	assert.Equal(t, bn, "foo")
+		//bs.UpdateBlockStatus(b1, tfhfs_proto.BlockStatus_MISSING)
+		//assert.Equal(t, b2.Status, tfhfs_proto.BlockStatus_MISSING)
 
-	bs.SetNameToBlockId("name", "")
-	bn = bs.GetBlockIdByName("name")
-	assert.Equal(t, bn, "")
+		log.Print(" get nok?")
+		bn := bs.GetBlockIdByName("name")
+		assert.Equal(t, bn, "foo")
 
-	bs = factory()
-	b3 := bs.GetBlockById("nokey")
-	assert.Nil(t, b3)
+		bs.SetInFlush(true) // enable r-w mode
+		bs.SetNameToBlockId("name", "")
+		bs.SetInFlush(false)
+		log.Print(" second set")
 
-	bs = factory()
-	bn = bs.GetBlockIdByName("noname")
-	assert.Equal(t, bn, "")
+		bn = bs.GetBlockIdByName("name")
+		assert.Equal(t, bn, "")
+	}()
 
+	func() {
+		bs := factory()
+		defer bs.Close()
+
+		b3 := bs.GetBlockById("nokey")
+		assert.Nil(t, b3)
+
+	}()
+	func() {
+		bs := factory()
+		defer bs.Close()
+
+		bn := bs.GetBlockIdByName("noname")
+		assert.Equal(t, bn, "")
+
+	}()
+	ProdStorage(t, factory)
 }
 
 func ProdStorage(t *testing.T, factory func() BlockBackend) {
 	bs := factory()
+	log.Printf("ProdStorage %v", bs)
+	defer bs.Close()
+
 	s := Storage{Backend: bs}.Init()
 	b := s.ReferOrStoreBlock("foo", "bar")
 	assert.True(t, b != nil)
@@ -82,9 +113,73 @@ func ProdStorage(t *testing.T, factory func() BlockBackend) {
 
 func TestInMemory(t *testing.T) {
 	ProdBlockBackend(t, func() BlockBackend {
-		return InMemoryBlockBackend{}.Init()
+		be := InMemoryBlockBackend{}.Init()
+		return be
 	})
-	ProdStorage(t, func() BlockBackend {
-		return InMemoryBlockBackend{}.Init()
+}
+
+func TestBadger(t *testing.T) {
+	dir, _ := ioutil.TempDir("", "badger")
+	defer os.RemoveAll(dir)
+	ProdBlockBackend(t, func() BlockBackend {
+		be := BadgerBlockBackend{}.Init(dir)
+		return be
 	})
+}
+
+func BenchmarkBadgerSet(b *testing.B) {
+	dir, _ := ioutil.TempDir("", "badger")
+	defer os.RemoveAll(dir)
+	be := BadgerBlockBackend{}.Init(dir)
+	defer be.Close()
+
+	bl := &Block{Id: "foo", Data: "data"}
+
+	b.ResetTimer()
+
+	be.SetInFlush(true)
+	for i := 0; i < b.N; i++ {
+		be.StoreBlock(bl)
+	}
+	be.SetInFlush(false)
+}
+
+func BenchmarkBadgerGet(b *testing.B) {
+	dir, _ := ioutil.TempDir("", "badger")
+	defer os.RemoveAll(dir)
+	be := BadgerBlockBackend{}.Init(dir)
+	defer be.Close()
+
+	bl := &Block{Id: "foo", Data: "data"}
+	be.SetInFlush(true)
+	be.StoreBlock(bl)
+	be.SetInFlush(false)
+	be.GetBlockById("foo")
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		be.GetBlockById("foo")
+	}
+}
+
+func BenchmarkBadgerGetData(b *testing.B) {
+	dir, _ := ioutil.TempDir("", "badger")
+	defer os.RemoveAll(dir)
+	be := BadgerBlockBackend{}.Init(dir)
+	defer be.Close()
+
+	bl := &Block{Id: "foo", Data: "data"}
+	be.SetInFlush(true)
+	be.StoreBlock(bl)
+	be.SetInFlush(false)
+
+	bl2 := be.GetBlockById("foo")
+	bl2.GetData()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		bl2.Data = ""
+		bl2.GetData()
+	}
 }

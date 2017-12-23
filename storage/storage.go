@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Sat Dec 23 15:04:26 2017 mstenber
- * Edit time:     175 min
+ * Last modified: Sat Dec 23 20:37:16 2017 mstenber
+ * Edit time:     187 min
  *
  */
 
@@ -44,6 +44,9 @@ type Block struct {
 	// block _on disk_ (or what should be on disk).
 	refCount int
 
+	// Backend this is fetched from, if any
+	backend BlockBackend
+
 	// Storage this is stored on, if any
 	storage *Storage
 
@@ -57,7 +60,11 @@ type Block struct {
 
 func (self *Block) GetData() string {
 	if self.Data == "" {
-		self.Data = self.storage.Backend.GetBlockData(self)
+		if self.backend != nil {
+			self.Data = self.backend.GetBlockData(self)
+		} else {
+			self.Data = self.storage.Backend.GetBlockData(self)
+		}
 	}
 	return self.Data
 }
@@ -128,6 +135,9 @@ func (self *Block) markDirty() {
 // BlockBackend is the shadow behind the throne; it actually
 // handles the low-level operations of blocks.
 type BlockBackend interface {
+	// Close the backend
+	Close()
+
 	// DeleteBlock removes block from storage, and it MUST exist.
 	DeleteBlock(b *Block)
 
@@ -145,6 +155,9 @@ type BlockBackend interface {
 
 	// GetBytesUsed returns number of bytes used.
 	GetBytesUsed() int
+
+	// Update inflush status
+	SetInFlush(bool)
 
 	// SetBlockIdName sets the logical name to map to particular block id.
 	SetNameToBlockId(name, block_id string)
@@ -245,7 +258,11 @@ func (self *Storage) getBlockById(id string) *Block {
 			return b
 		}
 	}
-	return self.Backend.GetBlockById(id)
+	b = self.Backend.GetBlockById(id)
+	if b != nil {
+		b.storage = self
+	}
+	return b
 }
 
 func (self *Storage) ReferBlockId(id string) {
@@ -302,6 +319,8 @@ func (self *Storage) deleteBlockIfNoExtRef(b *Block) bool {
 }
 
 func (self *Storage) Flush() int {
+	self.Backend.SetInFlush(true)
+	defer self.Backend.SetInFlush(false)
 	oops := -1
 	ops := 0
 	// _flush_names in Python prototype

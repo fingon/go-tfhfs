@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Sun Dec 24 08:56:02 2017 mstenber
- * Edit time:     84 min
+ * Last modified: Sun Dec 24 10:40:29 2017 mstenber
+ * Edit time:     87 min
  *
  */
 
@@ -81,14 +81,11 @@ func (self *BadgerBlockBackend) GetBlockById(id string) *Block {
 	if err != nil {
 		log.Fatal("get error:", err)
 	}
-	var md BadgerBlockMetadata
-	_, err = md.UnmarshalMsg(bv)
+	b := &Block{Id: id, backend: self}
+	_, err = b.BlockMetadata.UnmarshalMsg(bv)
 	if err != nil {
 		log.Fatal(err)
 	}
-	b := &Block{Id: id, backend: self,
-		refCount: md.RefCount,
-		Status:   BlockStatus(md.Status)}
 	//log.Printf("b.GetBlockById %v", r)
 	return b
 }
@@ -167,9 +164,7 @@ func (self *BadgerBlockBackend) StoreBlock(b *Block) {
 }
 
 func (self *BadgerBlockBackend) updateBlock(b *Block) {
-	md := BadgerBlockMetadata{Status: b.Status,
-		RefCount: b.refCount}
-	buf, err := md.MarshalMsg(nil)
+	buf, err := b.BlockMetadata.MarshalMsg(nil)
 	if err != nil {
 		log.Fatal(err)
 	}

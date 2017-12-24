@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sun Dec 24 08:34:38 2017 mstenber
- * Edit time:     78 min
+ * Last modified: Sun Dec 24 10:55:59 2017 mstenber
+ * Edit time:     83 min
  *
  */
 
@@ -26,7 +26,9 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 		log.Printf("ProdBlockBackend %v", bs)
 		defer bs.Close()
 
-		b1 := &Block{Id: "foo", Data: "data", Status: BlockStatus_NORMAL}
+		b1 := &Block{Id: "foo", Data: "data",
+			BlockMetadata: BlockMetadata{RefCount: 123,
+				Status: BlockStatus_NORMAL}}
 		bs.SetInFlush(true) // enable r-w mode
 		bs.SetNameToBlockId("name", "foo")
 		bs.StoreBlock(b1)
@@ -40,6 +42,7 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 		// ^ has to be called before the next one, as .Data isn't
 		// populated by default.
 		//assert.Equal(t, b1, b2)
+		assert.Equal(t, b2.RefCount, 123)
 		assert.Equal(t, b2.Status, BlockStatus_NORMAL)
 
 		//bs.UpdateBlockStatus(b1, BlockStatus_MISSING)
@@ -83,12 +86,12 @@ func ProdStorage(t *testing.T, factory func() BlockBackend) {
 	defer bs.Close()
 
 	s := Storage{Backend: bs}.Init()
-	b := s.ReferOrStoreBlock("foo", "bar")
+	b := s.ReferOrStoreBlock("k", "v")
 	assert.True(t, b != nil)
-	assert.Equal(t, b.refCount, 1)
-	b2 := s.ReferOrStoreBlock("foo", "bar")
+	assert.Equal(t, b.RefCount, 1)
+	b2 := s.ReferOrStoreBlock("k", "v")
 	assert.Equal(t, b, b2)
-	assert.Equal(t, b.refCount, 2)
+	assert.Equal(t, b.RefCount, 2)
 	assert.Equal(t, len(s.dirty_bid2block), 1)
 	s.Flush()
 	assert.Equal(t, len(s.dirty_bid2block), 0)

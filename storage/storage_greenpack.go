@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 08:37:14 2017 mstenber
- * Last modified: Sun Dec 24 08:52:40 2017 mstenber
- * Edit time:     9 min
+ * Last modified: Sun Dec 24 10:37:43 2017 mstenber
+ * Edit time:     11 min
  *
  */
 
@@ -43,7 +43,21 @@ type CompressionType byte
 type PlainBlock struct {
 	BlockType       BlockType       `zid:"0"`
 	CompressionType CompressionType `zid:"1"`
-	RawData         []byte          `zid:"2"`
+
+	// RawData is the raw data of the particular BlockType.
 	// if type=FILE_EXTENT, contains raw file data
 	// if type=NODE, contains TreeNode (see below)
+	RawData []byte `zid:"2"`
+}
+
+type BlockStatus byte
+
+type BlockMetadata struct {
+	// RefCount is the non-negative number of references to a
+	// block _on disk_ (or what should be on disk).
+	RefCount int `zid:"0"`
+
+	// Status describes the desired behavior of sub-references and
+	// availability of data of a block.
+	Status BlockStatus `zid:"1"`
 }

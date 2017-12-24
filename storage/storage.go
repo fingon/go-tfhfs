@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Sun Dec 24 08:33:34 2017 mstenber
- * Edit time:     188 min
+ * Last modified: Sun Dec 24 10:42:36 2017 mstenber
+ * Edit time:     199 min
  *
  */
 
@@ -22,6 +22,8 @@ import (
 // not allowed, and Status should be mutated only via
 // UpdateBlockStatus call of BlockStorer.
 type Block struct {
+	BlockMetadata // contains RefCount, Status
+
 	// Id contains identity of the block, derived from Data if not
 	// set.
 	Id string
@@ -34,23 +36,15 @@ type Block struct {
 	// block. Used to derive Data as needed.
 	//Node *TreeNode
 
-	// Status describes the desired behavior of sub-references and
-	// availability of data of a block.
-	Status BlockStatus
-
-	// RefCount is the non-negative number of references to a
-	// block _on disk_ (or what should be on disk).
-	refCount int
-
 	// Backend this is fetched from, if any
 	backend BlockBackend
 
 	// Storage this is stored on, if any
 	storage *Storage
 
-	// Stored version of the block, if any. Set only if something
-	// has changed locally.
-	stored *Block
+	// Stored version of the block metadata, if any. Set only if
+	// something has changed locally.
+	stored *BlockMetadata
 
 	// Time info if any
 	t time.Time
@@ -70,8 +64,8 @@ func (self *Block) GetData() string {
 func (self *Block) flush() int {
 	// self.stored MUST be set, otherwise we wouldn't be dirty!
 	ops := 0
-	if self.stored.refCount == 0 {
-		if self.refCount > 0 {
+	if self.stored.RefCount == 0 {
+		if self.RefCount > 0 {
 			self.storage.Backend.StoreBlock(self)
 			ops = ops + 1
 		} else {
@@ -111,7 +105,7 @@ func (self *Block) getCacheSize() int {
 
 func (self *Block) setRefCount(count int) {
 	self.markDirty()
-	self.refCount = count
+	self.RefCount = count
 }
 
 func (self *Block) setStatus(st BlockStatus) {
@@ -124,8 +118,8 @@ func (self *Block) markDirty() {
 	if self.stored != nil {
 		return
 	}
-	self.stored = &Block{Id: self.Id, Data: self.Data, Status: self.Status,
-		refCount: self.refCount}
+	self.stored = &BlockMetadata{Status: self.Status,
+		RefCount: self.RefCount}
 	// Add to dirty block list
 	self.storage.dirty_bid2block[self.Id] = self
 }
@@ -200,6 +194,124 @@ func (self Storage) Init() *Storage {
 	return &self
 }
 
+func (self *Storage) Flush() int {
+	self.Backend.SetInFlush(true)
+	defer self.Backend.SetInFlush(false)
+	oops := -1
+	ops := 0
+	// _flush_names in Python prototype
+	for k, v := range self.names {
+		if v.old_value != v.new_value {
+			self.Backend.SetNameToBlockId(k, v.new_value)
+			v.old_value = v.new_value
+			ops = ops + 1
+		}
+	}
+	// Main flush in Python prototype; handles deletion
+	for ops != oops {
+		oops = ops
+		s := self.referenced_refcnt0_blocks
+		if s == nil {
+			break
+		}
+		self.referenced_refcnt0_blocks = nil
+		for _, v := range s {
+			if v.RefCount == 0 && self.deleteBlockIfNoExtRef(v) {
+				ops = ops + 1
+			}
+		}
+	}
+
+	// flush_dirty_stored_blocks in Python
+	for len(self.dirty_bid2block) > 0 {
+		dirty := self.dirty_bid2block
+		self.dirty_bid2block = make(map[string]*Block)
+		nonzero_blocks := make([]*Block, 0)
+		for _, b := range dirty {
+			if b.RefCount == 0 {
+				ops = ops + b.flush()
+			} else {
+				nonzero_blocks = append(nonzero_blocks, b)
+			}
+		}
+		for _, b := range nonzero_blocks {
+			if b.RefCount > 0 {
+				ops = ops + b.flush()
+			} else {
+				// populate for subsequent round
+				self.dirty_bid2block[b.Id] = b
+			}
+		}
+	}
+
+	// end of flush in DelayedStorage in Python prototype
+	if self.maximum_cache_size > 0 && self.cache_size > self.maximum_cache_size {
+		self.shrinkCache()
+	}
+	return ops
+}
+
+func (self *Storage) GetBlockById(id string) (*Block, bool) {
+	b := self.gocBlockById(id)
+	if self.blockValid(b) {
+		return b, true
+	}
+	return nil, false
+}
+
+func (self *Storage) GetBlockIdByName(name string) string {
+	return self.getName(name).new_value
+}
+
+func (self *Storage) ReferBlockId(id string) {
+	b, ok := self.GetBlockById(id)
+	if !ok {
+		panic("block id disappeared")
+	}
+	b.setRefCount(b.RefCount + 1)
+}
+
+func (self *Storage) ReferOrStoreBlock(id, data string) *Block {
+	b, ok := self.GetBlockById(id)
+	if ok {
+		self.ReferBlockId(id)
+		return b
+	}
+	return self.StoreBlock(id, data, BlockStatus_NORMAL)
+}
+
+// ReleaseBlockId releases a block, and returns whether the block is
+// still usable or not.
+func (self *Storage) ReleaseBlockId(id string) bool {
+	b, ok := self.GetBlockById(id)
+	if !ok {
+		panic("block id disappeared")
+	}
+	b.setRefCount(b.RefCount - 1)
+	if b.RefCount == 0 {
+		if self.deleteBlockIfNoExtRef(b) {
+			return false
+		}
+	}
+	return true
+}
+
+func (self *Storage) SetNameToBlockId(name, block_id string) {
+	self.getName(name).new_value = block_id
+}
+
+func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Block {
+	b := self.gocBlockById(id)
+	b.setRefCount(1)
+	b.setStatus(status)
+	b.Data = data
+	self.cache_size = self.cache_size + b.getCacheSize()
+	self.updateBlockDataDependencies(data, true, status)
+	return b
+
+}
+
+/// Private
 func (self *Storage) gocBlockById(id string) *Block {
 	b, ok := self.cache_bid2block[id]
 	if !ok {
@@ -235,7 +347,7 @@ func (self *Storage) blockValid(b *Block) bool {
 	if b == nil {
 		return false
 	}
-	if b.refCount == 0 {
+	if b.RefCount == 0 {
 		if self.HasExternalReferencesCallback != nil && self.HasExternalReferencesCallback(b.Id) {
 			return true
 		}
@@ -263,38 +375,6 @@ func (self *Storage) getBlockById(id string) *Block {
 	return b
 }
 
-func (self *Storage) ReferBlockId(id string) {
-	b, ok := self.GetBlockById(id)
-	if !ok {
-		panic("block id disappeared")
-	}
-	b.setRefCount(b.refCount + 1)
-}
-
-func (self *Storage) GetBlockById(id string) (*Block, bool) {
-	b := self.gocBlockById(id)
-	if self.blockValid(b) {
-		return b, true
-	}
-	return nil, false
-}
-
-// ReleaseBlockId releases a block, and returns whether the block is
-// still usable or not.
-func (self *Storage) ReleaseBlockId(id string) bool {
-	b, ok := self.GetBlockById(id)
-	if !ok {
-		panic("block id disappeared")
-	}
-	b.setRefCount(b.refCount - 1)
-	if b.refCount == 0 {
-		if self.deleteBlockIfNoExtRef(b) {
-			return false
-		}
-	}
-	return true
-}
-
 func (self *Storage) deleteBlockWithDeps(b *Block) bool {
 	self.updateBlockDataDependencies(b.GetData(), false, b.Status)
 	self.Backend.DeleteBlock(b)
@@ -314,63 +394,6 @@ func (self *Storage) deleteBlockIfNoExtRef(b *Block) bool {
 		delete(self.referenced_refcnt0_blocks, b.Id)
 	}
 	return self.deleteBlockWithDeps(b)
-}
-
-func (self *Storage) Flush() int {
-	self.Backend.SetInFlush(true)
-	defer self.Backend.SetInFlush(false)
-	oops := -1
-	ops := 0
-	// _flush_names in Python prototype
-	for k, v := range self.names {
-		if v.old_value != v.new_value {
-			self.Backend.SetNameToBlockId(k, v.new_value)
-			v.old_value = v.new_value
-			ops = ops + 1
-		}
-	}
-	// Main flush in Python prototype; handles deletion
-	for ops != oops {
-		oops = ops
-		s := self.referenced_refcnt0_blocks
-		if s == nil {
-			break
-		}
-		self.referenced_refcnt0_blocks = nil
-		for _, v := range s {
-			if v.refCount == 0 && self.deleteBlockIfNoExtRef(v) {
-				ops = ops + 1
-			}
-		}
-	}
-
-	// flush_dirty_stored_blocks in Python
-	for len(self.dirty_bid2block) > 0 {
-		dirty := self.dirty_bid2block
-		self.dirty_bid2block = make(map[string]*Block)
-		nonzero_blocks := make([]*Block, 0)
-		for _, b := range dirty {
-			if b.refCount == 0 {
-				ops = ops + b.flush()
-			} else {
-				nonzero_blocks = append(nonzero_blocks, b)
-			}
-		}
-		for _, b := range nonzero_blocks {
-			if b.refCount > 0 {
-				ops = ops + b.flush()
-			} else {
-				// populate for subsequent round
-				self.dirty_bid2block[b.Id] = b
-			}
-		}
-	}
-
-	// end of flush in DelayedStorage in Python prototype
-	if self.maximum_cache_size > 0 && self.cache_size > self.maximum_cache_size {
-		self.shrinkCache()
-	}
-	return ops
 }
 
 func (self *Storage) shrinkCache() {
@@ -395,15 +418,15 @@ func (self *Storage) shrinkCache() {
 func (self *Storage) deleteCachedBlock(b *Block) {
 	delete(self.cache_bid2block, b.Id)
 	self.cache_size = self.cache_size - b.getCacheSize()
-	if b.stored.refCount == 0 {
+	if b.stored.RefCount == 0 {
 		// Locally stored, never hit disk, but references did
 		self.updateBlockDataDependencies(b.Data, false, b.Status)
 	}
 }
 
 func (self *Storage) updateBlock(b *Block) int {
-	if b.refCount == 0 {
-		if b.stored.refCount == 0 {
+	if b.RefCount == 0 {
+		if b.stored.RefCount == 0 {
 			self.deleteCachedBlock(b)
 			return 0
 		}
@@ -412,17 +435,6 @@ func (self *Storage) updateBlock(b *Block) int {
 		}
 	}
 	return self.Backend.UpdateBlock(b)
-}
-
-func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Block {
-	b := self.gocBlockById(id)
-	b.setRefCount(1)
-	b.setStatus(status)
-	b.Data = data
-	self.cache_size = self.cache_size + b.getCacheSize()
-	self.updateBlockDataDependencies(data, true, status)
-	return b
-
 }
 
 func (self *Storage) getName(name string) *oldNewStruct {
@@ -434,21 +446,4 @@ func (self *Storage) getName(name string) *oldNewStruct {
 	n = &oldNewStruct{old_value: id, new_value: id}
 	self.names[name] = n
 	return n
-}
-
-func (self *Storage) GetBlockIdByName(name string) string {
-	return self.getName(name).new_value
-}
-
-func (self *Storage) SetNameToBlockId(name, block_id string) {
-	self.getName(name).new_value = block_id
-}
-
-func (self *Storage) ReferOrStoreBlock(id, data string) *Block {
-	b, ok := self.GetBlockById(id)
-	if ok {
-		self.ReferBlockId(id)
-		return b
-	}
-	return self.StoreBlock(id, data, BlockStatus_NORMAL)
 }

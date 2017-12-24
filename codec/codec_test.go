@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 17:15:30 2017 mstenber
- * Last modified: Sun Dec 24 22:30:28 2017 mstenber
- * Edit time:     58 min
+ * Last modified: Mon Dec 25 00:58:47 2017 mstenber
+ * Edit time:     65 min
  *
  */
 
@@ -151,10 +151,13 @@ func BenchmarkCodec(b *testing.B) {
 		})
 
 	}
-	c1 := EncryptingCodec{}.Init([]byte("foo"), []byte("salt"), 64)
-	c2 := &CompressingCodec{}
-	cc := CodecChain{}.Init(c1, c2)
-	add(c1, "AES256")
-	add(c2, "Snappy")
-	add(cc, "AES+Snappy")
+	ce := EncryptingCodec{}.Init([]byte("foo"), []byte("salt"), 64)
+	cd := &CompressingCodec{}
+	c1 := &CompressingCodec{CompressionType: CompressionType_SNAPPY}
+	c2 := &CompressingCodec{CompressionType: CompressionType_ZLIB}
+	cc := CodecChain{}.Init(ce, cd)
+	add(ce, "AES256")
+	add(c1, "Snappy")
+	add(c2, "Zlib")
+	add(cc, "AES+Default")
 }

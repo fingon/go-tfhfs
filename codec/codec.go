@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 16:42:12 2017 mstenber
- * Last modified: Sun Dec 24 22:12:28 2017 mstenber
- * Edit time:     62 min
+ * Last modified: Mon Dec 25 00:58:09 2017 mstenber
+ * Edit time:     75 min
  *
  */
 
@@ -19,13 +19,17 @@
 package codec
 
 import (
+	"bytes"
+	"compress/zlib"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/sha256"
+	"io"
+	"io/ioutil"
 	"log"
 
 	"github.com/golang/snappy"
-	"github.com/minio/sha256-simd"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -89,6 +93,7 @@ func (self *EncryptingCodec) EncodeBytes(data, additionalData []byte) (ret []byt
 // result is marked to be plaintext and passed as-is (at cost of 1
 // byte).
 type CompressingCodec struct {
+	CompressionType CompressionType
 }
 
 func (self *CompressingCodec) DecodeBytes(data, additionalData []byte) (ret []byte, err error) {
@@ -102,15 +107,41 @@ func (self *CompressingCodec) DecodeBytes(data, additionalData []byte) (ret []by
 		ret = cd.RawData
 	case CompressionType_SNAPPY:
 		ret, err = snappy.Decode(nil, cd.RawData)
+	case CompressionType_ZLIB:
+		br := bytes.NewReader(cd.RawData)
+		var r io.Reader
+		r, err = zlib.NewReader(br)
+		if err != nil {
+			return
+		}
+		ret, err = ioutil.ReadAll(r)
 	}
 	return
 }
 
 func (self *CompressingCodec) EncodeBytes(data, additionalData []byte) (ret []byte, err error) {
 	var rd []byte
-	rd = snappy.Encode(nil, data)
-	ct := CompressionType_SNAPPY
-	if len(rd) > len(data) {
+	var ct CompressionType
+	switch self.CompressionType {
+	case CompressionType_ZLIB:
+		var b bytes.Buffer
+		w := zlib.NewWriter(&b)
+		w.Write(data)
+		w.Close()
+		rd = b.Bytes()
+		ct = CompressionType_ZLIB
+
+	case CompressionType_UNSET:
+		fallthrough
+	case CompressionType_SNAPPY:
+		rd = snappy.Encode(nil, data)
+		ct = CompressionType_SNAPPY
+
+	case CompressionType_PLAIN:
+		ct = CompressionType_PLAIN
+		rd = data
+	}
+	if ct != CompressionType_PLAIN && len(rd) >= len(data) {
 		ct = CompressionType_PLAIN
 		rd = data
 	}

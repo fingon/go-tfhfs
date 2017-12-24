@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 16:42:58 2017 mstenber
- * Last modified: Sun Dec 24 22:09:46 2017 mstenber
+ * Last modified: Mon Dec 25 00:37:13 2017 mstenber
  * Edit time:     4 min
  *
  */
@@ -36,6 +36,9 @@ const (
 
 	// The data is compressed with Snappy.
 	CompressionType_SNAPPY
+
+	// Golang built-in zlib
+	CompressionType_ZLIB
 )
 
 type CompressedData struct {

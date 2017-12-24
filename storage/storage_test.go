@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sun Dec 24 10:55:59 2017 mstenber
- * Edit time:     83 min
+ * Last modified: Sun Dec 24 15:54:54 2017 mstenber
+ * Edit time:     91 min
  *
  */
 
@@ -18,6 +18,7 @@ import (
 	"testing"
 
 	"github.com/stvp/assert"
+	"github.com/ugorji/go/codec"
 )
 
 func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
@@ -167,5 +168,37 @@ func BenchmarkBadgerGetData(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		bl2.Data = ""
 		bl2.GetData()
+	}
+}
+
+func BenchmarkCBORDecode(b *testing.B) {
+	var bh codec.CborHandle
+	var buf []byte
+	enc := codec.NewEncoderBytes(&buf, &bh)
+	md := BlockMetadata{}
+	if err := enc.Encode(md); err != nil {
+		log.Fatal(err)
+	}
+	// log.Printf("Encoded length: %d", len(buf))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		dec := codec.NewDecoderBytes(buf, &bh)
+		var v BlockMetadata
+		if err := dec.Decode(&v); err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkCBOREncode(b *testing.B) {
+	var bh codec.CborHandle
+	md := BlockMetadata{}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var buf []byte
+		enc := codec.NewEncoderBytes(&buf, &bh)
+		if err := enc.Encode(md); err != nil {
+			log.Fatal(err)
+		}
 	}
 }

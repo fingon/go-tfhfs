@@ -4,13 +4,14 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Sun Dec 24 08:42:15 2017 mstenber
-# Edit time:     14 min
+# Last modified: Sun Dec 24 13:26:04 2017 mstenber
+# Edit time:     15 min
 #
 #
 
 GREENPACKS=$(wildcard */*_greenpack.go)
-GREENPACK_OPTS=
+GREENPACK_OPTS=-alltuple
+# ^ remove -alltuple someday if we want to pretend to be compatible over versions
 
 all: generate
 	go test ./...

@@ -1,3 +1,5 @@
 github.com/pierrec/lz4
 github.com/stvp/assert
 github.com/glycerine/greenpack
+github.com/ugorji/codec
+

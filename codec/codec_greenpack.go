@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 16:42:58 2017 mstenber
- * Last modified: Sun Dec 24 17:33:48 2017 mstenber
+ * Last modified: Sun Dec 24 22:09:46 2017 mstenber
  * Edit time:     4 min
  *
  */
@@ -34,8 +34,8 @@ const (
 	// The data has not been compressed.
 	CompressionType_PLAIN
 
-	// The data is compressed with LZ4.
-	CompressionType_LZ4
+	// The data is compressed with Snappy.
+	CompressionType_SNAPPY
 )
 
 type CompressedData struct {

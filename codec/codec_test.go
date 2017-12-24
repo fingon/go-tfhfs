@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 17:15:30 2017 mstenber
- * Last modified: Sun Dec 24 21:46:18 2017 mstenber
- * Edit time:     50 min
+ * Last modified: Sun Dec 24 22:17:53 2017 mstenber
+ * Edit time:     57 min
  *
  */
 
@@ -77,7 +77,7 @@ func TestCompressingCodec(t *testing.T) {
 	enc, err := c.EncodeBytes(p, nil)
 	assert.Nil(t, err)
 	assert.True(t, len(enc) < len(compressible))
-	assert.Equal(t, len(enc), 29) // much less than the original ~100b
+	assert.Equal(t, len(enc), 21) // much less than the original ~100b
 }
 
 func TestNopCodecChain(t *testing.T) {
@@ -94,30 +94,31 @@ func TestCodecChain(t *testing.T) {
 	enc, err := c.EncodeBytes(p, nil)
 	assert.Nil(t, err)
 	assert.True(t, len(enc) < len(compressible))
-	assert.Equal(t, len(enc), 62) // bit less than the original ~100
+	assert.Equal(t, len(enc), 54) // bit less than the original ~100
 }
 
 func BenchmarkCodec(b *testing.B) {
 	runEncode := func(b *testing.B, c Codec, p []byte) {
+		_, err := c.EncodeBytes(p, nil)
+		if err != nil {
+			log.Panic(err)
+		}
 		b.SetBytes(int64(len(p)))
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			enc, err := c.EncodeBytes(p, nil)
-			if err != nil || enc == nil {
-				log.Panic(err)
-			}
+			c.EncodeBytes(p, nil)
 
 		}
 	}
 	runDecode := func(b *testing.B, c Codec, p []byte) {
-		b.SetBytes(int64(len(p)))
+		dec, err := c.DecodeBytes(p, nil)
+		if err != nil {
+			log.Panic(err)
+		}
+		b.SetBytes(int64(len(dec)))
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			enc, err := c.EncodeBytes(p, nil)
-			if err != nil || enc == nil {
-				log.Panic(err)
-			}
-
+			c.DecodeBytes(p, nil)
 		}
 	}
 	add := func(c Codec, prefix string) {
@@ -153,7 +154,7 @@ func BenchmarkCodec(b *testing.B) {
 	c1 := EncryptingCodec{}.Init([]byte("foo"), []byte("salt"), 64)
 	c2 := &CompressingCodec{}
 	cc := CodecChain{}.Init(c1, c2)
-	add(c1, "AES")
-	add(c2, "LZ4")
-	add(cc, "AES+LZ4")
+	add(c1, "AES256")
+	add(c2, "Snappy")
+	add(cc, "AES+Snappy")
 }

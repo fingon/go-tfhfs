@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 16:42:12 2017 mstenber
- * Last modified: Sun Dec 24 20:53:18 2017 mstenber
- * Edit time:     60 min
+ * Last modified: Sun Dec 24 22:12:28 2017 mstenber
+ * Edit time:     62 min
  *
  */
 
@@ -24,8 +24,8 @@ import (
 	"crypto/rand"
 	"log"
 
+	"github.com/golang/snappy"
 	"github.com/minio/sha256-simd"
-	"github.com/pierrec/lz4"
 	"golang.org/x/crypto/pbkdf2"
 )
 
@@ -89,14 +89,7 @@ func (self *EncryptingCodec) EncodeBytes(data, additionalData []byte) (ret []byt
 // result is marked to be plaintext and passed as-is (at cost of 1
 // byte).
 type CompressingCodec struct {
-	// maximumSize represents the largest decode we have been hit
-	// with.  By default we always allocate target buffers of that
-	// size when decoding and exponentially grow the # if we are too small.
-	maximumSize int
 }
-
-const smallestCompressionSize = 1024      // Reasonable initial #
-const largestCompressionSize = 1024000000 // Gigabyte at once is madness
 
 func (self *CompressingCodec) DecodeBytes(data, additionalData []byte) (ret []byte, err error) {
 	var cd CompressedData
@@ -107,40 +100,19 @@ func (self *CompressingCodec) DecodeBytes(data, additionalData []byte) (ret []by
 	switch cd.CompressionType {
 	case CompressionType_PLAIN:
 		ret = cd.RawData
-	case CompressionType_LZ4:
-		maximumSize := self.maximumSize
-		if maximumSize < smallestCompressionSize {
-
-			maximumSize = 1024
-		}
-		ret = make([]byte, maximumSize)
-		var n int
-		n, err = lz4.UncompressBlock(cd.RawData, ret, 0)
-		if err == lz4.ErrShortBuffer {
-			self.maximumSize = maximumSize * 2
-			if self.maximumSize > largestCompressionSize {
-				log.Panic(err)
-			}
-			return self.DecodeBytes(data, additionalData)
-		}
-		ret = ret[:n]
+	case CompressionType_SNAPPY:
+		ret, err = snappy.Decode(nil, cd.RawData)
 	}
 	return
 }
 
 func (self *CompressingCodec) EncodeBytes(data, additionalData []byte) (ret []byte, err error) {
-	rd := make([]byte, len(data))
-	var n int
-	n, err = lz4.CompressBlock(data, rd, 0)
-	if err != nil {
-		return
-	}
-	ct := CompressionType_LZ4
-	if n == 0 {
+	var rd []byte
+	rd = snappy.Encode(nil, data)
+	ct := CompressionType_SNAPPY
+	if len(rd) > len(data) {
 		ct = CompressionType_PLAIN
 		rd = data
-	} else {
-		rd = rd[:n]
 	}
 	cd := CompressedData{CompressionType: ct, RawData: rd}
 	ret, err = cd.MarshalMsg(nil)

@@ -4,13 +4,14 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 08:37:14 2017 mstenber
- * Last modified: Sun Dec 24 10:37:43 2017 mstenber
- * Edit time:     11 min
+ * Last modified: Sun Dec 24 13:23:07 2017 mstenber
+ * Edit time:     17 min
  *
  */
 
-// These structs are used by Storage
-// see const.go for types used here.
+// These structs are used by Storage that are actually persisted to
+// disk.
+
 package storage
 
 /////////////////////////////////////////////////////////////////////////////
@@ -33,24 +34,68 @@ package storage
 // (Simpler versions may simply be value = Block message).
 
 type EncryptedBlock struct {
-	IV            []byte `zid:"0"` // used for AES GCM
-	EncryptedData []byte `zid:"1"` // AES GCM encrypted PlainBlock
+	// IV used for AES GCM
+	IV []byte `zid:"0"`
+
+	// EncryptedData is AES GCM encrypted PlainBlock
+	EncryptedData []byte `zid:"1"`
 }
 
 type BlockType byte
+
+const (
+	BlockType_UNSET BlockType = iota
+
+	// TreeNode struct encoded within
+	BlockType_TREE_NODE
+
+	// Raw file data encoded within
+	BlockType_FILE_EXTENT
+)
+
 type CompressionType byte
 
+const (
+	CompressionType_UNSET CompressionType = iota
+
+	// The data has not been compressed.
+	CompressionType_PLAIN
+
+	// The data is compressed with LZ4.
+	CompressionType_LZ4
+)
+
 type PlainBlock struct {
-	BlockType       BlockType       `zid:"0"`
+	// BlockType describes the type of data within.
+	BlockType BlockType `zid:"0"`
+
+	// CompressionType describes how the data has been compressed.
 	CompressionType CompressionType `zid:"1"`
 
 	// RawData is the raw data of the particular BlockType.
-	// if type=FILE_EXTENT, contains raw file data
-	// if type=NODE, contains TreeNode (see below)
 	RawData []byte `zid:"2"`
 }
 
 type BlockStatus byte
+
+const (
+	BlockStatus_UNSET BlockStatus = iota
+
+	// Has references on based on data, data present
+	BlockStatus_NORMAL
+
+	// Has references on based on data, data gone
+	BlockStatus_MISSING
+
+	// No references on based on data, no data
+	BlockStatus_WANT_NORMAL
+
+	// No references on based on data, data present
+	BlockStatus_WEAK
+
+	// No references on based on data, no data
+	BlockStatus_WANT_WEAK
+)
 
 type BlockMetadata struct {
 	// RefCount is the non-negative number of references to a

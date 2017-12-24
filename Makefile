@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Sun Dec 24 21:19:20 2017 mstenber
-# Edit time:     24 min
+# Last modified: Sun Dec 24 22:24:00 2017 mstenber
+# Edit time:     28 min
 #
 #
 
@@ -17,22 +17,18 @@ SUBDIRS=btree codec storage
 
 all: generate test
 
-bench:
+bench: .done.buildable
 	go test ./... -bench .
 
-clean:
-	rm -rf .done.* *.pb.go
+get: .done.getprebuild
 
-get: .done.get
-
-generate: .done.greenpack
+generate: .done.buildable
 
 html-cover-%: .done.cover.%
 	go tool cover -html=$<
 
-test: generate
+test: .done.buildable
 	go test ./...
-
 
 update-deps:
 	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -u . ); done
@@ -41,15 +37,21 @@ update-deps:
 .done.cover.%: $(wildcard %/*.go)
 	(cd $* && go test . -coverprofile=../$@)
 
-.done.get: go-get-deps.txt
-	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get . ); done
+.done.getprebuild: go-get-deps.txt
 	for LINE in `cat go-get-deps.txt`; do go get $$LINE; done
 	touch $@
+
+.done.get2: $(wildcard %/*.go)
+	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get . ); done
+	touch $@
+
 
 #.done.protoc: .done.get tfhfs_proto/$(wildcard *.proto)
 #	(cd tfhfs_proto && protoc --go_out=. *.proto )
 #	touch $@
 
-.done.greenpack: .done.get $(GREENPACKS)
+.done.greenpack: .done.getprebuild $(GREENPACKS)
 	for FILE in $(GREENPACKS); do greenpack $(GREENPACK_OPTS) -file $$FILE ; done
 	touch $@
+
+.done.buildable: .done.greenpack .done.get2

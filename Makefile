@@ -4,14 +4,16 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Sun Dec 24 13:26:04 2017 mstenber
-# Edit time:     15 min
+# Last modified: Sun Dec 24 21:09:48 2017 mstenber
+# Edit time:     17 min
 #
 #
 
 GREENPACKS=$(wildcard */*_greenpack.go)
 GREENPACK_OPTS=-alltuple
 # ^ remove -alltuple someday if we want to pretend to be compatible over versions
+
+SUBDIRS=btree codec storage
 
 all: generate
 	go test ./...
@@ -30,8 +32,13 @@ get: .done.get
 generate: .done.greenpack
 
 .done.get: go-get-deps.txt
-	for LINE in `cat go-get-deps.txt`; do go get -u $$LINE; done
+	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get . ); done
+	for LINE in `cat go-get-deps.txt`; do go get $$LINE; done
 	touch $@
+
+update-deps:
+	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -u . ); done
+	for LINE in `cat go-get-deps.txt`; do go get -u $$LINE; done
 
 #.done.protoc: .done.get tfhfs_proto/$(wildcard *.proto)
 #	(cd tfhfs_proto && protoc --go_out=. *.proto )

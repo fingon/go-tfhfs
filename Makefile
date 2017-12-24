@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Sun Dec 24 21:18:09 2017 mstenber
-# Edit time:     23 min
+# Last modified: Sun Dec 24 21:19:20 2017 mstenber
+# Edit time:     24 min
 #
 #
 
@@ -15,8 +15,10 @@ GREENPACK_OPTS=-alltuple
 
 SUBDIRS=btree codec storage
 
-all: generate
-	go test ./...
+all: generate test
+
+bench:
+	go test ./... -bench .
 
 clean:
 	rm -rf .done.* *.pb.go
@@ -27,6 +29,10 @@ generate: .done.greenpack
 
 html-cover-%: .done.cover.%
 	go tool cover -html=$<
+
+test: generate
+	go test ./...
+
 
 update-deps:
 	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -u . ); done
@@ -44,6 +50,6 @@ update-deps:
 #	(cd tfhfs_proto && protoc --go_out=. *.proto )
 #	touch $@
 
-.done.greenpack: $(GREENPACKS)
+.done.greenpack: .done.get $(GREENPACKS)
 	for FILE in $(GREENPACKS); do greenpack $(GREENPACK_OPTS) -file $$FILE ; done
 	touch $@

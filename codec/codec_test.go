@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 17:15:30 2017 mstenber
- * Last modified: Sun Dec 24 22:17:53 2017 mstenber
- * Edit time:     57 min
+ * Last modified: Sun Dec 24 22:30:28 2017 mstenber
+ * Edit time:     58 min
  *
  */
 
@@ -132,7 +132,7 @@ func BenchmarkCodec(b *testing.B) {
 		b.Run(l1, func(b *testing.B) {
 			runEncode(b, c, p1)
 		})
-		l1d := fmt.Sprintf("Encode-%s-%s", prefix, "Random")
+		l1d := fmt.Sprintf("Decode-%s-%s", prefix, "Random")
 		p1e, _ := c.EncodeBytes(p1, nil)
 		b.Run(l1d, func(b *testing.B) {
 			runDecode(b, c, p1e)

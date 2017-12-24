@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 17:15:30 2017 mstenber
- * Last modified: Sun Dec 24 18:18:15 2017 mstenber
- * Edit time:     22 min
+ * Last modified: Sun Dec 24 18:30:37 2017 mstenber
+ * Edit time:     27 min
  *
  */
 
@@ -16,6 +16,8 @@ import (
 
 	"github.com/stvp/assert"
 )
+
+const compressible = "123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789"
 
 func ProdCodecOnce(text string, c Codec, t *testing.T) {
 	p := []byte(text)
@@ -29,7 +31,7 @@ func ProdCodecOnce(text string, c Codec, t *testing.T) {
 
 func ProdCodec(c Codec, t *testing.T) {
 	ProdCodecOnce("foo", c, t)
-	ProdCodecOnce("123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789123456789", c, t)
+	ProdCodecOnce(compressible, c, t)
 }
 
 func TestEncryptingCodec(t *testing.T) {
@@ -67,10 +69,16 @@ func TestEncryptingCodec(t *testing.T) {
 func TestCompressingCodec(t *testing.T) {
 	c := &CompressingCodec{}
 	ProdCodec(c, t)
+
+	p := []byte(compressible)
+	enc, err := c.EncodeBytes(p, nil)
+	assert.Nil(t, err)
+	assert.True(t, len(enc) < len(compressible))
+	assert.Equal(t, len(enc), 29) // much less than the original ~100b
 }
 
 func TestNopCodecChain(t *testing.T) {
-	c := CodecChain{}.Init([]Codec{})
+	c := &CodecChain{}
 	ProdCodec(c, t)
 }
 func TestCodecChain(t *testing.T) {
@@ -78,4 +86,10 @@ func TestCodecChain(t *testing.T) {
 	c2 := &CompressingCodec{}
 	c := CodecChain{}.Init([]Codec{c1, c2})
 	ProdCodec(c, t)
+
+	p := []byte(compressible)
+	enc, err := c.EncodeBytes(p, nil)
+	assert.Nil(t, err)
+	assert.True(t, len(enc) < len(compressible))
+	assert.Equal(t, len(enc), 62) // bit less than the original ~100
 }

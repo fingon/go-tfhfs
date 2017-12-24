@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 16:42:12 2017 mstenber
- * Last modified: Sun Dec 24 18:21:56 2017 mstenber
- * Edit time:     56 min
+ * Last modified: Sun Dec 24 18:31:01 2017 mstenber
+ * Edit time:     58 min
  *
  */
 
@@ -151,6 +151,10 @@ type CodecChain struct {
 	codecs, reverseCodecs []Codec
 }
 
+// Init method initializes the codec chain.
+//
+// codecs are given in decryption order, so e.g.
+// encrypting one should be given before compressing one.
 func (self CodecChain) Init(codecs []Codec) *CodecChain {
 	self.codecs = codecs
 	// Reverse the codec slice for decryption purposes
@@ -164,7 +168,7 @@ func (self CodecChain) Init(codecs []Codec) *CodecChain {
 
 func (self *CodecChain) DecodeBytes(data, additionalData []byte) (ret []byte, err error) {
 	ret = data
-	for _, c := range self.reverseCodecs {
+	for _, c := range self.codecs {
 		ret, err = c.DecodeBytes(data, additionalData)
 		if err != nil {
 			return
@@ -176,7 +180,7 @@ func (self *CodecChain) DecodeBytes(data, additionalData []byte) (ret []byte, er
 
 func (self *CodecChain) EncodeBytes(data, additionalData []byte) (ret []byte, err error) {
 	ret = data
-	for _, c := range self.codecs {
+	for _, c := range self.reverseCodecs {
 		ret, err = c.EncodeBytes(data, additionalData)
 		if err != nil {
 			return

@@ -1,3 +1,5 @@
 coverage.out
 .done.*
 *.pb.go
+*_gen.go
+*_gen_test.go

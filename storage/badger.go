@@ -4,16 +4,14 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Sat Dec 23 21:46:44 2017 mstenber
- * Edit time:     75 min
+ * Last modified: Sun Dec 24 08:17:14 2017 mstenber
+ * Edit time:     83 min
  *
  */
 
 package storage
 
 import (
-	"bytes"
-	"encoding/binary"
 	"log"
 
 	"github.com/dgraph-io/badger"
@@ -27,11 +25,6 @@ import (
 type BadgerBlockBackend struct {
 	db  *badger.DB
 	txn *badger.Txn
-}
-
-type BadgerBlockMetadata struct {
-	refCount int
-	Status   tfhfs_proto.BlockStatus
 }
 
 var _ BlockBackend = &BadgerBlockBackend{}
@@ -89,18 +82,14 @@ func (self *BadgerBlockBackend) GetBlockById(id string) *Block {
 	if err != nil {
 		log.Fatal("get error:", err)
 	}
-	buf := bytes.NewBuffer(bv)
-	b := &Block{Id: id, backend: self}
-	i, err := binary.ReadVarint(buf)
+	var md BadgerBlockMetadata
+	_, err = md.UnmarshalMsg(bv)
 	if err != nil {
-		log.Fatal("read-ref", err)
+		log.Fatal(err)
 	}
-	b.refCount = int(i)
-	i, err = binary.ReadVarint(buf)
-	if err != nil {
-		log.Fatal("read-st", err)
-	}
-	b.Status = tfhfs_proto.BlockStatus(i)
+	b := &Block{Id: id, backend: self,
+		refCount: md.RefCount,
+		Status:   tfhfs_proto.BlockStatus(md.Status)}
 	//log.Printf("b.GetBlockById %v", r)
 	return b
 }
@@ -179,10 +168,12 @@ func (self *BadgerBlockBackend) StoreBlock(b *Block) {
 }
 
 func (self *BadgerBlockBackend) updateBlock(b *Block) {
-	buf := make([]byte, binary.MaxVarintLen64*2)
-	n1 := binary.PutVarint(buf, int64(b.refCount))
-	n2 := binary.PutVarint(buf[n1:], int64(b.Status))
-	buf = buf[:(n1 + n2)]
+	md := BadgerBlockMetadata{Status: byte(b.Status),
+		RefCount: b.refCount}
+	buf, err := md.MarshalMsg(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
 	self.setKKValue([]byte("1"), []byte(b.Id), buf)
 }
 

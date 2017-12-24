@@ -4,17 +4,20 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Sun Dec 24 10:42:36 2017 mstenber
- * Edit time:     199 min
+ * Last modified: Sun Dec 24 20:59:12 2017 mstenber
+ * Edit time:     243 min
  *
  */
 
 package storage
 
 import (
+	"log"
 	"sort"
 	"time"
 	"unsafe"
+
+	"github.com/fingon/go-tfhfs/codec"
 )
 
 // Block is externally usable read-only structure that is handled
@@ -28,8 +31,10 @@ type Block struct {
 	// set.
 	Id string
 
-	// Actually encoded plaintext data (if available; GetData()
-	// should be used to get it always)
+	// Actually plaintext data (if available; GetData() should be
+	// used to get it always). Backends should use
+	// GetCodecData() when writing things to disk and
+	// SetCodecData() when loading from disk.
 	Data string
 
 	// Node is the actual btree node encoded within this
@@ -55,10 +60,35 @@ func (self *Block) GetData() string {
 		if self.backend != nil {
 			self.Data = self.backend.GetBlockData(self)
 		} else {
-			self.Data = self.storage.Backend.GetBlockData(self)
+			data := self.storage.Backend.GetBlockData(self)
+			self.SetCodecData(data)
 		}
 	}
 	return self.Data
+}
+
+func (self *Block) GetCodecData() string {
+	data := self.GetData()
+	if self.storage == nil {
+		return data
+	}
+	b, err := self.storage.Codec.EncodeBytes([]byte(data), []byte(self.Id))
+	if err != nil {
+		log.Panic("Encoding failed", err)
+	}
+	return string(b)
+}
+
+func (self *Block) SetCodecData(s string) {
+	if self.storage == nil {
+		self.Data = s
+		return
+	}
+	b, err := self.storage.Codec.DecodeBytes([]byte(s), []byte(self.Id))
+	if err != nil {
+		log.Panic("Decoding failed", err)
+	}
+	self.Data = string(b)
 }
 
 func (self *Block) flush() int {
@@ -172,6 +202,7 @@ type Storage struct {
 	Backend                       BlockBackend
 	IterateReferencesCallback     BlockIterateReferencesCallback
 	HasExternalReferencesCallback BlockHasExternalReferencesCallback
+	Codec                         codec.Codec
 
 	// Map of block id => block for dirty blocks.
 	dirty_bid2block map[string]*Block
@@ -191,6 +222,10 @@ func (self Storage) Init() *Storage {
 	self.dirty_bid2block = make(map[string]*Block)
 	self.cache_bid2block = make(map[string]*Block)
 	self.names = make(map[string]*oldNewStruct)
+	// No need to special case Codec = nil elsewhere with this
+	if self.Codec == nil {
+		self.Codec = &codec.CodecChain{}
+	}
 	return &self
 }
 
@@ -280,20 +315,14 @@ func (self *Storage) ReferOrStoreBlock(id, data string) *Block {
 	return self.StoreBlock(id, data, BlockStatus_NORMAL)
 }
 
-// ReleaseBlockId releases a block, and returns whether the block is
-// still usable or not.
-func (self *Storage) ReleaseBlockId(id string) bool {
+// ReleaseBlockId will eventually release block (in Flush), if its
+// refcnt is zero.
+func (self *Storage) ReleaseBlockId(id string) {
 	b, ok := self.GetBlockById(id)
 	if !ok {
 		panic("block id disappeared")
 	}
 	b.setRefCount(b.RefCount - 1)
-	if b.RefCount == 0 {
-		if self.deleteBlockIfNoExtRef(b) {
-			return false
-		}
-	}
-	return true
 }
 
 func (self *Storage) SetNameToBlockId(name, block_id string) {

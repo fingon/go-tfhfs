@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 16:42:12 2017 mstenber
- * Last modified: Sun Dec 24 18:31:01 2017 mstenber
- * Edit time:     58 min
+ * Last modified: Sun Dec 24 20:53:18 2017 mstenber
+ * Edit time:     60 min
  *
  */
 
@@ -155,7 +155,7 @@ type CodecChain struct {
 //
 // codecs are given in decryption order, so e.g.
 // encrypting one should be given before compressing one.
-func (self CodecChain) Init(codecs []Codec) *CodecChain {
+func (self CodecChain) Init(codecs ...Codec) *CodecChain {
 	self.codecs = codecs
 	// Reverse the codec slice for decryption purposes
 	rc := make([]Codec, len(codecs))

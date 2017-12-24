@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sun Dec 24 15:54:54 2017 mstenber
- * Edit time:     91 min
+ * Last modified: Sun Dec 24 20:57:56 2017 mstenber
+ * Edit time:     100 min
  *
  */
 
@@ -17,8 +17,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/fingon/go-tfhfs/codec"
 	"github.com/stvp/assert"
-	"github.com/ugorji/go/codec"
 )
 
 func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
@@ -81,12 +81,7 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 	ProdStorage(t, factory)
 }
 
-func ProdStorage(t *testing.T, factory func() BlockBackend) {
-	bs := factory()
-	log.Printf("ProdStorage %v", bs)
-	defer bs.Close()
-
-	s := Storage{Backend: bs}.Init()
+func ProdStorageOne(t *testing.T, s *Storage) {
 	b := s.ReferOrStoreBlock("k", "v")
 	assert.True(t, b != nil)
 	assert.Equal(t, b.RefCount, 1)
@@ -96,6 +91,25 @@ func ProdStorage(t *testing.T, factory func() BlockBackend) {
 	assert.Equal(t, len(s.dirty_bid2block), 1)
 	s.Flush()
 	assert.Equal(t, len(s.dirty_bid2block), 0)
+
+	s.ReleaseBlockId("k")
+	s.ReleaseBlockId("k")
+	s.Flush()
+
+}
+
+func ProdStorage(t *testing.T, factory func() BlockBackend) {
+	bs := factory()
+	log.Printf("ProdStorage %v", bs)
+	defer bs.Close()
+
+	s := Storage{Backend: bs}.Init()
+	ProdStorageOne(t, s)
+
+	c := codec.CodecChain{}.Init(&codec.CompressingCodec{})
+	s2 := Storage{Backend: bs, Codec: c}.Init()
+	ProdStorageOne(t, s2)
+
 }
 
 func TestInMemory(t *testing.T) {
@@ -168,37 +182,5 @@ func BenchmarkBadgerGetData(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		bl2.Data = ""
 		bl2.GetData()
-	}
-}
-
-func BenchmarkCBORDecode(b *testing.B) {
-	var bh codec.CborHandle
-	var buf []byte
-	enc := codec.NewEncoderBytes(&buf, &bh)
-	md := BlockMetadata{}
-	if err := enc.Encode(md); err != nil {
-		log.Fatal(err)
-	}
-	// log.Printf("Encoded length: %d", len(buf))
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		dec := codec.NewDecoderBytes(buf, &bh)
-		var v BlockMetadata
-		if err := dec.Decode(&v); err != nil {
-			log.Fatal(err)
-		}
-	}
-}
-
-func BenchmarkCBOREncode(b *testing.B) {
-	var bh codec.CborHandle
-	md := BlockMetadata{}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		var buf []byte
-		enc := codec.NewEncoderBytes(&buf, &bh)
-		if err := enc.Encode(md); err != nil {
-			log.Fatal(err)
-		}
 	}
 }

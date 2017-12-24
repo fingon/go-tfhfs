@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 17:15:30 2017 mstenber
- * Last modified: Sun Dec 24 18:30:37 2017 mstenber
- * Edit time:     27 min
+ * Last modified: Sun Dec 24 20:53:36 2017 mstenber
+ * Edit time:     28 min
  *
  */
 
@@ -84,7 +84,7 @@ func TestNopCodecChain(t *testing.T) {
 func TestCodecChain(t *testing.T) {
 	c1 := EncryptingCodec{}.Init([]byte("foo"), []byte("salt"), 64)
 	c2 := &CompressingCodec{}
-	c := CodecChain{}.Init([]Codec{c1, c2})
+	c := CodecChain{}.Init(c1, c2)
 	ProdCodec(c, t)
 
 	p := []byte(compressible)

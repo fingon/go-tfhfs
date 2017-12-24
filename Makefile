@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Sun Dec 24 22:24:00 2017 mstenber
-# Edit time:     28 min
+# Last modified: Mon Dec 25 01:27:18 2017 mstenber
+# Edit time:     29 min
 #
 #
 
@@ -45,10 +45,6 @@ update-deps:
 	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get . ); done
 	touch $@
 
-
-#.done.protoc: .done.get tfhfs_proto/$(wildcard *.proto)
-#	(cd tfhfs_proto && protoc --go_out=. *.proto )
-#	touch $@
 
 .done.greenpack: .done.getprebuild $(GREENPACKS)
 	for FILE in $(GREENPACKS); do greenpack $(GREENPACK_OPTS) -file $$FILE ; done

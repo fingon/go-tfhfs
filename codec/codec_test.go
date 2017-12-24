@@ -4,14 +4,17 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 17:15:30 2017 mstenber
- * Last modified: Sun Dec 24 20:53:36 2017 mstenber
- * Edit time:     28 min
+ * Last modified: Sun Dec 24 21:46:18 2017 mstenber
+ * Edit time:     50 min
  *
  */
 
 package codec
 
 import (
+	"crypto/rand"
+	"fmt"
+	"log"
 	"testing"
 
 	"github.com/stvp/assert"
@@ -92,4 +95,65 @@ func TestCodecChain(t *testing.T) {
 	assert.Nil(t, err)
 	assert.True(t, len(enc) < len(compressible))
 	assert.Equal(t, len(enc), 62) // bit less than the original ~100
+}
+
+func BenchmarkCodec(b *testing.B) {
+	runEncode := func(b *testing.B, c Codec, p []byte) {
+		b.SetBytes(int64(len(p)))
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			enc, err := c.EncodeBytes(p, nil)
+			if err != nil || enc == nil {
+				log.Panic(err)
+			}
+
+		}
+	}
+	runDecode := func(b *testing.B, c Codec, p []byte) {
+		b.SetBytes(int64(len(p)))
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			enc, err := c.EncodeBytes(p, nil)
+			if err != nil || enc == nil {
+				log.Panic(err)
+			}
+
+		}
+	}
+	add := func(c Codec, prefix string) {
+		// Compressed
+		l1 := fmt.Sprintf("Encode-%s-%s", prefix, "Random")
+		p1 := make([]byte, 1024)
+		_, err := rand.Read(p1)
+		if err != nil {
+			log.Panic(err)
+		}
+		b.Run(l1, func(b *testing.B) {
+			runEncode(b, c, p1)
+		})
+		l1d := fmt.Sprintf("Encode-%s-%s", prefix, "Random")
+		p1e, _ := c.EncodeBytes(p1, nil)
+		b.Run(l1d, func(b *testing.B) {
+			runDecode(b, c, p1e)
+		})
+
+		// Zero hero variant
+		l2 := fmt.Sprintf("Encode-%s-%s", prefix, "Zeros")
+		p2 := make([]byte, 1024)
+		b.Run(l2, func(b *testing.B) {
+			runEncode(b, c, p2)
+		})
+		l2d := fmt.Sprintf("Decode-%s-%s", prefix, "Zeros")
+		p2e, _ := c.EncodeBytes(p2, nil)
+		b.Run(l2d, func(b *testing.B) {
+			runDecode(b, c, p2e)
+		})
+
+	}
+	c1 := EncryptingCodec{}.Init([]byte("foo"), []byte("salt"), 64)
+	c2 := &CompressingCodec{}
+	cc := CodecChain{}.Init(c1, c2)
+	add(c1, "AES")
+	add(c2, "LZ4")
+	add(cc, "AES+LZ4")
 }

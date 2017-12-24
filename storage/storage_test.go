@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sat Dec 23 21:34:31 2017 mstenber
- * Edit time:     75 min
+ * Last modified: Sun Dec 24 08:34:38 2017 mstenber
+ * Edit time:     78 min
  *
  */
 
@@ -17,25 +17,8 @@ import (
 	"os"
 	"testing"
 
-	"github.com/fingon/go-tfhfs/tfhfs_proto"
-	"github.com/golang/protobuf/proto"
 	"github.com/stvp/assert"
 )
-
-func TestProto(t *testing.T) {
-	n := &tfhfs_proto.TreeNodeEntry{Key: []byte("foo")}
-	data, err := proto.Marshal(n)
-	if err != nil {
-		log.Fatal("marshaling error: ", err)
-	}
-	n2 := &tfhfs_proto.TreeNodeEntry{}
-	err = proto.Unmarshal(data, n2)
-	if err != nil {
-		log.Fatal("unmarshaling error: ", err)
-	}
-	assert.Equal(t, n.Key, n2.Key)
-	assert.True(t, proto.Equal(n, n2))
-}
 
 func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 	func() {
@@ -43,7 +26,7 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 		log.Printf("ProdBlockBackend %v", bs)
 		defer bs.Close()
 
-		b1 := &Block{Id: "foo", Data: "data"}
+		b1 := &Block{Id: "foo", Data: "data", Status: BlockStatus_NORMAL}
 		bs.SetInFlush(true) // enable r-w mode
 		bs.SetNameToBlockId("name", "foo")
 		bs.StoreBlock(b1)
@@ -57,10 +40,10 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 		// ^ has to be called before the next one, as .Data isn't
 		// populated by default.
 		//assert.Equal(t, b1, b2)
-		assert.Equal(t, b2.Status, tfhfs_proto.BlockStatus_NORMAL)
+		assert.Equal(t, b2.Status, BlockStatus_NORMAL)
 
-		//bs.UpdateBlockStatus(b1, tfhfs_proto.BlockStatus_MISSING)
-		//assert.Equal(t, b2.Status, tfhfs_proto.BlockStatus_MISSING)
+		//bs.UpdateBlockStatus(b1, BlockStatus_MISSING)
+		//assert.Equal(t, b2.Status, BlockStatus_MISSING)
 
 		log.Print(" get nok?")
 		bn := bs.GetBlockIdByName("name")

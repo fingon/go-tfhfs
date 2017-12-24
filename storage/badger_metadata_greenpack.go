@@ -4,14 +4,16 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 07:49:51 2017 mstenber
- * Last modified: Sun Dec 24 08:16:47 2017 mstenber
- * Edit time:     2 min
+ * Last modified: Sun Dec 24 08:55:17 2017 mstenber
+ * Edit time:     3 min
  *
  */
 
 package storage
 
+type BlockStatus byte
+
 type BadgerBlockMetadata struct {
-	RefCount int  `zid:"0"`
-	Status   byte `zid:"1"`
+	RefCount int         `zid:"0"`
+	Status   BlockStatus `zid:"1"`
 }

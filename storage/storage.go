@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Sat Dec 23 20:37:16 2017 mstenber
- * Edit time:     187 min
+ * Last modified: Sun Dec 24 08:33:34 2017 mstenber
+ * Edit time:     188 min
  *
  */
 
@@ -15,8 +15,6 @@ import (
 	"sort"
 	"time"
 	"unsafe"
-
-	"github.com/fingon/go-tfhfs/tfhfs_proto"
 )
 
 // Block is externally usable read-only structure that is handled
@@ -38,7 +36,7 @@ type Block struct {
 
 	// Status describes the desired behavior of sub-references and
 	// availability of data of a block.
-	Status tfhfs_proto.BlockStatus
+	Status BlockStatus
 
 	// RefCount is the non-negative number of references to a
 	// block _on disk_ (or what should be on disk).
@@ -92,11 +90,11 @@ func (self *Block) flush() int {
 
 func (self *Block) flushStatus() {
 	// self.stored.status != self.status
-	if self.Status == tfhfs_proto.BlockStatus_MISSING {
+	if self.Status == BlockStatus_MISSING {
 		// old type = NORMAL
 		return
 	}
-	if self.Status == tfhfs_proto.BlockStatus_WANT_WEAK {
+	if self.Status == BlockStatus_WANT_WEAK {
 		// old type = WEAK
 		return
 	}
@@ -116,7 +114,7 @@ func (self *Block) setRefCount(count int) {
 	self.refCount = count
 }
 
-func (self *Block) setStatus(st tfhfs_proto.BlockStatus) {
+func (self *Block) setStatus(st BlockStatus) {
 	self.markDirty()
 	self.Status = st
 
@@ -216,9 +214,9 @@ func (self *Storage) gocBlockById(id string) *Block {
 	return b
 }
 
-func (self *Storage) updateBlockDataDependencies(data string, add bool, st tfhfs_proto.BlockStatus) {
+func (self *Storage) updateBlockDataDependencies(data string, add bool, st BlockStatus) {
 	// No sub-references
-	if st >= tfhfs_proto.BlockStatus_WANT_NORMAL {
+	if st >= BlockStatus_WANT_NORMAL {
 		return
 	}
 	if self.IterateReferencesCallback == nil {
@@ -416,7 +414,7 @@ func (self *Storage) updateBlock(b *Block) int {
 	return self.Backend.UpdateBlock(b)
 }
 
-func (self *Storage) StoreBlock(id string, data string, status tfhfs_proto.BlockStatus) *Block {
+func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Block {
 	b := self.gocBlockById(id)
 	b.setRefCount(1)
 	b.setStatus(status)
@@ -452,5 +450,5 @@ func (self *Storage) ReferOrStoreBlock(id, data string) *Block {
 		self.ReferBlockId(id)
 		return b
 	}
-	return self.StoreBlock(id, data, tfhfs_proto.BlockStatus_NORMAL)
+	return self.StoreBlock(id, data, BlockStatus_NORMAL)
 }

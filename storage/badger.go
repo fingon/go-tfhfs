@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Sun Dec 24 08:17:14 2017 mstenber
- * Edit time:     83 min
+ * Last modified: Sun Dec 24 08:56:02 2017 mstenber
+ * Edit time:     84 min
  *
  */
 
@@ -15,7 +15,6 @@ import (
 	"log"
 
 	"github.com/dgraph-io/badger"
-	"github.com/fingon/go-tfhfs/tfhfs_proto"
 )
 
 // BadgerBlockBackend provides on-disk storage.
@@ -89,7 +88,7 @@ func (self *BadgerBlockBackend) GetBlockById(id string) *Block {
 	}
 	b := &Block{Id: id, backend: self,
 		refCount: md.RefCount,
-		Status:   tfhfs_proto.BlockStatus(md.Status)}
+		Status:   BlockStatus(md.Status)}
 	//log.Printf("b.GetBlockById %v", r)
 	return b
 }
@@ -168,7 +167,7 @@ func (self *BadgerBlockBackend) StoreBlock(b *Block) {
 }
 
 func (self *BadgerBlockBackend) updateBlock(b *Block) {
-	md := BadgerBlockMetadata{Status: byte(b.Status),
+	md := BadgerBlockMetadata{Status: b.Status,
 		RefCount: b.refCount}
 	buf, err := md.MarshalMsg(nil)
 	if err != nil {

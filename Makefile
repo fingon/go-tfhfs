@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Sun Dec 24 08:19:23 2017 mstenber
-# Edit time:     13 min
+# Last modified: Sun Dec 24 08:42:15 2017 mstenber
+# Edit time:     14 min
 #
 #
 
@@ -26,15 +26,15 @@ cover: coverage.out
 
 get: .done.get
 
-generate: .done.protoc .done.greenpack
+generate: .done.greenpack
 
 .done.get: go-get-deps.txt
 	for LINE in `cat go-get-deps.txt`; do go get -u $$LINE; done
 	touch $@
 
-.done.protoc: .done.get tfhfs_proto/$(wildcard *.proto)
-	(cd tfhfs_proto && protoc --go_out=. *.proto )
-	touch $@
+#.done.protoc: .done.get tfhfs_proto/$(wildcard *.proto)
+#	(cd tfhfs_proto && protoc --go_out=. *.proto )
+#	touch $@
 
 .done.greenpack: $(GREENPACKS)
 	for FILE in $(GREENPACKS); do greenpack $(GREENPACK_OPTS) -file $$FILE ; done

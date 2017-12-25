@@ -4,13 +4,13 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Mon Dec 25 11:08:09 2017 mstenber
- * Edit time:     150 min
+ * Last modified: Mon Dec 25 17:26:49 2017 mstenber
+ * Edit time:     217 min
  *
  */
 
-// ibtree package provides a functional b-tree that consists of nodes,
-// with N children each, that are either leaves or other nodes.
+// ibtree package provides a functional b+ tree that consists of
+// nodes, with N children each, that are either leaves or other nodes.
 //
 // It has built-in persistence, and Merkle tree-style hash tree
 // behavior; root is defined by simply root node's hash, and similarly
@@ -22,6 +22,7 @@ package ibtree
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"sort"
 )
@@ -55,7 +56,7 @@ type IBTree struct {
 	backend IBTreeBackend
 }
 
-const minimumNodeMaximumSize = 1024
+const minimumNodeMaximumSize = 512
 const maximumTreeDepth = 10
 
 func (self IBTree) Init(backend IBTreeBackend) *IBTree {
@@ -69,9 +70,18 @@ func (self IBTree) Init(backend IBTreeBackend) *IBTree {
 }
 
 type ibStack struct {
+	// Static arrays that are used to store the 'trace' of our
+	// walk in the tre. By backtracking it at 'commit', we can
+	// handle COW of the recursive data structure.
+
 	nodes   [maximumTreeDepth]*IBNode
 	indexes [maximumTreeDepth]int
-	top     int
+
+	// The highest index of the nodes/indexes arrays with the values set.
+	top int
+
+	// How many nodes have turned small during lifetime of the stack.
+	smallCount int
 }
 
 func (self *ibStack) rewriteAtIndex(replace bool, child *IBNodeDataChild) {
@@ -89,8 +99,9 @@ func (self *ibStack) rewriteAtIndex(replace bool, child *IBNodeDataChild) {
 	c := make([]*IBNodeDataChild, nl)
 	copy(c, n.Children[:idx])
 	if child != nil {
-		c = append(c, child)
+		c[idx] = child
 	}
+	fmt.Printf("rewriteAtIndex idx:%d ni:%d => %d items\n", idx, ni, nl)
 	copy(c[idx+1:], n.Children[ni:])
 	self.rewriteNodeChildren(c)
 }
@@ -99,11 +110,22 @@ func (self *ibStack) rewriteNodeChildren(children []*IBNodeDataChild) {
 	n := self.node().copy()
 	n.Children = children
 	self.nodes[self.top] = n
+	// This invalidates sub-trees (if any)
+	self.nodes[self.top+1] = nil
+	self.indexes[self.top] = -1
 }
 
 func (self *ibStack) child() *IBNodeDataChild {
-	return self.node().Children[self.index()]
+	cl := self.node().Children
+	index := self.index()
+	if index < 0 || index >= len(cl) {
+		return nil
+	}
+	return cl[index]
+}
 
+func (self *ibStack) index() int {
+	return self.indexes[self.top]
 }
 
 func (self *ibStack) node() *IBNode {
@@ -122,14 +144,9 @@ func (self *ibStack) nodeSib(ofs int) *IBNode {
 	return self.nodes[self.top-1].childNode(nidx)
 }
 
-func (self *ibStack) index() int {
-	return self.indexes[self.top]
-
-}
-
 func (self *ibStack) pop() {
 	n := self.node()
-	self.top = self.top - 1
+	self.top--
 	c := &IBNodeDataChild{Key: n.Children[0].Key,
 		childNode: n}
 	self.rewriteAtIndex(true, c)
@@ -141,12 +158,17 @@ func (self *ibStack) commit() *IBNode {
 	for self.top > 0 {
 		self.pop()
 	}
+	if self.smallCount > 0 {
+		// TBD: make the nodes smaller
+
+		// TBD: cut root down a level if its children are together small enough
+	}
 	return self.node()
 }
 
-// NewNode creates a new node; by default, it is essentially new tree
+// NewRoot creates a new node; by default, it is essentially new tree
 // of its own. IBTree is really just factory for root nodes.
-func (self *IBTree) NewNode() *IBNode {
+func (self *IBTree) NewRoot() *IBNode {
 	return &IBNode{tree: self, IBNodeData: IBNodeData{Leafy: true}}
 }
 
@@ -161,8 +183,50 @@ func (self *IBNode) Delete(key IBKey) *IBNode {
 	if err != nil {
 		log.Panic(err)
 	}
-	st.deleteChildAt()
+	c := st.child()
+	if c.Key != key {
+		log.Panic("ibp.Delete: Key missing", key)
+	}
+	st.rewriteAtIndex(true, nil)
+	node := st.node()
+	if node.Msgsize() <= self.tree.smallSize {
+		st.smallCount++
+	}
 	return st.commit()
+}
+
+func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
+	var st ibStack
+	err := self.searchPrevOrEq(key1, &st)
+	if err != nil {
+		log.Panic(err)
+	}
+	var st2 ibStack = st
+	st2.top = 0
+	err = st2.searchPrevOrEq(key2)
+	if err != nil {
+		log.Panic(err)
+	}
+	if st2.child().Key == key2 {
+		st2.indexes[st2.top]++
+	}
+	// No matches at all?
+	if st == st2 {
+		return self
+	}
+	common := 0
+	for i := 1; i < st.top && st.indexes[i-1] == st2.indexes[i-1]; i++ {
+		common = i
+	}
+	// nodes [ .. common] and indexes[.. common-1] are same
+
+	// Make the st2 match st, one level at a time.
+	// top = the level we are currently editing
+	for st2.top >= common {
+
+	}
+	st2.top++
+	return st2.commit()
 }
 
 func (self *IBNode) Get(key IBKey) *string {
@@ -172,7 +236,7 @@ func (self *IBNode) Get(key IBKey) *string {
 		log.Panic(err)
 	}
 	c := st.child()
-	if c.Key != key {
+	if c == nil || c.Key != key {
 		return nil
 	}
 	return &c.Value
@@ -186,7 +250,8 @@ func (self *IBNode) Set(key IBKey, value string) *IBNode {
 		log.Panic(err)
 	}
 	child := &IBNodeDataChild{Key: key, Value: value}
-	if st.child().Key != key {
+	c := st.child()
+	if c == nil || c.Key != key {
 		st.addChildAt(child)
 		return st.commit()
 	}
@@ -196,15 +261,6 @@ func (self *IBNode) Set(key IBKey, value string) *IBNode {
 	st.rewriteAtIndex(false, child)
 	return st.commit()
 
-}
-
-func (self *ibStack) deleteChildAt() {
-	self.rewriteAtIndex(false, nil)
-	node := self.node()
-	if node.Msgsize() >= node.tree.smallSize {
-		return
-	}
-	// TBD balance now, or later?
 }
 
 func (self *ibStack) addChildAt(child *IBNodeDataChild) {
@@ -252,23 +308,33 @@ func (self *ibStack) addChildAt(child *IBNodeDataChild) {
 }
 
 func (self *IBNode) searchPrevOrEq(key IBKey, stack *ibStack) error {
-	if len(self.Children) == 0 {
-		return ErrEmptyTree
-	}
-	n := self
-	stack.top = 0
+	stack.nodes[0] = self
+	return stack.searchPrevOrEq(key)
+}
+
+func (self *ibStack) searchPrevOrEq(key IBKey) error {
+	n := self.nodes[0]
+	self.top = 0
 	for {
-		stack.nodes[stack.top] = n
 		idx := n.childIndexWithKeyGT(key)
 		if idx > 0 {
 			idx = idx - 1
 		}
-		stack.indexes[stack.top] = idx
+		on := self.nodes[self.top+1]
+		if idx != self.indexes[self.top] {
+			on = nil
+		}
+		self.indexes[self.top] = idx
 		if n.Leafy {
 			break
 		}
-		n = n.childNode(idx)
-		stack.top++
+		if on != nil {
+			n = on
+		} else {
+			n = n.childNode(idx)
+			self.nodes[self.top] = n
+		}
+		self.top++
 	}
 	return nil
 }
@@ -280,6 +346,7 @@ func (self *IBNode) childSearch(fun func(int) bool) int {
 
 func (self *IBNode) childIndexWithKeyGT(key IBKey) int {
 	return self.childSearch(func(i int) bool {
+		fmt.Printf("childSearch i:%d of %d\n", i, len(self.Children))
 		return self.Children[i].Key > key
 	})
 }
@@ -296,6 +363,5 @@ func (self *IBNode) childNode(idx int) *IBNode {
 	if nd == nil {
 		return nil
 	}
-	n := &IBNode{tree: self.tree, IBNodeData: *nd}
-	return n
+	return &IBNode{tree: self.tree, IBNodeData: *nd}
 }

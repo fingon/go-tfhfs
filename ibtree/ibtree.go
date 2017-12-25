@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Mon Dec 25 03:33:27 2017 mstenber
- * Edit time:     111 min
+ * Last modified: Mon Dec 25 03:51:27 2017 mstenber
+ * Edit time:     116 min
  *
  */
 
@@ -32,9 +32,8 @@ type BlockId string
 
 type IBNode struct {
 	IBNodeData
-	blockId    BlockId // on disk, if any
-	tree       *IBTree
-	cachedSize int // cached estimate
+	blockId BlockId // on disk, if any
+	tree    *IBTree
 }
 
 type IBTreeBackend interface {
@@ -151,24 +150,20 @@ func (self *IBNode) AddChild(child *IBNodeDataChild) (n *IBNode) {
 	return st.commit()
 }
 
-func (self *IBNodeDataChild) size() int {
-	return len(self.Key) + len(self.Value) + 1
-}
-
 func (self *ibStack) addChildAt(child *IBNodeDataChild) {
 	// Insert child where it belongs
 	self.rewriteAtIndex(true, child)
 
 	node := self.node()
 
-	if node.size() <= node.tree.NodeMaximumSize {
+	if node.Msgsize() <= node.tree.NodeMaximumSize {
 		return
 	}
 
 	s := 0
 	i := 0
-	for s < node.size()/2 {
-		s += node.Children[i].size()
+	for s < node.Msgsize()/2 {
+		s += node.Children[i].Msgsize()
 		i++
 	}
 	nodec := node.Children[:i]
@@ -197,17 +192,6 @@ func (self *ibStack) addChildAt(child *IBNodeDataChild) {
 	self.nodes[0] = &IBNode{tree: node.tree,
 		IBNodeData: IBNodeData{
 			Children: []*IBNodeDataChild{mechild, nextchild}}}
-}
-
-func (self *IBNode) size() int {
-	if self.cachedSize == 0 {
-		size := 1
-		for _, v := range self.Children {
-			size += v.size()
-		}
-		self.cachedSize = size
-	}
-	return self.cachedSize
 }
 
 func (self *IBNode) searchPrevOrEq(key IBKey, stack *ibStack) error {

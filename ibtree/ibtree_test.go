@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Wed Dec 27 18:12:47 2017 mstenber
- * Edit time:     88 min
+ * Last modified: Wed Dec 27 18:39:12 2017 mstenber
+ * Edit time:     102 min
  *
  */
 
@@ -145,6 +145,45 @@ func TestIBTree(t *testing.T) {
 	tree := IBTree{}.Init(nil)
 	tree.setNodeMaximumSize(nodeSize) // more depth = smaller examples that blow up
 	ProdIBTree(t, tree, 10000)
+}
+
+func TestIBTreeDeleteRange(t *testing.T) {
+	n := 1000
+	tree := IBTree{}.Init(nil)
+	r := CreateIBTree(t, tree, n)
+	// We attempt to remove higher bits, as they offend us.
+	for i := 4; i < n; i = i * 4 {
+		s1 := IBKey(fmt.Sprintf("%d", i*3/4))
+		s2 := IBKey(fmt.Sprintf("%d", i))
+		r = r.DeleteRange(s1, s2)
+	}
+	for i := 4; i < n*4; i = i * 4 {
+		i0 := i*3/4 - 1
+		s0 := fmt.Sprintf("%d", i0)
+		r0 := r.Get(IBKey(s0))
+		if i0 < n {
+			assert.Equal(t, r0, s0)
+		} else {
+			assert.Nil(t, r0)
+		}
+		s1 := IBKey(fmt.Sprintf("%d", i*3/4))
+		r1 := r.Get(IBKey(s1))
+		assert.Nil(t, r1)
+
+		s2 := IBKey(fmt.Sprintf("%d", i))
+		r2 := r.Get(IBKey(s2))
+		assert.Nil(t, r2)
+
+		i3 := i + 1
+		s3 := IBKey(fmt.Sprintf("%d", i3))
+		r3 := r.Get(IBKey(s3))
+		if i3 < n {
+			assert.Equal(t, r3, s3)
+		} else {
+			assert.Nil(t, r3)
+		}
+
+	}
 }
 
 func TestIBTreeStorage(t *testing.T) {

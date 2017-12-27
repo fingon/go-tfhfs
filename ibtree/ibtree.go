@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Wed Dec 27 17:57:10 2017 mstenber
- * Edit time:     553 min
+ * Last modified: Wed Dec 27 18:21:53 2017 mstenber
+ * Edit time:     554 min
  *
  */
 
@@ -161,6 +161,9 @@ func (self *IBNode) Commit() *IBNode {
 }
 
 func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
+	if key1 > key2 {
+		log.Panic("ibt.DeleteRange: first key more than second key", key1, key2)
+	}
 	var st ibStack
 	err := self.search(key1, &st)
 	if err != nil {

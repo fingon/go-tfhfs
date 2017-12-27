@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Wed Dec 27 18:05:06 2017 mstenber
- * Edit time:     80 min
+ * Last modified: Wed Dec 27 18:12:47 2017 mstenber
+ * Edit time:     88 min
  *
  */
 
@@ -23,6 +23,7 @@ import (
 type DummyBackend struct {
 	h2nd  map[BlockId]*IBNodeData
 	loads int
+	saves int
 }
 
 func (self DummyBackend) Init() *DummyBackend {
@@ -78,7 +79,8 @@ func checkTree(t *testing.T, r *IBNode, n int) {
 	checkTree2(t, r, n, 0)
 }
 
-func ProdIBTree(t *testing.T, r *IBNode, n int, commit int) *IBNode {
+func CreateIBTree(t *testing.T, tree *IBTree, n int) *IBNode {
+	r := tree.NewRoot()
 	v := r.Get(IBKey("foo"))
 	assert.Nil(t, v)
 	for i := 0; i < n; i++ {
@@ -99,56 +101,57 @@ func ProdIBTree(t *testing.T, r *IBNode, n int, commit int) *IBNode {
 		s := fmt.Sprintf("%d", i)
 		r = r.Set(IBKey(s), s)
 	}
+	return r
+}
 
-	rv := r
-	if commit == 1 {
-		r = r.Commit()
+func EmptyIBTreeForward(t *testing.T, r *IBNode, n int) *IBNode {
+	for i := 0; i < n; i++ {
+		if debug > 0 {
+			checkTree2(t, r, n, i)
+		}
+		if debug > 0 {
+			log.Printf("Deleting #%d\n", i)
+		}
+		r = r.Delete(IBKey(fmt.Sprintf("%d", i)))
 	}
+	return r
+}
+
+func EmptyIBTreeBackward(t *testing.T, r *IBNode, n int) *IBNode {
+	for i := n - 1; i > 0; i-- {
+		if debug > 0 {
+			checkTree2(t, r, i+1, 0)
+		}
+		if debug > 0 {
+			log.Printf("Deleting #%d\n", i)
+		}
+		r = r.Delete(IBKey(fmt.Sprintf("%d", i)))
+	}
+	return r
+}
+
+func ProdIBTree(t *testing.T, tree *IBTree, n int) {
+	r := CreateIBTree(t, tree, n)
 	// Ensure in-place mutate works fine as well and does not change r
 	rr := r.Set(IBKey("0"), "z")
 	assert.Equal(t, "z", *rr.Get(IBKey("0")))
 	assert.Equal(t, "0", *r.Get(IBKey("0")))
 	checkTree(t, r, n)
-	r2 := r
-	for i := 0; i < n; i++ {
-		if debug > 0 {
-			checkTree2(t, r2, n, i)
-		}
-		if debug > 0 {
-			log.Printf("Deleting #%d\n", i)
-		}
-		r2 = r2.Delete(IBKey(fmt.Sprintf("%d", i)))
-	}
-	if commit == 2 {
-		rv = r2.Commit()
-
-	}
-	r3 := r
-	for i := n - 1; i > 0; i-- {
-		if debug > 0 {
-			checkTree2(t, r3, i+1, 0)
-		}
-		if debug > 0 {
-			log.Printf("Deleting #%d\n", i)
-		}
-		r3 = r3.Delete(IBKey(fmt.Sprintf("%d", i)))
-	}
-	return rv
+	EmptyIBTreeForward(t, r, n)
+	EmptyIBTreeBackward(t, r, n)
 }
 
 func TestIBTree(t *testing.T) {
 	tree := IBTree{}.Init(nil)
 	tree.setNodeMaximumSize(nodeSize) // more depth = smaller examples that blow up
-	r := tree.NewRoot()
-	ProdIBTree(t, r, 10000, 0)
+	ProdIBTree(t, tree, 10000)
 }
 
 func TestIBTreeStorage(t *testing.T) {
 	n := 1000
 	be := DummyBackend{}.Init()
 	tree := IBTree{}.Init(be)
-	r := tree.NewRoot()
-	r = ProdIBTree(t, r, n, 1)
+	r := CreateIBTree(t, tree, n).Commit()
 	c1 := r.nestedNodeCount()
 	assert.True(t, r.blockId != nil)
 	assert.Equal(t, be.loads, 0)
@@ -160,4 +163,7 @@ func TestIBTreeStorage(t *testing.T) {
 	assert.Equal(t, c2, 1)
 	//assert.Equal(t, c2, be.loads)
 	// loads is 'shotload', checkTree does .. plenty.
+	os := be.saves
+	r = r.Commit()
+	assert.Equal(t, os, be.saves)
 }

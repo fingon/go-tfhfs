@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Wed Dec 27 17:19:18 2017 mstenber
- * Edit time:     534 min
+ * Last modified: Wed Dec 27 17:57:10 2017 mstenber
+ * Edit time:     553 min
  *
  */
 
@@ -66,11 +66,19 @@ func (self IBTree) Init(backend IBTreeBackend) *IBTree {
 	if maximumSize < minimumNodeMaximumSize {
 		maximumSize = minimumNodeMaximumSize
 	}
-	self.setNodeMaximumSize(self.NodeMaximumSize)
+	self.setNodeMaximumSize(maximumSize)
 	self.backend = backend
 	self.placeholderValue = fmt.Sprintf("hash-%s",
 		strings.Repeat("x", hashSize-5))
 	return &self
+}
+
+func (self *IBTree) LoadRoot(bid BlockId) *IBNode {
+	data := self.backend.LoadNode(bid)
+	if data == nil {
+		return nil
+	}
+	return &IBNode{tree: self, IBNodeData: *data}
 }
 
 // NewRoot creates a new node; by default, it is essentially new tree
@@ -88,7 +96,7 @@ func (self *IBTree) setNodeMaximumSize(maximumSize int) {
 // IBNode represents single node in single tree.
 type IBNode struct {
 	IBNodeData
-	blockId BlockId // on disk, if any
+	blockId *BlockId // on disk, if any
 	tree    *IBTree
 }
 
@@ -115,6 +123,43 @@ func (self *IBNode) Delete(key IBKey) *IBNode {
 	return st.commit()
 }
 
+// Commit pushes dirty IBNode to disk.
+//
+// After it has been called, the data will be persisted to disk and
+// SHOULD NOT BE USED ANYMORE (nor any other related non-persisted
+// copies). Instead, the new returned treenode pointer should be used.
+func (self *IBNode) Commit() *IBNode {
+	// Iterate through the tree, updating the nodes as we go.
+
+	// TBD if this inplace mutation is nasty hack or not. It makes
+	// this much faster AND anything being committed should come
+	// from mutated version anyway.
+
+	if self.blockId != nil {
+		return self
+	}
+
+	self.iterateLeafFirst(func(n *IBNode) {
+		// if it is already persisted, not interesting
+		if n.blockId != nil {
+			return
+		}
+
+		if !n.Leafy {
+			// Update block ids if any
+			for _, v := range n.Children {
+				if v.childNode != nil {
+					v.Value = string(*v.childNode.blockId)
+				}
+			}
+
+		}
+		bid := self.tree.backend.SaveNode(n.IBNodeData)
+		n.blockId = &bid
+	})
+	return self
+}
+
 func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
 	var st ibStack
 	err := self.search(key1, &st)
@@ -138,6 +183,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
 	for i := 1; i < st.top && st.indexes[i-1] == st2.indexes[i-1]; i++ {
 		common = i
 	}
+	log.Panic("TBD")
 	// nodes [ .. common] and indexes[.. common-1] are same
 
 	// Make the st2 match st, one level at a time.
@@ -201,11 +247,12 @@ func (self *IBNode) childNode(idx int) *IBNode {
 	if self.tree.backend == nil {
 		return nil
 	}
-	nd := self.tree.backend.LoadNode(BlockId(c.Value))
+	bid := BlockId(c.Value)
+	nd := self.tree.backend.LoadNode(bid)
 	if nd == nil {
 		return nil
 	}
-	return &IBNode{tree: self.tree, IBNodeData: *nd}
+	return &IBNode{tree: self.tree, blockId: &bid, IBNodeData: *nd}
 }
 
 func (self *IBNode) print(indent int) {
@@ -241,4 +288,12 @@ func (self *IBNode) checkTreeStructure() {
 		}
 
 	})
+}
+
+func (self *IBNode) nestedNodeCount() int {
+	cnt := 0
+	self.iterateLeafFirst(func(n *IBNode) {
+		cnt++
+	})
+	return cnt
 }

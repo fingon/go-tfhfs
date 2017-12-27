@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Wed Dec 27 17:19:16 2017 mstenber
- * Edit time:     0 min
+ * Last modified: Wed Dec 27 17:52:29 2017 mstenber
+ * Edit time:     3 min
  *
  */
 package ibtree
@@ -362,12 +362,7 @@ func (self *ibStack) addChildAt(child *IBNodeDataChild) {
 	}
 
 	//log.Printf("Leaf too big")
-	s := 0
-	i := 0
-	for s < node.Msgsize()/2 {
-		s += node.Children[i].Msgsize()
-		i++
-	}
+	i := len(node.Children) / 2
 	nodec := node.Children[:i] // passed to rewriteNodeChildren; it will create new array
 	nextc := make([]*IBNodeDataChild, len(node.Children)-i)
 	copy(nextc, node.Children[i:])

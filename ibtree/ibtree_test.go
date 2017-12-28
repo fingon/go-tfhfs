@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Thu Dec 28 19:38:45 2017 mstenber
- * Edit time:     222 min
+ * Last modified: Thu Dec 28 20:52:59 2017 mstenber
+ * Edit time:     233 min
  *
  */
 
@@ -106,7 +106,7 @@ func EnsureDelta(t *testing.T, old, new *IBNode, del, upd, add int) {
 	var got_upd, got_add, got_del int
 	var previous *IBNodeDataChild
 	new.IterateDelta(old, func(c1, c2 *IBNodeDataChild) {
-		log.Printf("c0:%v c:%v", c1, c2)
+		// log.Printf("c0:%v c:%v", c1, c2)
 		c := c1
 		if c1 == nil {
 			c = c2
@@ -332,4 +332,26 @@ func TestIBTreeStorage(t *testing.T) {
 	os := be.saves
 	r = r.Commit()
 	assert.Equal(t, os, be.saves)
+}
+
+func TestIBTransaction(t *testing.T) {
+	t.Parallel()
+	n := 100
+	be := DummyBackend{}.Init()
+	tree := DummyTree{}.Init(be)
+	r := tree.CreateIBTree(t, n).Commit()
+	tr := NewTransaction(r)
+	assert.Equal(t, tr.Commit(), r)
+	k := tree.idcb(42)
+	assert.Equal(t, *tr.Get(k), "v42")
+	tr.Delete(k)
+	assert.Nil(t, tr.Get(k))
+	tr.DeleteRange(tree.idcb(7), tree.idcb(9))
+	assert.Nil(t, tr.Get(tree.idcb(7)))
+	assert.Nil(t, tr.Get(tree.idcb(9)))
+	assert.True(t, tr.Get(tree.idcb(6)) != nil)
+	assert.True(t, tr.Get(tree.idcb(10)) != nil)
+	tr.Set(k, "42")
+	assert.Equal(t, *tr.Get(k), "42")
+
 }

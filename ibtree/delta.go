@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:53:36 2017 mstenber
- * Last modified: Thu Dec 28 16:37:35 2017 mstenber
- * Edit time:     50 min
+ * Last modified: Thu Dec 28 19:09:15 2017 mstenber
+ * Edit time:     51 min
  *
  */
 
@@ -20,7 +20,7 @@ type IBDeltaCallback func(old, new *IBNodeDataChild)
 // Still, this is pretty expensive operation and should be done only
 // in background.
 func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
-	var st, st0 ibStack
+	var st, st0 IBStack
 	st0.nodes[0] = original
 	st.nodes[0] = self
 
@@ -29,7 +29,7 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		if c0 == nil {
 			if st0.top > 0 {
 				st0.popNode()
-				st0.indexes[st0.top]++
+				st0.nextIndex()
 				continue
 			}
 		}
@@ -37,7 +37,7 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		if c == nil {
 			if st.top > 0 {
 				st.popNode()
-				st.indexes[st.top]++
+				st.nextIndex()
 				continue
 			}
 		}
@@ -55,8 +55,8 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		// Best cast first - they seem to be same exactly;
 		// direct omit and no need to recurse
 		if n.Leafy == n0.Leafy && c != nil && c0 != nil && *c == *c0 {
-			st0.indexes[st0.top]++
-			st.indexes[st.top]++
+			st0.nextIndex()
+			st.nextIndex()
 			continue
 		}
 
@@ -79,7 +79,7 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 			} else {
 				deltacb(nil, cst.child())
 			}
-			cst.indexes[cst.top]++
+			cst.nextIndex()
 			continue
 		}
 
@@ -100,7 +100,7 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		// nodes. Hooray. It's update.
 		deltacb(c0, c)
 
-		st0.indexes[st0.top]++
-		st.indexes[st.top]++
+		st0.nextIndex()
+		st.nextIndex()
 	}
 }

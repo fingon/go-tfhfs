@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Thu Dec 28 16:48:12 2017 mstenber
- * Edit time:     180 min
+ * Last modified: Thu Dec 28 19:38:45 2017 mstenber
+ * Edit time:     222 min
  *
  */
 
@@ -68,21 +68,22 @@ func (self *DummyBackend) SaveNode(nd IBNodeData) BlockId {
 const debug = 1
 const nodeSize = 256
 
-func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n int, st int) {
+func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n, s int) {
 	if debug > 1 {
 		r.print(0)
-		log.Printf("checkTree [%d..%d[\n", st, n)
+		log.Printf("checkTree [%d..%d[\n", s, n)
 	}
-	for i := st - 1; i <= n; i++ {
+	for i := s - 2; i <= n+1; i++ {
+		var st IBStack
 		if debug > 1 {
 			log.Printf(" #%d\n", i)
 		}
-		s := self.idcb(i)
-		v := r.Get(s)
-		if i == (st-1) || i == n {
+		ss := self.idcb(i)
+		v := r.Get(ss, &st)
+		if i < s || i >= n {
 			assert.Nil(t, v)
 		} else {
-			assert.True(t, v != nil)
+			assert.True(t, v != nil, "missing key ", ss)
 			assert.Equal(t, *v, fmt.Sprintf("v%d", i))
 		}
 	}
@@ -132,9 +133,10 @@ func EnsureDelta2(t *testing.T, old, new *IBNode, del, upd, add int) {
 	EnsureDelta(t, new, old, add, upd, del)
 }
 func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
+	var st IBStack
 	r0 := self.NewRoot()
 	r := r0
-	v := r0.Get(IBKey("foo"))
+	v := r0.Get(IBKey("foo"), &st)
 	assert.Nil(t, v)
 	for i := 0; i < n; i++ {
 		if debug > 1 {
@@ -142,18 +144,25 @@ func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
 			log.Printf("Inserting #%d\n", i)
 		}
 		cnt := 0
-		var st ibStack
-		st.nodes[0] = r
-		st.iterateMutatingChildLeafFirst(func() {
+		if r != st.nodes[0] {
+			log.Panic("asdf1", r, st.nodes[0])
+		}
+		r = st.iterateMutatingChildLeafFirst(func() {
 			if debug > 1 {
-				log.Printf("Child %v %v", st.indexes, st.child())
+				log.Printf("(iterating) Child %v %v", st.indexes, st.child())
 			}
 			cnt++
 		})
 		assert.Equal(t, cnt, r.nestedNodeCount()-1, "iterateMutatingChildLeafFirst broken")
 		k := self.idcb(i)
 		v := fmt.Sprintf("v%d", i)
-		r = r.Set(k, v)
+		if r != st.nodes[0] {
+			log.Panic("asdf2", r, st.nodes[0])
+		}
+		r = r.Set(k, v, &st)
+		if r != st.nodes[0] {
+			log.Panic("asdf3", r, st.nodes[0])
+		}
 	}
 	//EnsureDelta2(t, r0, r, 0, 0, n)
 	//r2 := r0.Set(IBKey("z"), "42")
@@ -163,29 +172,31 @@ func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
 }
 
 func EmptyIBTreeForward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode {
+	var st IBStack
 	for i := 0; i < n; i++ {
 		if debug > 1 {
 			dt.checkTree2(t, r, n, i)
 		}
-		if debug > 0 {
+		if debug > 1 {
 			log.Printf("Deleting #%d\n", i)
 		}
 		k := dt.idcb(i)
-		r = r.Delete(k)
+		r = r.Delete(k, &st)
 	}
 	return r
 }
 
 func EmptyIBTreeBackward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode {
+	var st IBStack
 	for i := n - 1; i > 0; i-- {
-		if debug > 1 {
+		if debug > 2 {
 			dt.checkTree2(t, r, i+1, 0)
 		}
-		if debug > 0 {
+		if debug > 1 {
 			log.Printf("Deleting #%d\n", i)
 		}
 		k := dt.idcb(i)
-		r = r.Delete(IBKey(k))
+		r = r.Delete(IBKey(k), &st)
 	}
 	return r
 }
@@ -193,16 +204,16 @@ func EmptyIBTreeBackward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode 
 func ProdIBTree(t *testing.T, tree *DummyTree, n int) {
 	r := tree.CreateIBTree(t, n)
 	// Check forward and backwards iteration
-	var st ibStack
+	var st IBStack
 	st.nodes[0] = r
-	st.indexes[0] = -1
+	st.setIndex(-1)
 	c1 := 0
 
 	st2 := st
 	st2.goNextLeaf()
 
 	st3 := st
-	st3.indexes[0] = 0
+	st3.Reset()
 	st3.goDownLeftAny()
 	assert.Equal(t, st2, st3)
 
@@ -218,9 +229,9 @@ func ProdIBTree(t *testing.T, tree *DummyTree, n int) {
 
 	// Ensure in-place mutate works fine as well and does not change r
 	k := tree.idcb(0)
-	rr := r.Set(k, "z")
-	assert.Equal(t, "z", *rr.Get(k))
-	assert.Equal(t, "v0", *r.Get(k))
+	rr := r.Set(k, "z", &st)
+	assert.Equal(t, "z", *rr.Get(k, &st))
+	assert.Equal(t, "v0", *r.Get(k, &IBStack{}))
 	tree.checkTree(t, r, n)
 	EmptyIBTreeForward(t, tree, r, n)
 	EmptyIBTreeBackward(t, tree, r, n)
@@ -239,13 +250,14 @@ func TestIBTreeDeleteRange(t *testing.T) {
 	n := 1000
 	r := tree.CreateIBTree(t, n)
 	log.Printf("TestIBTreeDeleteRange start")
-	r1 := r.DeleteRange(paddedIBKey(-1), paddedIBKey(-1))
+	r1 := r.DeleteRange(paddedIBKey(-1), paddedIBKey(-1), &IBStack{})
 	assert.Equal(t, r1, r)
-	r2 := r.DeleteRange(IBKey("z"), IBKey("z"))
+	r2 := r.DeleteRange(IBKey("z"), IBKey("z"), &IBStack{})
 	assert.Equal(t, r2, r)
 
 	// We attempt to remove higher bits, as they offend us.
 	for i := 4; i < n; i = i * 4 {
+		var st IBStack
 		i0 := i * 3 / 4
 		removed := i - i0 + 1
 		r.checkTreeStructure()
@@ -256,8 +268,10 @@ func TestIBTreeDeleteRange(t *testing.T) {
 		s1 := tree.idcb(i0)
 		s2 := tree.idcb(i)
 		or := r
-		r = r.DeleteRange(s1, s2)
-		r.print(0)
+		r = r.DeleteRange(s1, s2, &st)
+		if debug > 0 {
+			r.print(0)
+		}
 		EnsureDelta2(t, or, r, removed, 0, 0)
 
 		r.checkTreeStructure()
@@ -265,7 +279,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 		for j := 4; j <= i; j = j * 4 {
 			j0 := j*3/4 - 1
 			s0 := tree.idcb(j0)
-			r0 := r.Get(s0)
+			r0 := r.Get(s0, &st)
 			if debug > 0 {
 				log.Printf("Checking %d-%d\n", j0, j)
 
@@ -277,16 +291,16 @@ func TestIBTreeDeleteRange(t *testing.T) {
 				assert.Nil(t, r0)
 			}
 			s1 := tree.idcb(j * 3 / 4)
-			r1 := r.Get(s1)
+			r1 := r.Get(s1, &st)
 			assert.Nil(t, r1)
 
 			s2 := tree.idcb(j)
-			r2 := r.Get(s2)
+			r2 := r.Get(s2, &st)
 			assert.Nil(t, r2)
 
 			j3 := j + 1
 			s3 := tree.idcb(j3)
-			r3 := r.Get(s3)
+			r3 := r.Get(s3, &st)
 			if j3 < n {
 				assert.True(t, r3 != nil, "missing index:", j3)
 				assert.Equal(t, *r3, fmt.Sprintf("v%d", j3))

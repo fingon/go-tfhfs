@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Thu Dec 28 16:46:04 2017 mstenber
- * Edit time:     67 min
+ * Last modified: Thu Dec 28 19:16:29 2017 mstenber
+ * Edit time:     114 min
  *
  */
 package ibtree
@@ -15,9 +15,12 @@ import (
 	"sort"
 )
 
-// ibStack is internal utility class which is used to keep trace about
+// IBStack is internal utility class which is used to keep trace about
 // stack of nodes on the current immutable tree path (parents mainly).
-type ibStack struct {
+//
+// If using lowlevel API (= direct calls to IBNode), passing empty one
+// may be necessary. Otherwise IBTransaction should be used.
+type IBStack struct {
 	// Static arrays that are used to store the 'trace' of our
 	// walk in the tre. By backtracking it at 'commit', we can
 	// handle COW of the recursive data structure.
@@ -32,7 +35,27 @@ type ibStack struct {
 	smallCount int
 }
 
-func (self *ibStack) rewriteAtIndex(replace bool, child *IBNodeDataChild) {
+// Reset rests the IBStack to ~factory defaults. It is still tied to
+// particular tree though, and also calling it mid-operation is fatal
+// error.
+func (self *IBStack) Reset() {
+	if self.nodes[0] == nil {
+		log.Panic("Reset() on uninitialized IBStack")
+	}
+	if self.top > 0 {
+		log.Panic("uncommitted state in reset")
+	}
+	self.setIndex(0)
+}
+
+func (self *IBStack) setIndex(idx int) {
+	if idx == self.indexes[self.top] {
+		return
+	}
+	self.indexes[self.top] = idx
+	self.nodes[self.top+1] = nil
+}
+func (self *IBStack) rewriteAtIndex(replace bool, child *IBNodeDataChild) {
 	n := self.node()
 	idx := self.index()
 
@@ -66,7 +89,7 @@ func (self *ibStack) rewriteAtIndex(replace bool, child *IBNodeDataChild) {
 	self.rewriteNodeChildren(c)
 }
 
-func (self *ibStack) rewriteNodeChildren(children []*IBNodeDataChild) {
+func (self *IBStack) rewriteNodeChildren(children []*IBNodeDataChild) {
 	//log.Printf("rewriteNodeChildren")
 	n := self.node().copy()
 	n.Children = children
@@ -75,14 +98,14 @@ func (self *ibStack) rewriteNodeChildren(children []*IBNodeDataChild) {
 	self.nodes[self.top+1] = nil
 }
 
-func (self *ibStack) rewriteNodeChildrenWithCopyOf(children []*IBNodeDataChild) {
+func (self *IBStack) rewriteNodeChildrenWithCopyOf(children []*IBNodeDataChild) {
 	ochildren := children
 	children = make([]*IBNodeDataChild, len(ochildren))
 	copy(children, ochildren)
 	self.rewriteNodeChildren(children)
 }
 
-func (self *ibStack) child() *IBNodeDataChild {
+func (self *IBStack) child() *IBNodeDataChild {
 	cl := self.node().Children
 	index := self.index()
 	if index < 0 || index >= len(cl) {
@@ -91,27 +114,28 @@ func (self *ibStack) child() *IBNodeDataChild {
 	return cl[index]
 }
 
-func (self *ibStack) index() int {
-	return self.indexes[self.top]
-}
-
-func (self *ibStack) node() *IBNode {
-	//log.Printf("node() from %v [%d]", self.nodes, self.top)
-	return self.nodes[self.top]
-}
-
-func (self *ibStack) childSibNode(ofs int) *IBNode {
-	idx := self.index() + ofs
+func (self *IBStack) childNode(idx int) *IBNode {
 	n := self.node()
 	if idx < 0 || idx >= len(n.Children) {
 		return nil
 	}
-	return n.childNode(idx)
+	if self.indexes[self.top] == idx && self.nodes[self.top+1] != nil {
+		return self.nodes[self.top+1]
+	}
+	return self.node().childNode(idx)
 }
 
-func (self *ibStack) popNode() *IBNode {
+func (self *IBStack) index() int {
+	return self.indexes[self.top]
+}
+
+func (self *IBStack) node() *IBNode {
+	//log.Printf("node() from %v [%d]", self.nodes, self.top)
+	return self.nodes[self.top]
+}
+
+func (self *IBStack) popNode() *IBNode {
 	n := self.node()
-	self.indexes[self.top] = -1
 	self.top--
 	if self.top < 0 {
 		log.Panic("popped beyond top! madness!")
@@ -119,7 +143,7 @@ func (self *ibStack) popNode() *IBNode {
 	return n
 }
 
-func (self *ibStack) pop() {
+func (self *IBStack) pop() {
 	n := self.popNode()
 	key := IBKey("")
 	if len(n.Children) > 0 {
@@ -131,14 +155,14 @@ func (self *ibStack) pop() {
 	self.rewriteAtIndex(true, c)
 }
 
-func (self *ibStack) push(index int, node *IBNode) {
-	self.indexes[self.top] = index
+func (self *IBStack) push(index int, node *IBNode) {
+	self.setIndex(index)
 	self.top++
 	self.nodes[self.top] = node
-	self.indexes[self.top] = 0
+	self.setIndex(0)
 }
 
-func (self *ibStack) moveFrom(ofs int, sib *IBNode) {
+func (self *IBStack) moveFrom(ofs int, sib *IBNode) {
 	// Keep track of which child we are really at
 	node := self.child().childNode
 	oi := self.index()
@@ -164,9 +188,9 @@ func (self *ibStack) moveFrom(ofs int, sib *IBNode) {
 	// Now rewrite current node
 	self.push(oi, node)
 	if ofs == -1 {
-		self.indexes[self.top] = 0
+		self.setIndex(0)
 	} else {
-		self.indexes[self.top] = len(node.Children)
+		self.setIndex(len(node.Children))
 	}
 	self.rewriteAtIndex(false, c)
 
@@ -175,7 +199,7 @@ func (self *ibStack) moveFrom(ofs int, sib *IBNode) {
 
 }
 
-func (self *ibStack) mergeTo(ofs int, sib *IBNode) {
+func (self *IBStack) mergeTo(ofs int, sib *IBNode) {
 	clen1 := len(self.node().Children)
 	oi := self.index()
 	si := ofs + oi
@@ -219,88 +243,94 @@ func (self *ibStack) mergeTo(ofs int, sib *IBNode) {
 
 // Pop rest of the stack, creating new Nodes as need be, and return
 // the top node.
-func (self *ibStack) commit() *IBNode {
+func (self *IBStack) commit() *IBNode {
 	for self.top > 0 {
 		self.pop()
 	}
-	if self.smallCount > 0 {
-		//log.Printf("commit - pruning")
-		self.indexes[0] = 0
-		self.iterateMutatingChildLeafFirst(func() {
-			//log.Printf("iterating @%d[%d] %v", self.top, self.index(), self.child())
-			n := self.child().childNode
-			s := n.Msgsize()
-			if s >= n.tree.smallSize {
-				return
-			}
-			// Try to look for neighbor with spare nodes to borrow.
-			n1 := self.childSibNode(-1)
-			n2 := self.childSibNode(1)
-			ofs := -1
-			//log.Printf("s:%s n1:%s n2:%s", s, n1, n2)
-			if n1 != nil && n2 != nil {
-				if n1.Msgsize() < n2.Msgsize() {
-					n1 = n2
-					ofs = 1
-				}
-			} else if n1 == nil {
-				ofs = 1
-				n1 = n2
-			}
-			if n1 == nil {
-				return
-			}
-			s1 := n1.Msgsize()
-			if s1 < n.tree.halfSize {
-				//log.Printf("mergeTo %d (%d)", ofs, s1)
-				self.mergeTo(ofs, n1)
-				return
-			}
-			//log.Printf("moveFrom %d", ofs)
-			// Borrow from that sibling
-			self.moveFrom(ofs, n1)
-		})
 
-		n := self.node()
-		if !n.Leafy && n.Msgsize() < n.tree.smallSize {
-			ts := 0
-			cc := 0
-			for i := range n.Children {
-				cn := n.childNode(i)
-				ts += cn.Msgsize()
-				cc += len(cn.Children)
+	// Nothing small was encountered -> we're still good to go
+	if self.smallCount == 0 {
+		return self.node()
+	}
+
+	// Check tree for small nodes
+	self.iterateMutatingChildLeafFirst(func() {
+		//log.Printf("iterating @%d[%d] %v", self.top, self.index(), self.child())
+		n := self.child().childNode
+		s := n.Msgsize()
+		if s >= n.tree.smallSize {
+			return
+		}
+		// Try to look for neighbor with spare nodes to borrow.
+		idx := self.index()
+		n1 := self.childNode(idx - 1)
+		n2 := self.childNode(idx + 1)
+		ofs := -1
+		//log.Printf("s:%s n1:%s n2:%s", s, n1, n2)
+		if n1 != nil && n2 != nil {
+			if n1.Msgsize() < n2.Msgsize() {
+				n1 = n2
+				ofs = 1
 			}
-			if ts <= n.tree.NodeMaximumSize {
-				//log.Printf("Decreasing depth by 1")
-				cl := make([]*IBNodeDataChild, 0, cc)
-				leafy := false
-				for i := range n.Children {
-					cn := n.childNode(i)
-					if cn.Leafy {
-						leafy = true
-					}
-					ts += cn.Msgsize()
-					cl = append(cl, cn.Children...)
+		} else if n1 == nil {
+			ofs = 1
+			n1 = n2
+		}
+		if n1 == nil {
+			return
+		}
+		s1 := n1.Msgsize()
+		if s1 < n.tree.halfSize {
+			//log.Printf("mergeTo %d (%d)", ofs, s1)
+			self.mergeTo(ofs, n1)
+			return
+		}
+		//log.Printf("moveFrom %d", ofs)
+		// Borrow from that sibling
+		self.moveFrom(ofs, n1)
+	})
+
+	// Check root
+	n := self.node()
+	if !n.Leafy && n.Msgsize() < n.tree.smallSize {
+		ts := 0
+		cc := 0
+		for i := range n.Children {
+			cn := self.childNode(i)
+			ts += cn.Msgsize()
+			cc += len(cn.Children)
+		}
+		if ts <= n.tree.NodeMaximumSize {
+			//log.Printf("Decreasing depth by 1")
+			cl := make([]*IBNodeDataChild, 0, cc)
+			leafy := false
+			for i := range n.Children {
+				cn := self.childNode(i)
+				if cn.Leafy {
+					leafy = true
 				}
-				self.rewriteNodeChildren(cl)
-				if leafy {
-					// Just copied the node, it is fresh
-					self.node().Leafy = true
-				}
+				ts += cn.Msgsize()
+				cl = append(cl, cn.Children...)
+			}
+			self.rewriteNodeChildren(cl)
+			n = self.node()
+			if leafy {
+				// Just copied the node, it is fresh
+				n.Leafy = true
 			}
 		}
 	}
-	return self.node()
+	return n
 }
 
 // Go to the first leaf that has been set, going down from the current
 // node.
-func (self *ibStack) goDownLeft() {
+func (self *IBStack) goDownLeft() {
 	n := self.node()
 	for i := 0; i < len(n.Children); i++ {
-		v := n.Children[i]
-		if v.childNode != nil && !v.childNode.Leafy {
-			self.push(i, v.childNode)
+		cn := n.Children[i].childNode
+		if cn != nil && !cn.Leafy {
+			self.push(i, cn)
 			self.goDownLeft()
 			return
 		}
@@ -309,31 +339,30 @@ func (self *ibStack) goDownLeft() {
 
 // goDownLeftAny goes down any leaf, including clean ones, that are
 // loaded from disk if need be.
-func (self *ibStack) goDownLeftAny() {
+func (self *IBStack) goDownLeftAny() {
 	idx := self.index()
 	for {
 		n := self.node()
 		if n.Leafy {
 			return
 		}
-		v := n.childNode(idx)
+		v := self.childNode(idx)
 		self.push(idx, v)
 		idx = 0
 	}
 }
 
-func (self *ibStack) pushIndex(idx int) {
-	n := self.node()
-	n = n.childNode(idx)
+func (self *IBStack) pushIndex(idx int) {
+	n := self.childNode(idx)
 	self.push(idx, n)
 }
 
-func (self *ibStack) pushCurrentIndex() {
+func (self *IBStack) pushCurrentIndex() {
 	idx := self.index()
 	self.pushIndex(idx)
 }
 
-func (self *ibStack) goPreviousLeaf() bool {
+func (self *IBStack) goPreviousLeaf() bool {
 	for {
 		idx := self.index() - 1
 		n := self.node()
@@ -344,15 +373,13 @@ func (self *ibStack) goPreviousLeaf() bool {
 					n = self.node()
 					idx = len(n.Children) - 1
 				}
-				self.indexes[self.top] = idx
-			} else {
-				self.indexes[self.top] = idx
 			}
+			self.setIndex(idx)
 			return true
 		}
 		if self.top == 0 {
 			if self.indexes[self.top] == 0 {
-				self.indexes[self.top] = -1
+				self.setIndex(-1)
 				return true
 			}
 			return false
@@ -362,7 +389,7 @@ func (self *ibStack) goPreviousLeaf() bool {
 
 }
 
-func (self *ibStack) goNextLeaf() bool {
+func (self *IBStack) goNextLeaf() bool {
 	//log.Printf("goNextLeaf")
 	for {
 		idx := self.index() + 1
@@ -375,8 +402,9 @@ func (self *ibStack) goNextLeaf() bool {
 					idx = 0
 				}
 			} else {
-				self.indexes[self.top] = idx
+				self.setIndex(idx)
 			}
+			self.nodes[self.top+1] = nil
 			return true
 
 		}
@@ -384,7 +412,7 @@ func (self *ibStack) goNextLeaf() bool {
 			lidx := len(n.Children)
 			// go to 'beyond last'
 			if self.indexes[self.top] != lidx {
-				self.indexes[self.top] = lidx
+				self.setIndex(lidx)
 				return true
 			}
 			return false
@@ -393,7 +421,7 @@ func (self *ibStack) goNextLeaf() bool {
 	}
 }
 
-func (self *ibStack) moveRight() bool {
+func (self *IBStack) moveRight() bool {
 	// Current node has been travelled.
 	// Options: go right to node's next child, OR recurse to parent.
 	n := self.node()
@@ -404,7 +432,7 @@ func (self *ibStack) moveRight() bool {
 				self.pushIndex(i)
 				self.goDownLeft()
 			} else {
-				self.indexes[self.top] = i
+				self.setIndex(i)
 			}
 			return true
 		}
@@ -419,9 +447,11 @@ func (self *ibStack) moveRight() bool {
 
 }
 
-func (self *ibStack) iterateMutatingChildLeafFirst(fun func()) {
-	if self.node().Leafy {
-		return
+func (self *IBStack) iterateMutatingChildLeafFirst(fun func()) *IBNode {
+	self.Reset()
+	n := self.node()
+	if n.Leafy {
+		return n
 	}
 	self.goDownLeft()
 	for {
@@ -431,7 +461,7 @@ func (self *ibStack) iterateMutatingChildLeafFirst(fun func()) {
 			// log.Printf("child stayed same")
 			if !self.moveRight() {
 				// log.Printf("no more children")
-				return
+				break
 			}
 			nn := self.child()
 			if on == nn {
@@ -444,9 +474,13 @@ func (self *ibStack) iterateMutatingChildLeafFirst(fun func()) {
 			//self.node().checkTreeStructure()
 		}
 	}
+	for self.top > 0 {
+		self.pop()
+	}
+	return self.nodes[0]
 }
 
-func (self *ibStack) addChildAt(child *IBNodeDataChild) {
+func (self *IBStack) addChildAt(child *IBNodeDataChild) {
 	// Insert child where it belongs
 	self.rewriteAtIndex(false, child)
 
@@ -474,16 +508,15 @@ func (self *ibStack) addChildAt(child *IBNodeDataChild) {
 		childNode: next}
 	if self.top > 0 {
 		//log.Printf("Adding sibling leaf with key %v", nextc[0].Key)
-		old_index := self.indexes[self.top-1]
 		self.pop()
-		self.indexes[self.top] = old_index + 1
+		self.nextIndex()
 		// next.print(2)
 		//log.Printf("top:%d idx:%d", self.top, self.indexes[self.top])
 		self.addChildAt(nextchild)
 		return
 	}
 
-	//log.Printf("Replacing root")
+	// log.Printf("Replacing root")
 	// Uh oh. Didn't fit to root level. Have to create new root
 	// with two children instead.
 	node = self.node()
@@ -493,10 +526,10 @@ func (self *ibStack) addChildAt(child *IBNodeDataChild) {
 	self.nodes[0] = &IBNode{tree: node.tree,
 		IBNodeData: IBNodeData{
 			Children: []*IBNodeDataChild{mechild, nextchild}}}
-	self.indexes[0] = -1
+	self.nodes[1] = nil
 }
 
-func (self *ibStack) search(key IBKey) error {
+func (self *IBStack) search(key IBKey) error {
 	n := self.nodes[0]
 	self.top = 0
 	//log.Printf("search %v", key)
@@ -525,21 +558,17 @@ func (self *ibStack) search(key IBKey) error {
 			// subsequent calls, unless tree is empty.
 		}
 		//log.Printf(" @%d => %d", self.top, idx)
-		var on *IBNode
-		if idx == self.indexes[self.top] {
-			on = self.nodes[self.top+1]
-		}
 		if n.Leafy {
-			self.indexes[self.top] = idx
+			self.setIndex(idx)
 			//log.Printf(" top:%d, n:%v, idx:%d", self.top, n, idx)
 			break
 		}
-		if on != nil {
-			n = on
-		} else {
-			n = n.childNode(idx)
-		}
+		n = self.childNode(idx)
 		self.push(idx, n)
 	}
 	return nil
+}
+
+func (self *IBStack) nextIndex() {
+	self.setIndex(self.indexes[self.top] + 1)
 }

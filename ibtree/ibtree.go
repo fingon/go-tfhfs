@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Thu Dec 28 16:41:17 2017 mstenber
- * Edit time:     615 min
+ * Last modified: Thu Dec 28 19:36:18 2017 mstenber
+ * Edit time:     650 min
  *
  */
 
@@ -100,14 +100,8 @@ type IBNode struct {
 	tree    *IBTree
 }
 
-func (self *IBNode) copy() *IBNode {
-	return &IBNode{tree: self.tree, blockId: self.blockId,
-		IBNodeData: self.IBNodeData}
-}
-
-func (self *IBNode) Delete(key IBKey) *IBNode {
-	var st ibStack
-	err := self.search(key, &st)
+func (self *IBNode) Delete(key IBKey, st *IBStack) *IBNode {
+	err := self.search(key, st)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -160,28 +154,25 @@ func (self *IBNode) Commit() *IBNode {
 	return self
 }
 
-func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
+func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	if key1 > key2 {
 		log.Panic("ibt.DeleteRange: first key more than second key", key1, key2)
 	}
-	log.Printf("DeleteRange [%v..%v]", key1, key2)
-	var st ibStack
+	//log.Printf("DeleteRange [%v..%v]", key1, key2)
+	st2.top = 0
+	st := *st2
 	err := self.searchLesser(key1, &st)
 	if err != nil {
 		log.Panic(err)
 	}
-	var st2 ibStack = st
-	st2.top = 0
-	c1 := st.child()
-	log.Printf("c1:%v @%v", c1, st.indexes)
-	err = self.searchGreater(key2, &st2)
+	//log.Printf("c1:%v @%v", st.child(), st.indexes)
+	err = self.searchGreater(key2, st2)
 	if err != nil {
 		log.Panic(err)
 	}
-	c2 := st2.child()
-	log.Printf("c2:%v @%v", c2, st2.indexes)
+	//log.Printf("c2:%v @%v", st2.child(), st2.indexes)
 	// No matches at all?
-	if st == st2 {
+	if st == *st2 {
 		return self
 	}
 	unique := 0
@@ -191,11 +182,11 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
 	if st.indexes == st2.indexes {
 		return self
 	}
-	log.Printf("unique:%d", unique)
+	//log.Printf("unique:%d", unique)
 	for st2.top > unique {
 		idx := st2.index()
 		if idx > 0 {
-			log.Printf("removing @%d[<%d]", st2.top, idx)
+			//log.Printf("removing @%d[<%d]", st2.top, idx)
 			st2.rewriteNodeChildrenWithCopyOf(st2.node().Children[idx:])
 		}
 		st2.pop()
@@ -204,7 +195,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
 		cl := st.node().Children
 		idx := st.index()
 		if idx < (len(cl) - 1) {
-			log.Printf("removing @%d[>%d]", st.top, idx)
+			//log.Printf("removing @%d[>%d]", st.top, idx)
 			st.rewriteNodeChildrenWithCopyOf(cl[:(idx + 1)])
 		}
 		st.pop()
@@ -215,7 +206,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
 	cl := st2.node().Children
 	idx1 := st.indexes[st.top]
 	idx2 := st2.indexes[st.top]
-	log.Printf("idx1:%d idx2:%d", idx1, idx2)
+	//log.Printf("idx1:%d idx2:%d", idx1, idx2)
 	ncl := make([]*IBNodeDataChild, len(cl)-(idx2-idx1)+1)
 	copy(ncl, cl[:idx1])
 	ncl[idx1] = st.child()
@@ -227,50 +218,22 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
 	return st2.commit()
 }
 
-func (self *IBNode) Get(key IBKey) *string {
-	var st ibStack
-	err := self.search(key, &st)
+func (self *IBNode) Get(key IBKey, st *IBStack) *string {
+	err := self.search(key, st)
 	if err != nil {
 		log.Panic(err)
 	}
 	c := st.child()
+	st.top = 0
 	if c == nil || c.Key != key {
-		//log.Printf("non-matching child:%v for %v", c, key)
 		return nil
 	}
 	return &c.Value
 
 }
 
-func (self *IBNode) searchLesser(key IBKey, st *ibStack) (err error) {
-	err = self.search(key, st)
-	if err != nil {
-		return
-	}
-	c := st.child()
-	if c != nil && c.Key == key {
-		log.Printf("moving to previous leaf from %v", st.indexes)
-		st.goPreviousLeaf()
-	}
-	return
-}
-
-func (self *IBNode) searchGreater(key IBKey, st *ibStack) (err error) {
-	err = self.search(key, st)
-	if err != nil {
-		return
-	}
-	c := st.child()
-	if c != nil && c.Key == key {
-		log.Printf("moving to next leaf from %v", st.indexes)
-		st.goNextLeaf()
-	}
-	return
-}
-
-func (self *IBNode) Set(key IBKey, value string) *IBNode {
-	var st ibStack
-	err := self.search(key, &st)
+func (self *IBNode) Set(key IBKey, value string, st *IBStack) *IBNode {
+	err := self.search(key, st)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -279,19 +242,31 @@ func (self *IBNode) Set(key IBKey, value string) *IBNode {
 	if c == nil || c.Key != key {
 		// now at next -> insertion point is where it pointing at
 		st.addChildAt(child)
-		return st.commit()
+	} else {
+		if st.child().Value == value {
+			return self
+		}
+		st.rewriteAtIndex(true, child)
 	}
-	if st.child().Value == value {
-		return self
-	}
-	st.rewriteAtIndex(true, child)
 	return st.commit()
 
 }
 
-func (self *IBNode) search(key IBKey, stack *ibStack) error {
-	stack.nodes[0] = self
-	return stack.search(key)
+func (self *IBNode) search(key IBKey, st *IBStack) error {
+	if st.nodes[0] == nil {
+		st.nodes[0] = self
+	} else if self != st.nodes[0] {
+		log.Panic("historic/wrong self:", self, " != ", st.nodes[0])
+	}
+	if st.top > 0 {
+		log.Panic("leftover stack")
+	}
+	return st.search(key)
+}
+
+func (self *IBNode) copy() *IBNode {
+	return &IBNode{tree: self.tree, blockId: self.blockId,
+		IBNodeData: self.IBNodeData}
 }
 
 func (self *IBNode) childNode(idx int) *IBNode {
@@ -355,4 +330,30 @@ func (self *IBNode) nestedNodeCount() int {
 		cnt++
 	})
 	return cnt
+}
+
+func (self *IBNode) searchLesser(key IBKey, st *IBStack) (err error) {
+	err = self.search(key, st)
+	if err != nil {
+		return
+	}
+	c := st.child()
+	if c != nil && c.Key == key {
+		//log.Printf("moving to previous leaf from %v", st.indexes)
+		st.goPreviousLeaf()
+	}
+	return
+}
+
+func (self *IBNode) searchGreater(key IBKey, st *IBStack) (err error) {
+	err = self.search(key, st)
+	if err != nil {
+		return
+	}
+	c := st.child()
+	if c != nil && c.Key == key {
+		//log.Printf("moving to next leaf from %v", st.indexes)
+		st.goNextLeaf()
+	}
+	return
 }

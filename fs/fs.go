@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Dec 29 00:35:34 2017 mstenber
- * Edit time:     87 min
+ * Last modified: Fri Dec 29 00:54:35 2017 mstenber
+ * Edit time:     92 min
  *
  */
 
@@ -68,7 +68,7 @@ func (self *Fs) SaveNode(nd ibtree.IBNodeData) ibtree.BlockId {
 	}
 	h := sha256.Sum256(b)
 	bid := h[:]
-	nb := make([]byte, 0, len(b)+1)
+	nb := make([]byte, len(b)+1)
 	nb[0] = byte(BDT_NODE)
 	copy(nb[1:], b)
 	block := self.storage.ReferOrStoreBlock(string(bid), string(nb))

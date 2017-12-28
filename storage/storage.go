@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Sun Dec 24 20:59:12 2017 mstenber
- * Edit time:     243 min
+ * Last modified: Thu Dec 28 11:30:14 2017 mstenber
+ * Edit time:     244 min
  *
  */
 
@@ -286,12 +286,12 @@ func (self *Storage) Flush() int {
 	return ops
 }
 
-func (self *Storage) GetBlockById(id string) (*Block, bool) {
+func (self *Storage) GetBlockById(id string) *Block {
 	b := self.gocBlockById(id)
 	if self.blockValid(b) {
-		return b, true
+		return b
 	}
-	return nil, false
+	return nil
 }
 
 func (self *Storage) GetBlockIdByName(name string) string {
@@ -299,16 +299,16 @@ func (self *Storage) GetBlockIdByName(name string) string {
 }
 
 func (self *Storage) ReferBlockId(id string) {
-	b, ok := self.GetBlockById(id)
-	if !ok {
+	b := self.GetBlockById(id)
+	if b == nil {
 		panic("block id disappeared")
 	}
 	b.setRefCount(b.RefCount + 1)
 }
 
 func (self *Storage) ReferOrStoreBlock(id, data string) *Block {
-	b, ok := self.GetBlockById(id)
-	if ok {
+	b := self.GetBlockById(id)
+	if b != nil {
 		self.ReferBlockId(id)
 		return b
 	}
@@ -318,8 +318,8 @@ func (self *Storage) ReferOrStoreBlock(id, data string) *Block {
 // ReleaseBlockId will eventually release block (in Flush), if its
 // refcnt is zero.
 func (self *Storage) ReleaseBlockId(id string) {
-	b, ok := self.GetBlockById(id)
-	if !ok {
+	b := self.GetBlockById(id)
+	if b == nil {
 		panic("block id disappeared")
 	}
 	b.setRefCount(b.RefCount - 1)

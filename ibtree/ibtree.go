@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Thu Dec 28 21:03:28 2017 mstenber
- * Edit time:     658 min
+ * Last modified: Thu Dec 28 21:31:31 2017 mstenber
+ * Edit time:     659 min
  *
  */
 
@@ -21,15 +21,12 @@
 package ibtree
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"strings"
 )
 
 const hashSize = 32
-
-var ErrEmptyTree = errors.New("empty tree")
 
 type BlockId string
 

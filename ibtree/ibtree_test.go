@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Thu Dec 28 03:36:02 2017 mstenber
- * Edit time:     151 min
+ * Last modified: Thu Dec 28 16:48:12 2017 mstenber
+ * Edit time:     180 min
  *
  */
 
@@ -83,7 +83,7 @@ func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n int, st int) {
 			assert.Nil(t, v)
 		} else {
 			assert.True(t, v != nil)
-			assert.Equal(t, *v, fmt.Sprintf("%d", i))
+			assert.Equal(t, *v, fmt.Sprintf("v%d", i))
 		}
 	}
 	r.checkTreeStructure()
@@ -94,16 +94,47 @@ func (self *DummyTree) checkTree(t *testing.T, r *IBNode, n int) {
 }
 
 func nonpaddedIBKey(n int) IBKey {
-	return IBKey(fmt.Sprintf("%d", n))
+	return IBKey(fmt.Sprintf("nk%d", n))
 }
 
 func paddedIBKey(n int) IBKey {
-	return IBKey(fmt.Sprintf("%08d", n))
+	return IBKey(fmt.Sprintf("pk%08d", n))
 }
 
+func EnsureDelta(t *testing.T, old, new *IBNode, del, upd, add int) {
+	var got_upd, got_add, got_del int
+	var previous *IBNodeDataChild
+	new.IterateDelta(old, func(c1, c2 *IBNodeDataChild) {
+		log.Printf("c0:%v c:%v", c1, c2)
+		c := c1
+		if c1 == nil {
+			c = c2
+			got_add++
+		} else if c2 == nil {
+			got_del++
+		} else {
+			assert.Equal(t, c1.Key, c2.Key)
+			got_upd++
+		}
+		if previous != nil {
+			assert.True(t, previous.Key < c.Key, "broken iteration at key", previous, c)
+		}
+		previous = c
+
+	})
+	assert.Equal(t, got_add, add)
+	assert.Equal(t, got_upd, upd)
+	assert.Equal(t, got_del, del)
+}
+
+func EnsureDelta2(t *testing.T, old, new *IBNode, del, upd, add int) {
+	EnsureDelta(t, old, new, del, upd, add)
+	EnsureDelta(t, new, old, add, upd, del)
+}
 func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
-	r := self.NewRoot()
-	v := r.Get(IBKey("foo"))
+	r0 := self.NewRoot()
+	r := r0
+	v := r0.Get(IBKey("foo"))
 	assert.Nil(t, v)
 	for i := 0; i < n; i++ {
 		if debug > 1 {
@@ -121,9 +152,13 @@ func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
 		})
 		assert.Equal(t, cnt, r.nestedNodeCount()-1, "iterateMutatingChildLeafFirst broken")
 		k := self.idcb(i)
-		v := fmt.Sprintf("%d", i)
+		v := fmt.Sprintf("v%d", i)
 		r = r.Set(k, v)
 	}
+	//EnsureDelta2(t, r0, r, 0, 0, n)
+	//r2 := r0.Set(IBKey("z"), "42")
+	//EnsureDelta2(t, r2, r, 1, 0, n)
+
 	return r
 }
 
@@ -162,6 +197,15 @@ func ProdIBTree(t *testing.T, tree *DummyTree, n int) {
 	st.nodes[0] = r
 	st.indexes[0] = -1
 	c1 := 0
+
+	st2 := st
+	st2.goNextLeaf()
+
+	st3 := st
+	st3.indexes[0] = 0
+	st3.goDownLeftAny()
+	assert.Equal(t, st2, st3)
+
 	for st.goNextLeaf() {
 		c1++
 	}
@@ -173,9 +217,10 @@ func ProdIBTree(t *testing.T, tree *DummyTree, n int) {
 	assert.Equal(t, c1, c2, "next count = previous count")
 
 	// Ensure in-place mutate works fine as well and does not change r
-	rr := r.Set(IBKey("0"), "z")
-	assert.Equal(t, "z", *rr.Get(IBKey("0")))
-	assert.Equal(t, "0", *r.Get(IBKey("0")))
+	k := tree.idcb(0)
+	rr := r.Set(k, "z")
+	assert.Equal(t, "z", *rr.Get(k))
+	assert.Equal(t, "v0", *r.Get(k))
 	tree.checkTree(t, r, n)
 	EmptyIBTreeForward(t, tree, r, n)
 	EmptyIBTreeBackward(t, tree, r, n)
@@ -202,6 +247,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 	// We attempt to remove higher bits, as they offend us.
 	for i := 4; i < n; i = i * 4 {
 		i0 := i * 3 / 4
+		removed := i - i0 + 1
 		r.checkTreeStructure()
 		if debug > 0 {
 			r.print(0)
@@ -209,7 +255,10 @@ func TestIBTreeDeleteRange(t *testing.T) {
 		}
 		s1 := tree.idcb(i0)
 		s2 := tree.idcb(i)
+		or := r
 		r = r.DeleteRange(s1, s2)
+		r.print(0)
+		EnsureDelta2(t, or, r, removed, 0, 0)
 
 		r.checkTreeStructure()
 
@@ -223,7 +272,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 			}
 			if j0 < n {
 				assert.True(t, r0 != nil, "missing index:", j0)
-				assert.Equal(t, *r0, fmt.Sprintf("%d", j0))
+				assert.Equal(t, *r0, fmt.Sprintf("v%d", j0))
 			} else {
 				assert.Nil(t, r0)
 			}
@@ -240,7 +289,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 			r3 := r.Get(s3)
 			if j3 < n {
 				assert.True(t, r3 != nil, "missing index:", j3)
-				assert.Equal(t, *r3, fmt.Sprintf("%d", j3))
+				assert.Equal(t, *r3, fmt.Sprintf("v%d", j3))
 			} else {
 				assert.Nil(t, r3)
 			}

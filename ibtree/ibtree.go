@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Thu Dec 28 03:12:53 2017 mstenber
- * Edit time:     598 min
+ * Last modified: Thu Dec 28 16:41:17 2017 mstenber
+ * Edit time:     615 min
  *
  */
 
@@ -216,7 +216,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
 	idx1 := st.indexes[st.top]
 	idx2 := st2.indexes[st.top]
 	log.Printf("idx1:%d idx2:%d", idx1, idx2)
-	ncl := make([]*IBNodeDataChild, len(cl)-(idx2-idx1))
+	ncl := make([]*IBNodeDataChild, len(cl)-(idx2-idx1)+1)
 	copy(ncl, cl[:idx1])
 	ncl[idx1] = st.child()
 	if len(cl) > idx2 {

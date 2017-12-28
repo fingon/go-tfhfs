@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Thu Dec 28 03:01:49 2017 mstenber
- * Edit time:     45 min
+ * Last modified: Thu Dec 28 16:46:04 2017 mstenber
+ * Edit time:     67 min
  *
  */
 package ibtree
@@ -109,13 +109,18 @@ func (self *ibStack) childSibNode(ofs int) *IBNode {
 	return n.childNode(idx)
 }
 
-func (self *ibStack) pop() {
+func (self *ibStack) popNode() *IBNode {
 	n := self.node()
 	self.indexes[self.top] = -1
 	self.top--
 	if self.top < 0 {
 		log.Panic("popped beyond top! madness!")
 	}
+	return n
+}
+
+func (self *ibStack) pop() {
+	n := self.popNode()
 	key := IBKey("")
 	if len(n.Children) > 0 {
 		key = n.Children[0].Key
@@ -302,6 +307,32 @@ func (self *ibStack) goDownLeft() {
 	}
 }
 
+// goDownLeftAny goes down any leaf, including clean ones, that are
+// loaded from disk if need be.
+func (self *ibStack) goDownLeftAny() {
+	idx := self.index()
+	for {
+		n := self.node()
+		if n.Leafy {
+			return
+		}
+		v := n.childNode(idx)
+		self.push(idx, v)
+		idx = 0
+	}
+}
+
+func (self *ibStack) pushIndex(idx int) {
+	n := self.node()
+	n = n.childNode(idx)
+	self.push(idx, n)
+}
+
+func (self *ibStack) pushCurrentIndex() {
+	idx := self.index()
+	self.pushIndex(idx)
+}
+
 func (self *ibStack) goPreviousLeaf() bool {
 	for {
 		idx := self.index() - 1
@@ -309,8 +340,7 @@ func (self *ibStack) goPreviousLeaf() bool {
 		if idx >= 0 {
 			if !n.Leafy {
 				for !n.Leafy {
-					n = n.childNode(idx)
-					self.push(idx, n)
+					self.pushIndex(idx)
 					n = self.node()
 					idx = len(n.Children) - 1
 				}
@@ -327,7 +357,7 @@ func (self *ibStack) goPreviousLeaf() bool {
 			}
 			return false
 		}
-		self.pop()
+		self.popNode()
 	}
 
 }
@@ -340,8 +370,8 @@ func (self *ibStack) goNextLeaf() bool {
 		if idx < len(n.Children) {
 			if !n.Leafy {
 				for !n.Leafy {
-					n = self.node().childNode(idx)
-					self.push(idx, n)
+					self.pushIndex(idx)
+					n = self.node()
 					idx = 0
 				}
 			} else {
@@ -359,7 +389,7 @@ func (self *ibStack) goNextLeaf() bool {
 			}
 			return false
 		}
-		self.pop()
+		self.popNode()
 	}
 }
 
@@ -371,7 +401,7 @@ func (self *ibStack) moveRight() bool {
 		cn := n.Children[i].childNode
 		if cn != nil {
 			if !cn.Leafy {
-				self.push(i, cn)
+				self.pushIndex(i)
 				self.goDownLeft()
 			} else {
 				self.indexes[self.top] = i

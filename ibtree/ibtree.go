@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Thu Dec 28 19:45:57 2017 mstenber
- * Edit time:     652 min
+ * Last modified: Thu Dec 28 21:03:28 2017 mstenber
+ * Edit time:     658 min
  *
  */
 
@@ -101,10 +101,7 @@ type IBNode struct {
 }
 
 func (self *IBNode) Delete(key IBKey, st *IBStack) *IBNode {
-	err := self.search(key, st)
-	if err != nil {
-		log.Panic(err)
-	}
+	self.search(key, st)
 	c := st.child()
 	if c.Key != key {
 		log.Panic("ibp.Delete: Key missing ", key)
@@ -157,15 +154,9 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	//log.Printf("DeleteRange [%v..%v]", key1, key2)
 	st2.top = 0
 	st := *st2
-	err := self.searchLesser(key1, &st)
-	if err != nil {
-		log.Panic(err)
-	}
+	self.searchLesser(key1, &st)
 	//log.Printf("c1:%v @%v", st.child(), st.indexes)
-	err = self.searchGreater(key2, st2)
-	if err != nil {
-		log.Panic(err)
-	}
+	self.searchGreater(key2, st2)
 	//log.Printf("c2:%v @%v", st2.child(), st2.indexes)
 	// No matches at all?
 	if st == *st2 {
@@ -214,10 +205,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 }
 
 func (self *IBNode) Get(key IBKey, st *IBStack) *string {
-	err := self.search(key, st)
-	if err != nil {
-		log.Panic(err)
-	}
+	self.search(key, st)
 	c := st.child()
 	st.top = 0
 	if c == nil || c.Key != key {
@@ -228,10 +216,7 @@ func (self *IBNode) Get(key IBKey, st *IBStack) *string {
 }
 
 func (self *IBNode) Set(key IBKey, value string, st *IBStack) *IBNode {
-	err := self.search(key, st)
-	if err != nil {
-		log.Panic(err)
-	}
+	self.search(key, st)
 	child := &IBNodeDataChild{Key: key, Value: value}
 	c := st.child()
 	if c == nil || c.Key != key {
@@ -247,7 +232,7 @@ func (self *IBNode) Set(key IBKey, value string, st *IBStack) *IBNode {
 
 }
 
-func (self *IBNode) search(key IBKey, st *IBStack) error {
+func (self *IBNode) search(key IBKey, st *IBStack) {
 	if st.nodes[0] == nil {
 		st.nodes[0] = self
 	} else if self != st.nodes[0] {
@@ -256,7 +241,7 @@ func (self *IBNode) search(key IBKey, st *IBStack) error {
 	if st.top > 0 {
 		log.Panic("leftover stack")
 	}
-	return st.search(key)
+	st.search(key)
 }
 
 func (self *IBNode) copy() *IBNode {
@@ -327,28 +312,20 @@ func (self *IBNode) nestedNodeCount() int {
 	return cnt
 }
 
-func (self *IBNode) searchLesser(key IBKey, st *IBStack) (err error) {
-	err = self.search(key, st)
-	if err != nil {
-		return
-	}
+func (self *IBNode) searchLesser(key IBKey, st *IBStack) {
+	self.search(key, st)
 	c := st.child()
 	if c != nil && c.Key == key {
 		//log.Printf("moving to previous leaf from %v", st.indexes)
 		st.goPreviousLeaf()
 	}
-	return
 }
 
-func (self *IBNode) searchGreater(key IBKey, st *IBStack) (err error) {
-	err = self.search(key, st)
-	if err != nil {
-		return
-	}
+func (self *IBNode) searchGreater(key IBKey, st *IBStack) {
+	self.search(key, st)
 	c := st.child()
 	if c != nil && c.Key == key {
 		//log.Printf("moving to next leaf from %v", st.indexes)
 		st.goNextLeaf()
 	}
-	return
 }

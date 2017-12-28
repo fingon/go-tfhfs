@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Thu Dec 28 19:49:26 2017 mstenber
- * Edit time:     119 min
+ * Last modified: Thu Dec 28 20:59:30 2017 mstenber
+ * Edit time:     122 min
  *
  */
 package ibtree
@@ -535,7 +535,7 @@ func (self *IBStack) addChildAt(child *IBNodeDataChild) {
 	self.nodes[1] = nil
 }
 
-func (self *IBStack) search(key IBKey) error {
+func (self *IBStack) search(key IBKey) {
 	n := self.nodes[0]
 	self.top = 0
 	//log.Printf("search %v", key)
@@ -572,7 +572,6 @@ func (self *IBStack) search(key IBKey) error {
 		n = self.childNode(idx)
 		self.push(idx, n)
 	}
-	return nil
 }
 
 func (self *IBStack) nextIndex() {

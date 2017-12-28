@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Thu Dec 28 14:36:52 2017 mstenber
- * Edit time:     7 min
+ * Last modified: Fri Dec 29 00:33:03 2017 mstenber
+ * Edit time:     9 min
  *
  */
 
@@ -18,26 +18,26 @@ const (
 	BDT_EXTENT BlockDataType = 2
 )
 
-type ObjectSubType byte
+type BlockSubType byte
 
 const (
 	// should not occur in real world
 	// (can be used as end-of-range marker given ino+1 + this OST)
-	OST_NONE ObjectSubType = 0
+	BST_NONE BlockSubType = 0
 
 	// value: INodeMeta
-	OST_META ObjectSubType = 1
+	BST_META BlockSubType = 1
 
 	// key: k (string->bytes), value: data (bytes)
-	OST_XATTR ObjectSubType = 2
+	BST_XATTR BlockSubType = 2
 
 	// key: teahash.name, value: 8 byte inode
-	OST_DIR_NAME2INODE ObjectSubType = 0x10
+	BST_DIR_NAME2INODE BlockSubType = 0x10
 
 	// key: inode (dir it is in) . filename
-	OST_FILE_INODEFILENAME ObjectSubType = 0x20
+	BST_FILE_INODEFILENAME BlockSubType = 0x20
 	// key: 8 byte offset, value: data block id (for data @ offset)
-	OST_FILE_OFFSET2EXTENT ObjectSubType = 0x21
+	BST_FILE_OFFSET2EXTENT BlockSubType = 0x21
 )
 
 type INodeMeta struct {

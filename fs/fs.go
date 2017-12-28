@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Dec 28 14:34:49 2017 mstenber
- * Edit time:     77 min
+ * Last modified: Fri Dec 29 00:35:34 2017 mstenber
+ * Edit time:     87 min
  *
  */
 
@@ -19,7 +19,6 @@ package fs
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"log"
 
 	"github.com/fingon/go-tfhfs/codec"
@@ -30,7 +29,7 @@ import (
 
 const iterations = 1234
 const inodeDataLength = 8
-const objectSubTypeOffset = inodeDataLength
+const blockSubTypeOffset = inodeDataLength
 
 type Fs struct {
 	server   *fuse.Server
@@ -38,29 +37,6 @@ type Fs struct {
 	storage  *storage.Storage
 	rootName string
 	treeRoot *ibtree.IBNode
-}
-
-type FsTreeKey string
-
-func (self FsTreeKey) ObjectSubType() ObjectSubType {
-	return ObjectSubType(self[objectSubTypeOffset])
-}
-
-func (self FsTreeKey) Ino() uint64 {
-	b := []byte(self[:inodeDataLength])
-	return binary.BigEndian.Uint64(b)
-}
-
-func NewFsTreeKey(ino uint64, st ObjectSubType, data string) FsTreeKey {
-	b := make([]byte, inodeDataLength+1, inodeDataLength+1+len(data))
-	binary.BigEndian.PutUint64(b, ino)
-	b[inodeDataLength] = byte(st)
-	b = append(b, []byte(data)...)
-	return FsTreeKey(b)
-}
-
-func (self FsTreeKey) SubTypeData() string {
-	return string(self[inodeDataLength+1:])
 }
 
 var _ fuse.RawFileSystem = &Fs{}
@@ -121,9 +97,9 @@ func (self *Fs) iterateReferencesCallback(id string, cb storage.BlockReferenceCa
 		return
 	}
 	for _, c := range nd.Children {
-		k := FsTreeKey(c.Key)
-		switch k.ObjectSubType() {
-		case OST_FILE_OFFSET2EXTENT:
+		k := BlockKey(c.Key)
+		switch k.SubType() {
+		case BST_FILE_OFFSET2EXTENT:
 			cb(c.Value)
 		}
 	}

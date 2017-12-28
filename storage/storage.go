@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Dec 28 11:30:14 2017 mstenber
- * Edit time:     244 min
+ * Last modified: Thu Dec 28 13:19:27 2017 mstenber
+ * Edit time:     247 min
  *
  */
 
@@ -191,7 +191,8 @@ type BlockBackend interface {
 	UpdateBlock(b *Block) int
 }
 
-type BlockIterateReferencesCallback func(string, func(string))
+type BlockReferenceCallback func(string)
+type BlockIterateReferencesCallback func(string, BlockReferenceCallback)
 type BlockHasExternalReferencesCallback func(string) bool
 
 // Storage is essentially DelayedStorage of Python prototype; it has

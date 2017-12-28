@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Sun Dec 24 20:37:01 2017 mstenber
- * Edit time:     93 min
+ * Last modified: Thu Dec 28 13:34:39 2017 mstenber
+ * Edit time:     94 min
  *
  */
 
@@ -18,9 +18,10 @@ import (
 )
 
 // BadgerBlockBackend provides on-disk storage.
-// key prefix 1 + block id -> metadata
-// key prefix 2 + block id -> data (essentially immutable)
-// key prefix 3 + name -> block id
+//
+// - key prefix 1 + block id -> metadata
+// - key prefix 2 + block id -> data (essentially immutable)
+// - key prefix 3 + name -> block id
 type BadgerBlockBackend struct {
 	db  *badger.DB
 	txn *badger.Txn

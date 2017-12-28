@@ -4,16 +4,27 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Mon Dec 25 01:22:37 2017 mstenber
- * Edit time:     3 min
+ * Last modified: Thu Dec 28 14:36:52 2017 mstenber
+ * Edit time:     7 min
  *
  */
 
 package fs
 
+type BlockDataType byte
+
+const (
+	BDT_NODE   BlockDataType = 1
+	BDT_EXTENT BlockDataType = 2
+)
+
 type ObjectSubType byte
 
 const (
+	// should not occur in real world
+	// (can be used as end-of-range marker given ino+1 + this OST)
+	OST_NONE ObjectSubType = 0
+
 	// value: INodeMeta
 	OST_META ObjectSubType = 1
 

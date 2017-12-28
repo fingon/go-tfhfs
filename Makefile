@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Dec 28 19:55:34 2017 mstenber
-# Edit time:     34 min
+# Last modified: Thu Dec 28 19:58:53 2017 mstenber
+# Edit time:     36 min
 #
 #
 
@@ -31,8 +31,7 @@ prof-%: .done.cpuprof.%
 	go tool pprof $<
 
 
-test: .done.buildable
-	go test -cpuprofile $@.new ./...
+test: .done.test
 
 update-deps:
 	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -u . ); done
@@ -61,3 +60,8 @@ update-deps:
 	touch $@
 
 .done.buildable: .done.greenpack .done.get2
+	touch $@
+
+.done.test: .done.buildable $(wildcard */*.go)
+	go test ./...
+	touch $@

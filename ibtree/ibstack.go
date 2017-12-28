@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Thu Dec 28 19:16:29 2017 mstenber
- * Edit time:     114 min
+ * Last modified: Thu Dec 28 19:49:26 2017 mstenber
+ * Edit time:     119 min
  *
  */
 package ibtree
@@ -96,6 +96,9 @@ func (self *IBStack) rewriteNodeChildren(children []*IBNodeDataChild) {
 	self.nodes[self.top] = n
 	// This invalidates sub-trees (if any)
 	self.nodes[self.top+1] = nil
+	if n.Leafy && n.Msgsize() <= n.tree.smallSize {
+		self.smallCount++
+	}
 }
 
 func (self *IBStack) rewriteNodeChildrenWithCopyOf(children []*IBNodeDataChild) {
@@ -320,6 +323,9 @@ func (self *IBStack) commit() *IBNode {
 			}
 		}
 	}
+
+	self.smallCount = 0
+
 	return n
 }
 

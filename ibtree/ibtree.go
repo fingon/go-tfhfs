@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Thu Dec 28 19:36:18 2017 mstenber
- * Edit time:     650 min
+ * Last modified: Thu Dec 28 19:45:57 2017 mstenber
+ * Edit time:     652 min
  *
  */
 
@@ -110,10 +110,6 @@ func (self *IBNode) Delete(key IBKey, st *IBStack) *IBNode {
 		log.Panic("ibp.Delete: Key missing ", key)
 	}
 	st.rewriteAtIndex(true, nil)
-	node := st.node()
-	if node.Msgsize() <= self.tree.smallSize {
-		st.smallCount++
-	}
 	return st.commit()
 }
 
@@ -214,7 +210,6 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 		copy(ncl[(idx1+1):], cl[idx2:])
 	}
 	st2.rewriteNodeChildren(ncl)
-	st2.smallCount++
 	return st2.commit()
 }
 

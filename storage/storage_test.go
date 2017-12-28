@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sun Dec 24 20:57:56 2017 mstenber
+ * Last modified: Thu Dec 28 03:37:16 2017 mstenber
  * Edit time:     100 min
  *
  */
@@ -113,6 +113,7 @@ func ProdStorage(t *testing.T, factory func() BlockBackend) {
 }
 
 func TestInMemory(t *testing.T) {
+	t.Parallel()
 	ProdBlockBackend(t, func() BlockBackend {
 		be := InMemoryBlockBackend{}.Init()
 		return be
@@ -120,6 +121,7 @@ func TestInMemory(t *testing.T) {
 }
 
 func TestBadger(t *testing.T) {
+	t.Parallel()
 	dir, _ := ioutil.TempDir("", "badger")
 	defer os.RemoveAll(dir)
 	ProdBlockBackend(t, func() BlockBackend {

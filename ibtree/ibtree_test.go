@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Thu Dec 28 03:12:09 2017 mstenber
- * Edit time:     148 min
+ * Last modified: Thu Dec 28 03:36:02 2017 mstenber
+ * Edit time:     151 min
  *
  */
 
@@ -182,12 +182,14 @@ func ProdIBTree(t *testing.T, tree *DummyTree, n int) {
 }
 
 func TestIBTree(t *testing.T) {
+	t.Parallel()
 	tree := DummyTree{}.Init(nil)
 	tree.setNodeMaximumSize(nodeSize) // more depth = smaller examples that blow up
 	ProdIBTree(t, tree, 10000)
 }
 
 func TestIBTreeDeleteRange(t *testing.T) {
+	t.Parallel()
 	tree := DummyTree{idcb: paddedIBKey}.Init(nil)
 	n := 1000
 	r := tree.CreateIBTree(t, n)
@@ -248,6 +250,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 }
 
 func TestIBTreeStorage(t *testing.T) {
+	t.Parallel()
 	n := 1000
 	be := DummyBackend{}.Init()
 	tree := DummyTree{}.Init(be)

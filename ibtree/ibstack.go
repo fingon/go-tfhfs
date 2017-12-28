@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Wed Dec 27 17:52:29 2017 mstenber
- * Edit time:     3 min
+ * Last modified: Thu Dec 28 03:01:49 2017 mstenber
+ * Edit time:     45 min
  *
  */
 package ibtree
@@ -116,7 +116,11 @@ func (self *ibStack) pop() {
 	if self.top < 0 {
 		log.Panic("popped beyond top! madness!")
 	}
-	c := &IBNodeDataChild{Key: n.Children[0].Key,
+	key := IBKey("")
+	if len(n.Children) > 0 {
+		key = n.Children[0].Key
+	}
+	c := &IBNodeDataChild{Key: key,
 		Value:     n.tree.placeholderValue,
 		childNode: n}
 	self.rewriteAtIndex(true, c)
@@ -298,6 +302,67 @@ func (self *ibStack) goDownLeft() {
 	}
 }
 
+func (self *ibStack) goPreviousLeaf() bool {
+	for {
+		idx := self.index() - 1
+		n := self.node()
+		if idx >= 0 {
+			if !n.Leafy {
+				for !n.Leafy {
+					n = n.childNode(idx)
+					self.push(idx, n)
+					n = self.node()
+					idx = len(n.Children) - 1
+				}
+				self.indexes[self.top] = idx
+			} else {
+				self.indexes[self.top] = idx
+			}
+			return true
+		}
+		if self.top == 0 {
+			if self.indexes[self.top] == 0 {
+				self.indexes[self.top] = -1
+				return true
+			}
+			return false
+		}
+		self.pop()
+	}
+
+}
+
+func (self *ibStack) goNextLeaf() bool {
+	//log.Printf("goNextLeaf")
+	for {
+		idx := self.index() + 1
+		n := self.node()
+		if idx < len(n.Children) {
+			if !n.Leafy {
+				for !n.Leafy {
+					n = self.node().childNode(idx)
+					self.push(idx, n)
+					idx = 0
+				}
+			} else {
+				self.indexes[self.top] = idx
+			}
+			return true
+
+		}
+		if self.top == 0 {
+			lidx := len(n.Children)
+			// go to 'beyond last'
+			if self.indexes[self.top] != lidx {
+				self.indexes[self.top] = lidx
+				return true
+			}
+			return false
+		}
+		self.pop()
+	}
+}
+
 func (self *ibStack) moveRight() bool {
 	// Current node has been travelled.
 	// Options: go right to node's next child, OR recurse to parent.
@@ -346,7 +411,7 @@ func (self *ibStack) iterateMutatingChildLeafFirst(fun func()) {
 			//log.Printf("mutated, trying harder")
 
 			// Sanity check (can remove eventually)
-			self.node().checkTreeStructure()
+			//self.node().checkTreeStructure()
 		}
 	}
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Wed Dec 27 18:21:53 2017 mstenber
- * Edit time:     554 min
+ * Last modified: Thu Dec 28 03:12:53 2017 mstenber
+ * Edit time:     598 min
  *
  */
 
@@ -164,37 +164,66 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey) *IBNode {
 	if key1 > key2 {
 		log.Panic("ibt.DeleteRange: first key more than second key", key1, key2)
 	}
+	log.Printf("DeleteRange [%v..%v]", key1, key2)
 	var st ibStack
-	err := self.search(key1, &st)
+	err := self.searchLesser(key1, &st)
 	if err != nil {
 		log.Panic(err)
 	}
 	var st2 ibStack = st
 	st2.top = 0
-	err = st2.search(key2)
+	c1 := st.child()
+	log.Printf("c1:%v @%v", c1, st.indexes)
+	err = self.searchGreater(key2, &st2)
 	if err != nil {
 		log.Panic(err)
 	}
-	if st2.child().Key == key2 {
-		st2.indexes[st2.top]++
-	}
+	c2 := st2.child()
+	log.Printf("c2:%v @%v", c2, st2.indexes)
 	// No matches at all?
 	if st == st2 {
 		return self
 	}
-	common := 0
-	for i := 1; i < st.top && st.indexes[i-1] == st2.indexes[i-1]; i++ {
-		common = i
+	unique := 0
+	for i := 0; i < st.top && st.indexes[i] == st2.indexes[i]; i++ {
+		unique = i + 1
 	}
-	log.Panic("TBD")
-	// nodes [ .. common] and indexes[.. common-1] are same
-
-	// Make the st2 match st, one level at a time.
-	// top = the level we are currently editing
-	for st2.top >= common {
-
+	if st.indexes == st2.indexes {
+		return self
 	}
-	st2.top++
+	log.Printf("unique:%d", unique)
+	for st2.top > unique {
+		idx := st2.index()
+		if idx > 0 {
+			log.Printf("removing @%d[<%d]", st2.top, idx)
+			st2.rewriteNodeChildrenWithCopyOf(st2.node().Children[idx:])
+		}
+		st2.pop()
+	}
+	for st.top > unique {
+		cl := st.node().Children
+		idx := st.index()
+		if idx < (len(cl) - 1) {
+			log.Printf("removing @%d[>%d]", st.top, idx)
+			st.rewriteNodeChildrenWithCopyOf(cl[:(idx + 1)])
+		}
+		st.pop()
+	}
+
+	// nodes[unique] should be same
+	// indexes[unique] should differ
+	cl := st2.node().Children
+	idx1 := st.indexes[st.top]
+	idx2 := st2.indexes[st.top]
+	log.Printf("idx1:%d idx2:%d", idx1, idx2)
+	ncl := make([]*IBNodeDataChild, len(cl)-(idx2-idx1))
+	copy(ncl, cl[:idx1])
+	ncl[idx1] = st.child()
+	if len(cl) > idx2 {
+		copy(ncl[(idx1+1):], cl[idx2:])
+	}
+	st2.rewriteNodeChildren(ncl)
+	st2.smallCount++
 	return st2.commit()
 }
 
@@ -211,6 +240,32 @@ func (self *IBNode) Get(key IBKey) *string {
 	}
 	return &c.Value
 
+}
+
+func (self *IBNode) searchLesser(key IBKey, st *ibStack) (err error) {
+	err = self.search(key, st)
+	if err != nil {
+		return
+	}
+	c := st.child()
+	if c != nil && c.Key == key {
+		log.Printf("moving to previous leaf from %v", st.indexes)
+		st.goPreviousLeaf()
+	}
+	return
+}
+
+func (self *IBNode) searchGreater(key IBKey, st *ibStack) (err error) {
+	err = self.search(key, st)
+	if err != nil {
+		return
+	}
+	c := st.child()
+	if c != nil && c.Key == key {
+		log.Printf("moving to next leaf from %v", st.indexes)
+		st.goNextLeaf()
+	}
+	return
 }
 
 func (self *IBNode) Set(key IBKey, value string) *IBNode {
@@ -283,9 +338,10 @@ func (self *IBNode) checkTreeStructure() {
 	self.iterateLeafFirst(func(n *IBNode) {
 		for i, c := range n.Children {
 			if i > 0 {
-				if n.Children[i-1].Key >= c.Key {
+				k0 := n.Children[i-1].Key
+				if k0 >= c.Key {
 					self.print(0)
-					log.Panic("tree broke!")
+					log.Panic("tree broke: ", k0, " >= ", c.Key)
 				}
 			}
 		}

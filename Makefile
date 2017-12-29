@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Dec 28 19:58:53 2017 mstenber
-# Edit time:     36 min
+# Last modified: Fri Dec 29 08:00:29 2017 mstenber
+# Edit time:     41 min
 #
 #
 
@@ -13,7 +13,7 @@ GREENPACKS=$(wildcard */*_greenpack.go)
 GREENPACK_OPTS=-alltuple
 # ^ remove -alltuple someday if we want to pretend to be compatible over versions
 
-SUBDIRS=btree codec storage
+SUBDIRS=codec fs ibtree storage
 
 all: generate test
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Fri Dec 29 09:22:38 2017 mstenber
- * Edit time:     16 min
+ * Last modified: Fri Dec 29 13:01:33 2017 mstenber
+ * Edit time:     18 min
  *
  */
 
@@ -41,10 +41,10 @@ const (
 
 	// value: FsData
 	// (this should be only in root inode)
-	BST_FS_DATA = 0x30
+	//BST_FS_DATA = 0x30
 )
 
-type InodeMeta struct {
+type InodeMetaData struct {
 	// int64 st_ino = 1;
 	// ^ part of key, not data
 	StMode    uint32
@@ -55,15 +55,20 @@ type InodeMeta struct {
 	StMtimeNs uint64
 	StSize    uint64
 	StNlink   uint32
+	Nchildren uint32
+}
+
+type InodeMeta struct {
+	InodeMetaData
 	// dynamic: st_rdev
 	// static but from elsewhere: st_blksize
 
-	// InPlaceData contains e.g. symlink target, mini-file
+	// Data contains e.g. symlink target, mini-file
 	// content; at most path-max-len (~ 1kb?)
-	InPlaceData []byte
+	Data []byte
 }
 
-type FsData struct {
-	// Eventually can stick fs-data in here
-	// notably: stuff for statfs?
-}
+//type FsData struct {
+// Eventually can stick fs-data in here
+// notably: stuff for statfs?
+//}

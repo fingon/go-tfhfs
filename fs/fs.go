@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Dec 29 08:41:45 2017 mstenber
+ * Last modified: Fri Dec 29 11:04:45 2017 mstenber
  * Edit time:     95 min
  *
  */
@@ -116,7 +116,7 @@ func (self *Fs) iterateReferencesCallback(id string, cb storage.BlockReferenceCa
 
 func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
-	fs.InodeTracker.fs = fs
+	fs.InodeTracker.Init(fs)
 	fs.tree = ibtree.IBTree{}.Init(fs)
 	st.HasExternalReferencesCallback = func(id string) bool {
 		return fs.hasExternalReferences(id)

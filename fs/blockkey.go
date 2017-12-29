@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 00:34:54 2017 mstenber
- * Last modified: Fri Dec 29 09:11:27 2017 mstenber
- * Edit time:     9 min
+ * Last modified: Fri Dec 29 12:52:25 2017 mstenber
+ * Edit time:     12 min
  *
  */
 
@@ -43,6 +43,12 @@ func NewBlockKeyDirFilename(ino uint64, filename string) BlockKey {
 	h := fnv.New32()
 	h.Write([]byte(filename))
 	n := h.Sum32()
-	b := util.ConcatBytes(util.Uint32Bytes(n), []byte(filename))
+	b0 := util.Uint32Bytes(n)
+	b := util.ConcatBytes(b0, []byte(filename))
 	return NewBlockKey(ino, BST_DIR_NAME2INODE, string(b))
+}
+
+func NewBlockKeyReverseDirFilename(ino, dirIno uint64, filename string) BlockKey {
+	b := util.ConcatBytes(util.Uint64Bytes(dirIno), []byte(filename))
+	return NewBlockKey(ino, BST_FILE_INODEFILENAME, string(b))
 }

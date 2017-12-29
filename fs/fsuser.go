@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Fri Dec 29 17:11:23 2017 mstenber
- * Edit time:     57 min
+ * Last modified: Sat Dec 30 00:05:56 2017 mstenber
+ * Edit time:     74 min
  *
  */
 
@@ -17,7 +17,7 @@
 //
 // (parallel testing, arbitrary permission simulation with nonroot
 // user)
-package fstest
+package fs
 
 import (
 	"errors"
@@ -28,7 +28,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/fingon/go-tfhfs/fs"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -43,14 +42,15 @@ func s2e(status fuse.Status) error {
 
 type FSUser struct {
 	fuse.InHeader
-	fs *fs.Fs
+	fs *Fs
 }
 
 type fileInfo struct {
-	name  string
-	size  int64
-	mode  os.FileMode
-	mtime time.Time
+	name       string
+	size       int64
+	mode       os.FileMode
+	mtime      time.Time
+	PrevNodeId uint64
 }
 
 func (self *fileInfo) Name() string {
@@ -77,8 +77,23 @@ func (self *fileInfo) Sys() interface{} {
 	return nil
 }
 
-func NewFSUser(f *fs.Fs) *FSUser {
-	return &FSUser{fs: f}
+func fileModeFromFuse(mode uint32) os.FileMode {
+	var r os.FileMode
+	translate := func(mask uint32, bits os.FileMode) {
+		if (mode & mask) != 0 {
+			mode = mode & ^mask
+			r = r | bits
+		}
+	}
+	translate(uint32(os.ModePerm), os.FileMode(mode)&os.ModePerm) // UNIX permissions
+	translate(fuse.S_IFDIR, os.ModeDir)
+	translate(fuse.S_IFLNK, os.ModeSymlink)
+	translate(fuse.S_IFIFO, os.ModeNamedPipe)
+	return r
+}
+
+func NewFSUser(fs *Fs) *FSUser {
+	return &FSUser{fs: fs}
 }
 
 func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
@@ -134,19 +149,15 @@ func (self *FSUser) ReadDir(dirname string) (ret []os.FileInfo, err error) {
 	log.Printf(" ListDir:%v", l)
 	ret = make([]os.FileInfo, len(l))
 	for i, n := range l {
-		var eo fuse.EntryOut
-		err = self.lookup(fmt.Sprintf("%s/%s", dirname, n), &eo)
+		ret[i], err = self.Stat(fmt.Sprintf("%s/%s", dirname, n))
 		if err != nil {
 			return
 		}
-		ret[i] = &fileInfo{name: n,
-			size:  int64(eo.Size),
-			mode:  os.FileMode(eo.Mode),
-			mtime: time.Unix(int64(eo.Mtime), int64(eo.Mtimensec))}
 	}
 	return
 }
 
+// MkDir is clone of os.MkDir
 func (self *FSUser) Mkdir(path string, perm os.FileMode) (err error) {
 	dirname, basename := filepath.Split(path)
 
@@ -157,5 +168,40 @@ func (self *FSUser) Mkdir(path string, perm os.FileMode) (err error) {
 	}
 	err = s2e(self.fs.Mkdir(&fuse.MkdirIn{InHeader: self.InHeader,
 		Mode: uint32(perm)}, basename, &eo))
+	return
+}
+
+// Stat is clone of os.Stat
+func (self *FSUser) Stat(path string) (fi os.FileInfo, err error) {
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	_, basename := filepath.Split(path)
+	fi = &fileInfo{name: basename,
+		size:  int64(eo.Size),
+		mode:  fileModeFromFuse(eo.Mode),
+		mtime: time.Unix(int64(eo.Mtime), int64(eo.Mtimensec))}
+	return
+}
+
+// Remove is clone of os.Remove
+func (self *FSUser) Remove(path string) (err error) {
+	fi, err := self.Stat(path)
+	if err != nil {
+		return
+	}
+	dirname, basename := filepath.Split(path)
+	var eo fuse.EntryOut
+	err = self.lookup(dirname, &eo)
+	if err != nil {
+		return
+	}
+	if fi.IsDir() {
+		err = s2e(self.fs.Rmdir(&self.InHeader, basename))
+	} else {
+		err = s2e(self.fs.Unlink(&self.InHeader, basename))
+	}
 	return
 }

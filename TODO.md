@@ -1,11 +1,9 @@
 # Pending early todo #
 
+* figure 
 
-* persistent (= immutable) btree with peds-based sub-vectors (or maybe not,
-  TBD - go get github.com/tobgu/peds/cmd/peds)
-
-* implement things from Python prototype - done: storage, codec; pending:
-  forest, inode, ops.
+* implement things from Python prototype - done: storage, codec, forest;
+  pending (somewhat): inode, ops.
 
 * immutable-btree (iteration 2); arbitrary string key+value with fancy ids
   derived from data using sha256 of plaintext data + encryption key. Keep
@@ -15,8 +13,6 @@
 
 * tree-merger (new design); input: 2 trees, output: new tree => flush to
   storage, use as base for further w operations
-
-* inode (or equivalent)
 
 * glue to fuse binding
 
@@ -29,3 +25,7 @@
   where it calls codec's EncodeBytes during Flush) should be
   parallelized. Decoding part is probably easier to make occur in each
   fs-using goroutine by default.
+
+* persistent (= immutable) btree with peds-based sub-vectors (or maybe not,
+  TBD - go get github.com/tobgu/peds/cmd/peds)
+

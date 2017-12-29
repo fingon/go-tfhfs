@@ -3,3 +3,4 @@ coverage.out
 *.pb.go
 *_gen.go
 *_gen_test.go
+/tfhfs

@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Dec 29 08:00:29 2017 mstenber
-# Edit time:     41 min
+# Last modified: Fri Dec 29 13:42:46 2017 mstenber
+# Edit time:     45 min
 #
 #
 
@@ -15,7 +15,7 @@ GREENPACK_OPTS=-alltuple
 
 SUBDIRS=codec fs ibtree storage
 
-all: generate test
+all: generate test tfhfs
 
 bench: .done.buildable
 	go test ./... -bench .
@@ -30,8 +30,10 @@ html-cover-%: .done.cover.%
 prof-%: .done.cpuprof.%
 	go tool pprof $<
 
-
 test: .done.test
+
+tfhfs: .done.test tfhfs.go $(wildcard */*.go)
+	go build -o tfhfs tfhfs.go
 
 update-deps:
 	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -u . ); done

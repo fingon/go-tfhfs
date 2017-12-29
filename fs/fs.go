@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Dec 29 00:54:35 2017 mstenber
- * Edit time:     92 min
+ * Last modified: Fri Dec 29 08:41:45 2017 mstenber
+ * Edit time:     95 min
  *
  */
 
@@ -32,6 +32,7 @@ const inodeDataLength = 8
 const blockSubTypeOffset = inodeDataLength
 
 type Fs struct {
+	InodeTracker
 	server   *fuse.Server
 	tree     *ibtree.IBTree
 	storage  *storage.Storage
@@ -79,6 +80,14 @@ func (self *Fs) SaveNode(nd ibtree.IBNodeData) ibtree.BlockId {
 	return ibtree.BlockId(block.Id)
 }
 
+func (self *Fs) GetTransaction() *ibtree.IBTransaction {
+	return ibtree.NewTransaction(self.treeRoot)
+}
+
+func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
+	self.treeRoot = t.Commit()
+}
+
 // We don't refer to blocks at all (TBD: Get rid of the feature? it is
 // relic of Python era?)
 func (self *Fs) hasExternalReferences(id string) bool {
@@ -107,6 +116,7 @@ func (self *Fs) iterateReferencesCallback(id string, cb storage.BlockReferenceCa
 
 func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
+	fs.InodeTracker.fs = fs
 	fs.tree = ibtree.IBTree{}.Init(fs)
 	st.HasExternalReferencesCallback = func(id string) bool {
 		return fs.hasExternalReferences(id)

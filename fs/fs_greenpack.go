@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Fri Dec 29 00:33:03 2017 mstenber
- * Edit time:     9 min
+ * Last modified: Fri Dec 29 09:22:38 2017 mstenber
+ * Edit time:     16 min
  *
  */
 
@@ -25,36 +25,45 @@ const (
 	// (can be used as end-of-range marker given ino+1 + this OST)
 	BST_NONE BlockSubType = 0
 
-	// value: INodeMeta
+	// value: InodeMeta
 	BST_META BlockSubType = 1
 
 	// key: k (string->bytes), value: data (bytes)
 	BST_XATTR BlockSubType = 2
 
-	// key: teahash.name, value: 8 byte inode
+	// key: fnvhash.name, value: 8 byte inode
 	BST_DIR_NAME2INODE BlockSubType = 0x10
 
 	// key: inode (dir it is in) . filename
 	BST_FILE_INODEFILENAME BlockSubType = 0x20
 	// key: 8 byte offset, value: data block id (for data @ offset)
 	BST_FILE_OFFSET2EXTENT BlockSubType = 0x21
+
+	// value: FsData
+	// (this should be only in root inode)
+	BST_FS_DATA = 0x30
 )
 
-type INodeMeta struct {
+type InodeMeta struct {
 	// int64 st_ino = 1;
 	// ^ part of key, not data
-	StMode    int32
-	StUid     int32
-	StGid     int32
-	StAtimeNs int64
-	StCtimeNs int64
-	StMtimeNs int64
-	StSize    int64
-	StNlink   int32
+	StMode    uint32
+	StUid     uint32
+	StGid     uint32
+	StAtimeNs uint64
+	StCtimeNs uint64
+	StMtimeNs uint64
+	StSize    uint64
+	StNlink   uint32
 	// dynamic: st_rdev
 	// static but from elsewhere: st_blksize
 
 	// InPlaceData contains e.g. symlink target, mini-file
 	// content; at most path-max-len (~ 1kb?)
 	InPlaceData []byte
+}
+
+type FsData struct {
+	// Eventually can stick fs-data in here
+	// notably: stuff for statfs?
 }

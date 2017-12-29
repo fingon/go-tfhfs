@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Thu Dec 28 20:52:59 2017 mstenber
- * Edit time:     233 min
+ * Last modified: Fri Dec 29 11:59:48 2017 mstenber
+ * Edit time:     249 min
  *
  */
 
@@ -68,6 +68,29 @@ func (self *DummyBackend) SaveNode(nd IBNodeData) BlockId {
 const debug = 1
 const nodeSize = 256
 
+func (self *DummyTree) checkNextKey(t *testing.T, r *IBNode, n int) {
+	// check NextKey works
+	lkv := IBKey("")
+	lk := &lkv
+	cnt := 0
+	r.iterateLeafFirst(func(n *IBNode) {
+		if !n.Leafy {
+			return
+		}
+		for _, c := range n.Children {
+			cnt++
+			nk := r.NextKey(*lk, &IBStack{})
+			assert.Equal(t, *nk, c.Key)
+			lk = nk
+		}
+
+	})
+	assert.Equal(t, cnt, n)
+	nk := r.NextKey(*lk, &IBStack{})
+	assert.True(t, *lk != "", "did not even get anything?")
+	assert.Nil(t, nk, "weird next for", *lk, nk)
+}
+
 func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n, s int) {
 	if debug > 1 {
 		r.print(0)
@@ -88,6 +111,7 @@ func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n, s int) {
 		}
 	}
 	r.checkTreeStructure()
+
 }
 
 func (self *DummyTree) checkTree(t *testing.T, r *IBNode, n int) {
@@ -201,7 +225,7 @@ func EmptyIBTreeBackward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode 
 	return r
 }
 
-func ProdIBTree(t *testing.T, tree *DummyTree, n int) {
+func ProdIBTree(t *testing.T, tree *DummyTree, n int) *IBNode {
 	r := tree.CreateIBTree(t, n)
 	// Check forward and backwards iteration
 	var st IBStack
@@ -235,13 +259,16 @@ func ProdIBTree(t *testing.T, tree *DummyTree, n int) {
 	tree.checkTree(t, r, n)
 	EmptyIBTreeForward(t, tree, r, n)
 	EmptyIBTreeBackward(t, tree, r, n)
+	return r
 }
 
 func TestIBTree(t *testing.T) {
+	n := 10000
 	t.Parallel()
 	tree := DummyTree{}.Init(nil)
 	tree.setNodeMaximumSize(nodeSize) // more depth = smaller examples that blow up
-	ProdIBTree(t, tree, 10000)
+	r := ProdIBTree(t, tree, n)
+	tree.checkNextKey(t, r, n)
 }
 
 func TestIBTreeDeleteRange(t *testing.T) {
@@ -261,7 +288,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 		i0 := i * 3 / 4
 		removed := i - i0 + 1
 		r.checkTreeStructure()
-		if debug > 0 {
+		if debug > 1 {
 			r.print(0)
 			log.Printf("DeleteRange %d-%d\n", i0, i)
 		}
@@ -269,7 +296,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 		s2 := tree.idcb(i)
 		or := r
 		r = r.DeleteRange(s1, s2, &st)
-		if debug > 0 {
+		if debug > 1 {
 			r.print(0)
 		}
 		EnsureDelta2(t, or, r, removed, 0, 0)

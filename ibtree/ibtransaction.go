@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Thu Dec 28 20:56:39 2017 mstenber
- * Edit time:     9 min
+ * Last modified: Fri Dec 29 11:40:46 2017 mstenber
+ * Edit time:     11 min
  *
  */
 
@@ -41,6 +41,10 @@ func (self *IBTransaction) DeleteRange(key1, key2 IBKey) {
 
 func (self *IBTransaction) Get(key IBKey) *string {
 	return self.stack.node().Get(key, &self.stack)
+}
+
+func (self *IBTransaction) NextKey(key IBKey) *IBKey {
+	return self.stack.node().NextKey(key, &self.stack)
 }
 
 func (self *IBTransaction) Set(key IBKey, value string) {

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Thu Dec 28 21:31:31 2017 mstenber
- * Edit time:     659 min
+ * Last modified: Fri Dec 29 11:42:35 2017 mstenber
+ * Edit time:     661 min
  *
  */
 
@@ -210,6 +210,16 @@ func (self *IBNode) Get(key IBKey, st *IBStack) *string {
 	}
 	return &c.Value
 
+}
+
+func (self *IBNode) NextKey(key IBKey, st *IBStack) *IBKey {
+	self.searchGreater(key, st)
+	c := st.child()
+	st.top = 0
+	if c == nil {
+		return nil
+	}
+	return &c.Key
 }
 
 func (self *IBNode) Set(key IBKey, value string, st *IBStack) *IBNode {

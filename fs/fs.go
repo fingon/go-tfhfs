@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Dec 29 14:30:04 2017 mstenber
- * Edit time:     102 min
+ * Last modified: Fri Dec 29 16:39:54 2017 mstenber
+ * Edit time:     106 min
  *
  */
 
@@ -90,6 +90,25 @@ func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
 	self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 }
 
+// ListDir provides testing utility as output of ReadDir/ReadDirPlus
+// is binary garbage and I am too lazy to write a decoder for it.
+func (self *Fs) ListDir(ino uint64) (ret []string) {
+	inode := self.GetInode(ino)
+	defer inode.Release()
+
+	file := inode.GetFile()
+	defer file.Release()
+	for {
+		inode, name := file.ReadNextInode()
+		if inode == nil {
+			return
+		}
+		defer inode.Release()
+		ret = append(ret, name)
+	}
+	return
+}
+
 // We don't refer to blocks at all (TBD: Get rid of the feature? it is
 // relic of Python era?)
 func (self *Fs) hasExternalReferences(id string) bool {
@@ -132,7 +151,8 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	}
 	if fs.treeRoot == nil {
 		fs.treeRoot = fs.tree.NewRoot()
-		root := fs.GetInode(fuse.FUSE_ROOT_ID)
+		// getInode succeeds always; Get does not
+		root := fs.getInode(fuse.FUSE_ROOT_ID)
 		var meta InodeMeta
 		meta.StMode = 0777 | fuse.S_IFDIR
 		root.SetMeta(&meta)

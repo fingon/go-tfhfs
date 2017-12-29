@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Fri Dec 29 15:07:53 2017 mstenber
- * Edit time:     116 min
+ * Last modified: Fri Dec 29 16:53:12 2017 mstenber
+ * Edit time:     120 min
  *
  */
 
@@ -45,6 +45,9 @@ func (self *InodeFile) ReadNextInode() (inode *Inode, name string) {
 				i++
 				return true
 			})
+	}
+	if lkp == nil {
+		return nil, ""
 	}
 	nkeyp := tr.NextKey(ibtree.IBKey(*lkp))
 	if nkeyp == nil {

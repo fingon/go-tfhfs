@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Fri Dec 29 16:48:42 2017 mstenber
- * Edit time:     47 min
+ * Last modified: Fri Dec 29 17:11:23 2017 mstenber
+ * Edit time:     57 min
  *
  */
 
@@ -22,7 +22,9 @@ package fstest
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -103,7 +105,6 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 	if err != nil {
 		return
 	}
-	self.NodeId = eo.Ino
 	var oo fuse.OpenOut
 	err = s2e(self.fs.OpenDir(&fuse.OpenIn{InHeader: self.InHeader}, &oo))
 	if err != nil {
@@ -123,11 +124,14 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 	return
 }
 
+// ReadDir is clone of ioutil.ReadDir
 func (self *FSUser) ReadDir(dirname string) (ret []os.FileInfo, err error) {
+	log.Printf("ReadDir %s", dirname)
 	l, err := self.ListDir(dirname)
 	if err != nil {
 		return
 	}
+	log.Printf(" ListDir:%v", l)
 	ret = make([]os.FileInfo, len(l))
 	for i, n := range l {
 		var eo fuse.EntryOut
@@ -140,5 +144,18 @@ func (self *FSUser) ReadDir(dirname string) (ret []os.FileInfo, err error) {
 			mode:  os.FileMode(eo.Mode),
 			mtime: time.Unix(int64(eo.Mtime), int64(eo.Mtimensec))}
 	}
+	return
+}
+
+func (self *FSUser) Mkdir(path string, perm os.FileMode) (err error) {
+	dirname, basename := filepath.Split(path)
+
+	var eo fuse.EntryOut
+	err = self.lookup(dirname, &eo)
+	if err != nil {
+		return
+	}
+	err = s2e(self.fs.Mkdir(&fuse.MkdirIn{InHeader: self.InHeader,
+		Mode: uint32(perm)}, basename, &eo))
 	return
 }

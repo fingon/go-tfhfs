@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Dec 29 16:39:54 2017 mstenber
- * Edit time:     106 min
+ * Last modified: Fri Dec 29 17:47:08 2017 mstenber
+ * Edit time:     111 min
  *
  */
 
@@ -82,17 +82,20 @@ func (self *Fs) SaveNode(nd ibtree.IBNodeData) ibtree.BlockId {
 }
 
 func (self *Fs) GetTransaction() *ibtree.IBTransaction {
+	log.Printf("GetTransaction of %p", self.treeRoot)
 	return ibtree.NewTransaction(self.treeRoot)
 }
 
 func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
 	self.treeRoot, self.treeRootBlockId = t.Commit()
+	log.Printf("CommitTransaction %p", self.treeRoot)
 	self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 }
 
 // ListDir provides testing utility as output of ReadDir/ReadDirPlus
 // is binary garbage and I am too lazy to write a decoder for it.
 func (self *Fs) ListDir(ino uint64) (ret []string) {
+	log.Printf("Fs.ListDir #%d", ino)
 	inode := self.GetInode(ino)
 	defer inode.Release()
 
@@ -103,7 +106,9 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 		if inode == nil {
 			return
 		}
+		file.pos++
 		defer inode.Release()
+		log.Printf(" %s", name)
 		ret = append(ret, name)
 	}
 	return

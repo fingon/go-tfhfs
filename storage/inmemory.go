@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Sat Dec 23 20:10:20 2017 mstenber
- * Edit time:     58 min
+ * Last modified: Fri Dec 29 17:21:48 2017 mstenber
+ * Edit time:     59 min
  *
  */
 
@@ -91,6 +91,6 @@ func (self *InMemoryBlockBackend) UpdateBlock(b *Block) int {
 	return 1
 }
 
-func (self *InMemoryBlockBackend) Close () {
+func (self *InMemoryBlockBackend) Close() {
 
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Fri Dec 29 16:53:12 2017 mstenber
- * Edit time:     120 min
+ * Last modified: Fri Dec 29 17:48:28 2017 mstenber
+ * Edit time:     143 min
  *
  */
 
@@ -33,41 +33,50 @@ func (self *InodeFile) ReadNextInode() (inode *Inode, name string) {
 	// dentry at lastName (if set) or pos (if not set);
 	// return true if reading was successful (and pos got advanced)
 	tr := self.Fs().GetTransaction()
-	lkp := self.lastKey
-	if lkp == nil {
+	kp := self.lastKey
+	log.Printf("Inode.ReadNextInode %v", kp == nil)
+	if kp == nil {
 		i := uint64(0)
 		self.inode.IterateSubTypeKeys(BST_DIR_NAME2INODE,
 			func(key BlockKey) bool {
+				//log.Printf(" #%d %v", i, key.SubTypeData()[filenameHashSize:])
 				if i == self.pos {
-					lkp = &key
+					kp = &key
+					log.Printf(" found what we looked for")
 					return false
 				}
 				i++
 				return true
 			})
+	} else {
+		nkeyp := tr.NextKey(ibtree.IBKey(*kp))
+		if nkeyp == nil {
+			log.Printf(" next missing")
+			return nil, ""
+		}
+		nkey := BlockKey(*nkeyp)
+		kp = &nkey
 	}
-	if lkp == nil {
+	if kp == nil {
+		log.Printf(" empty")
 		return nil, ""
 	}
-	nkeyp := tr.NextKey(ibtree.IBKey(*lkp))
-	if nkeyp == nil {
+	if kp.Ino() != self.inode.ino || kp.SubType() != BST_DIR_NAME2INODE {
 		return nil, ""
 	}
-	nkey := BlockKey(*nkeyp)
-	if nkey.Ino() != self.lastKey.Ino() || nkey.SubType() != self.lastKey.SubType() {
-		return nil, ""
-	}
-	inop := tr.Get(*nkeyp)
+	inop := tr.Get(ibtree.IBKey(*kp))
 	ino := binary.BigEndian.Uint64([]byte(*inop))
-	name = string(nkey.SubTypeData()[filenameHashSize:])
+	name = string(kp.SubTypeData()[filenameHashSize:])
 	inode = self.inode.tracker.GetInode(ino)
 	return
 }
 
 func (self *InodeFile) ReadDirEntry(l *fuse.DirEntryList) bool {
+	log.Printf("InodeFile.ReadDirEntry")
 	inode, name := self.ReadNextInode()
 	defer inode.Release()
 	if inode == nil {
+		log.Printf(" nothing found")
 		return false
 	}
 	defer inode.Release()
@@ -75,8 +84,9 @@ func (self *InodeFile) ReadDirEntry(l *fuse.DirEntryList) bool {
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
 	ok, _ := l.AddDirEntry(e)
 	if ok {
-		self.pos++
 		nkey := NewBlockKeyDirFilename(inode.ino, name)
+		//log.Printf(" #%d %s", self.pos, nkey)
+		self.pos++
 		self.lastKey = &nkey
 	}
 	return ok
@@ -115,6 +125,7 @@ func (self *InodeFile) Release() {
 }
 
 func (self *InodeFile) SetPos(pos uint64) {
+	log.Printf("InodeFile.SetPos %d", pos)
 	if self.pos == pos {
 		return
 	}
@@ -131,6 +142,7 @@ type Inode struct {
 }
 
 func (self *Inode) AddChild(name string, child *Inode) {
+	log.Printf("Inode.AddChild %v = %v", name, child)
 	tr := self.Fs().GetTransaction()
 	k := NewBlockKeyDirFilename(self.ino, name)
 	rk := NewBlockKeyReverseDirFilename(child.ino, self.ino, name)
@@ -328,9 +340,11 @@ func (self *Inode) Release() {
 }
 
 func (self *Inode) RemoveChildByName(name string) {
+	log.Printf("Inode.RemoveChildByName %v", name)
 	child := self.GetChildByName(name)
 	defer child.Release()
 	if child == nil {
+		log.Printf(" not found")
 		return
 	}
 	tr := self.Fs().GetTransaction()
@@ -346,6 +360,7 @@ func (self *Inode) RemoveChildByName(name string) {
 	meta.Nchildren--
 	self.SetMeta(meta)
 
+	log.Printf(" Removed %v", child)
 	self.Fs().CommitTransaction(tr)
 }
 
@@ -353,10 +368,12 @@ func (self *Inode) RemoveChildByName(name string) {
 // It is valid for the duration of the inode, within validity period anyway.
 func (self *Inode) Meta() *InodeMeta {
 	if self.meta == nil {
+		log.Printf("Inode.Meta #%d", self.ino)
 		k := NewBlockKey(self.ino, BST_META, "")
 		tr := self.Fs().GetTransaction()
 		v := tr.Get(ibtree.IBKey(k))
 		if v == nil {
+			log.Printf(" not found")
 			return nil
 		}
 		var m InodeMeta
@@ -364,6 +381,7 @@ func (self *Inode) Meta() *InodeMeta {
 		if err != nil {
 			log.Panic(err)
 		}
+		log.Printf(" = %v", &m)
 		self.meta = &m
 	}
 	return self.meta
@@ -378,6 +396,7 @@ func (self *Inode) SetMeta(meta *InodeMeta) {
 	}
 	tr.Set(ibtree.IBKey(k), string(b))
 	self.Fs().CommitTransaction(tr)
+	log.Printf("Inode.SetMeta #%d = %v", self.ino, meta)
 	self.meta = meta
 }
 
@@ -433,7 +452,7 @@ func (self *InodeTracker) CreateInode() *Inode {
 		}
 
 		// Potentially interesting. See if it is on disk.
-		inode := self.GetInode(ino)
+		inode := self.getInode(ino)
 		if inode.Meta() != nil {
 			inode.Release()
 			continue
@@ -449,7 +468,7 @@ func (self *InodeTracker) CreateInode() *Inode {
 func (self *InodeMeta) SetMkdirIn(input *fuse.MkdirIn) {
 	self.StUid = input.Uid
 	self.StGid = input.Gid
-	self.StMode = input.Mode
+	self.StMode = input.Mode | fuse.S_IFDIR
 	// TBD: Umask?
 
 }

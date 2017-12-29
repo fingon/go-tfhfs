@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Fri Dec 29 15:27:15 2017 mstenber
- * Edit time:     143 min
+ * Last modified: Fri Dec 29 17:13:10 2017 mstenber
+ * Edit time:     148 min
  *
  */
 
@@ -293,7 +293,6 @@ func (self *Fs) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) 
 	meta.SetMkdirIn(input)
 	child = self.CreateInode()
 	defer child.Release()
-
 	child.SetMeta(&meta)
 	inode.AddChild(name, child)
 	child.FillEntryOut(out)

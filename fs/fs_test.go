@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Fri Dec 29 00:59:29 2017 mstenber
- * Edit time:     15 min
+ * Last modified: Fri Dec 29 14:28:06 2017 mstenber
+ * Edit time:     16 min
  *
  */
 
@@ -46,7 +46,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		k := ibtree.IBKey(NewBlockKey(uint64(i), BST_META, ""))
 		tr.Set(k, fmt.Sprintf("v%d", i))
 	}
-	fs.treeRoot = tr.Commit()
+	fs.treeRoot, _ = tr.Commit()
 
 	b.Run("Get1", func(b *testing.B) {
 		b.ResetTimer()

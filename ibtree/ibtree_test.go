@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Fri Dec 29 11:59:48 2017 mstenber
- * Edit time:     249 min
+ * Last modified: Fri Dec 29 14:25:58 2017 mstenber
+ * Edit time:     250 min
  *
  */
 
@@ -344,7 +344,8 @@ func TestIBTreeStorage(t *testing.T) {
 	n := 1000
 	be := DummyBackend{}.Init()
 	tree := DummyTree{}.Init(be)
-	r := tree.CreateIBTree(t, n).Commit()
+	r, bid := tree.CreateIBTree(t, n).Commit()
+	assert.True(t, string(bid) != "")
 	c1 := r.nestedNodeCount()
 	assert.True(t, r.blockId != nil)
 	assert.Equal(t, be.loads, 0)
@@ -357,7 +358,8 @@ func TestIBTreeStorage(t *testing.T) {
 	//assert.Equal(t, c2, be.loads)
 	// loads is 'shotload', checkTree does .. plenty.
 	os := be.saves
-	r = r.Commit()
+	r, bid = r.Commit()
+	assert.True(t, string(bid) != "")
 	assert.Equal(t, os, be.saves)
 }
 
@@ -366,9 +368,12 @@ func TestIBTransaction(t *testing.T) {
 	n := 100
 	be := DummyBackend{}.Init()
 	tree := DummyTree{}.Init(be)
-	r := tree.CreateIBTree(t, n).Commit()
+	r, bid := tree.CreateIBTree(t, n).Commit()
+	assert.True(t, string(bid) != "")
 	tr := NewTransaction(r)
-	assert.Equal(t, tr.Commit(), r)
+	r2, bid2 := tr.Commit()
+	assert.Equal(t, r, r2)
+	assert.Equal(t, bid, bid2)
 	k := tree.idcb(42)
 	assert.Equal(t, *tr.Get(k), "v42")
 	tr.Delete(k)

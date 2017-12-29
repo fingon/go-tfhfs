@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Fri Dec 29 13:40:43 2017 mstenber
- * Edit time:     16 min
+ * Last modified: Fri Dec 29 14:16:20 2017 mstenber
+ * Edit time:     17 min
  *
  */
 
@@ -36,9 +36,8 @@ func main() {
 		os.Exit(1)
 	}
 	badgerfs := fs.NewBadgerCryptoFs(storedir, *password, *salt, "xxx")
-	lfs := fuse.NewLockingRawFileSystem(badgerfs)
-	opts := &fuse.MountOptions{Debug: true}
-	server, err := fuse.NewServer(lfs, mountpoint, opts)
+	opts := &fuse.MountOptions{Debug: true, SingleThreaded: true}
+	server, err := fuse.NewServer(badgerfs, mountpoint, opts)
 	if err != nil {
 		log.Panic(err)
 	}

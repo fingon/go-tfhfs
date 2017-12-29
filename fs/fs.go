@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Dec 29 11:04:45 2017 mstenber
- * Edit time:     95 min
+ * Last modified: Fri Dec 29 14:30:04 2017 mstenber
+ * Edit time:     102 min
  *
  */
 
@@ -33,11 +33,12 @@ const blockSubTypeOffset = inodeDataLength
 
 type Fs struct {
 	InodeTracker
-	server   *fuse.Server
-	tree     *ibtree.IBTree
-	storage  *storage.Storage
-	rootName string
-	treeRoot *ibtree.IBNode
+	server          *fuse.Server
+	tree            *ibtree.IBTree
+	storage         *storage.Storage
+	rootName        string
+	treeRoot        *ibtree.IBNode
+	treeRootBlockId ibtree.BlockId
 }
 
 var _ fuse.RawFileSystem = &Fs{}
@@ -85,7 +86,8 @@ func (self *Fs) GetTransaction() *ibtree.IBTransaction {
 }
 
 func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
-	self.treeRoot = t.Commit()
+	self.treeRoot, self.treeRootBlockId = t.Commit()
+	self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 }
 
 // We don't refer to blocks at all (TBD: Get rid of the feature? it is
@@ -127,8 +129,13 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	rootbid := st.GetBlockIdByName(rootName)
 	if rootbid != "" {
 		fs.treeRoot = fs.tree.LoadRoot(ibtree.BlockId(rootbid))
-	} else {
+	}
+	if fs.treeRoot == nil {
 		fs.treeRoot = fs.tree.NewRoot()
+		root := fs.GetInode(fuse.FUSE_ROOT_ID)
+		var meta InodeMeta
+		meta.StMode = 0777 | fuse.S_IFDIR
+		root.SetMeta(&meta)
 	}
 	return fs
 }

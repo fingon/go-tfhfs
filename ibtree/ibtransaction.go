@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Fri Dec 29 11:40:46 2017 mstenber
- * Edit time:     11 min
+ * Last modified: Fri Dec 29 14:24:53 2017 mstenber
+ * Edit time:     12 min
  *
  */
 
@@ -31,7 +31,7 @@ func NewTransaction(root *IBNode) *IBTransaction {
 func (self *IBTransaction) Delete(key IBKey) {
 	self.stack.node().Delete(key, &self.stack)
 }
-func (self *IBTransaction) Commit() *IBNode {
+func (self *IBTransaction) Commit() (*IBNode, BlockId) {
 	return self.stack.node().Commit()
 }
 

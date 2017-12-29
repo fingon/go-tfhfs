@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Fri Dec 29 11:42:35 2017 mstenber
- * Edit time:     661 min
+ * Last modified: Fri Dec 29 14:24:36 2017 mstenber
+ * Edit time:     663 min
  *
  */
 
@@ -112,7 +112,7 @@ func (self *IBNode) Delete(key IBKey, st *IBStack) *IBNode {
 // After it has been called, the data will be persisted to disk and
 // SHOULD NOT BE USED ANYMORE (nor any other related non-persisted
 // copies). Instead, the new returned treenode pointer should be used.
-func (self *IBNode) Commit() *IBNode {
+func (self *IBNode) Commit() (*IBNode, BlockId) {
 	// Iterate through the tree, updating the nodes as we go.
 
 	// TBD if this inplace mutation is nasty hack or not. It makes
@@ -120,7 +120,7 @@ func (self *IBNode) Commit() *IBNode {
 	// from mutated version anyway.
 
 	if self.blockId != nil {
-		return self
+		return self, *self.blockId
 	}
 
 	self.iterateLeafFirst(func(n *IBNode) {
@@ -141,7 +141,7 @@ func (self *IBNode) Commit() *IBNode {
 		bid := self.tree.backend.SaveNode(n.IBNodeData)
 		n.blockId = &bid
 	})
-	return self
+	return self, *self.blockId
 }
 
 func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {

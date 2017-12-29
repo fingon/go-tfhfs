@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Fri Dec 29 17:13:10 2017 mstenber
- * Edit time:     148 min
+ * Last modified: Sat Dec 30 00:20:16 2017 mstenber
+ * Edit time:     150 min
  *
  */
 
@@ -61,7 +61,7 @@ func (self *Fs) access(inode *Inode, mode uint32, orOwn bool, ctx *Context) Stat
 		}
 		perms |= (meta.StMode >> 6) & 0x7
 	}
-	if ctx.Uid == meta.StGid {
+	if ctx.Gid == meta.StGid {
 		perms |= (meta.StMode >> 3) & 0x7
 	}
 	if (perms & mode) == mode {

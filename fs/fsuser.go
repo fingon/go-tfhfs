@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Sat Dec 30 00:05:56 2017 mstenber
- * Edit time:     74 min
+ * Last modified: Sat Dec 30 00:19:00 2017 mstenber
+ * Edit time:     77 min
  *
  */
 
@@ -31,11 +31,9 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-var ErrNok = errors.New("Non-zero fuse value")
-
 func s2e(status fuse.Status) error {
 	if !status.Ok() {
-		return ErrNok
+		return errors.New(fmt.Sprintf("%s", status.String()))
 	}
 	return nil
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Sat Dec 30 00:06:16 2017 mstenber
- * Edit time:     20 min
+ * Last modified: Sat Dec 30 00:22:03 2017 mstenber
+ * Edit time:     26 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/fingon/go-tfhfs/storage"
+	"github.com/hanwen/go-fuse/fuse"
 	"github.com/stvp/assert"
 )
 
@@ -67,6 +68,45 @@ func ProdFs(t *testing.T, fs *Fs) {
 
 	err = root.Remove("/asdf")
 	assert.True(t, err != nil)
+
+	u1 := NewFSUser(fs)
+	u1.Uid = 13
+	u1.Gid = 7
+
+	u2 := NewFSUser(fs)
+	u2.Uid = 42
+	u2.Gid = 7
+
+	u3 := NewFSUser(fs)
+	u3.Uid = 123
+	u3.Gid = 123
+
+	err = u1.Mkdir("/u1", 0777)
+	err = u1.Mkdir("/u1/u", 0700)
+	err = u1.Mkdir("/u1/g", 0070)
+	err = u1.Mkdir("/u1/o", 0007)
+
+	fi, err = u2.Stat("/u1/u/.")
+	assert.True(t, err != nil)
+
+	fi, err = u1.Stat("/u1/u/.")
+	assert.Nil(t, err)
+
+	fi, err = u3.Stat("/u1/g/.")
+	assert.True(t, err != nil)
+
+	fi, err = u2.Stat("/u1/g/.")
+	assert.Nil(t, err)
+
+	fi, err = u2.Stat("/u1/o/.")
+	assert.Nil(t, err)
+
+	fi, err = u3.Stat("/u1/o/.")
+	assert.Nil(t, err)
+
+	var sfo fuse.StatfsOut
+	code := fs.StatFs(&root.InHeader, &sfo)
+	assert.True(t, code.Ok())
 }
 
 func TestFs(t *testing.T) {

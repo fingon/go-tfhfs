@@ -4,14 +4,15 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Fri Dec 29 13:10:30 2017 mstenber
- * Edit time:     108 min
+ * Last modified: Fri Dec 29 15:27:15 2017 mstenber
+ * Edit time:     143 min
  *
  */
 
 package fs
 
 import (
+	"bytes"
 	"os"
 	"syscall"
 	"time"
@@ -299,7 +300,7 @@ func (self *Fs) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) 
 	return OK
 }
 
-func (self *Fs) unlink(input *InHeader, name string, isdir bool) (code Status) {
+func (self *Fs) unlink(input *InHeader, name string, isdir *bool) (code Status) {
 	inode := self.GetInode(input.NodeId)
 	defer inode.Release()
 
@@ -313,7 +314,7 @@ func (self *Fs) unlink(input *InHeader, name string, isdir bool) (code Status) {
 	if !code.Ok() {
 		return
 	}
-	if isdir != child.IsDir() {
+	if isdir != nil && *isdir != child.IsDir() {
 		code = EPERM
 		return
 	}
@@ -322,11 +323,153 @@ func (self *Fs) unlink(input *InHeader, name string, isdir bool) (code Status) {
 }
 
 func (self *Fs) Unlink(input *InHeader, name string) (code Status) {
-	return self.unlink(input, name, false)
+	b := false
+	return self.unlink(input, name, &b)
 }
 
 func (self *Fs) Rmdir(input *InHeader, name string) (code Status) {
-	return self.unlink(input, name, true)
+	b := true
+	return self.unlink(input, name, &b)
+}
+
+func (self *Fs) GetXAttrSize(input *InHeader, attr string) (size int, code Status) {
+	b, code := self.GetXAttrData(input, attr)
+	if !code.Ok() {
+		return
+	}
+	return len(b), code
+}
+
+func (self *Fs) GetXAttrData(input *InHeader, attr string) (data []byte, code Status) {
+	inode := self.GetInode(input.NodeId)
+	defer inode.Release()
+
+	code = self.access(inode, R_OK, false, &input.Context)
+	if !code.Ok() {
+		return
+	}
+
+	return inode.GetXAttr(attr)
+}
+
+func (self *Fs) SetXAttr(input *SetXAttrIn, attr string, data []byte) (code Status) {
+	inode := self.GetInode(input.NodeId)
+	defer inode.Release()
+
+	code = self.access(inode, W_OK, true, &input.Context)
+	if !code.Ok() {
+		return
+	}
+
+	return inode.SetXAttr(attr, data)
+}
+
+func (self *Fs) ListXAttr(input *InHeader) (data []byte, code Status) {
+	inode := self.GetInode(input.NodeId)
+	defer inode.Release()
+
+	code = self.access(inode, R_OK, false, &input.Context)
+	if !code.Ok() {
+		return
+	}
+	b := bytes.NewBuffer([]byte{})
+	inode.IterateSubTypeKeys(BST_XATTR,
+		func(key BlockKey) bool {
+			b.Write([]byte(key.SubTypeData()))
+			b.WriteByte(0)
+			return true
+		})
+	data = b.Bytes()
+	code = OK
+	return
+}
+
+func (self *Fs) RemoveXAttr(input *InHeader, attr string) (code Status) {
+	inode := self.GetInode(input.NodeId)
+	defer inode.Release()
+
+	code = self.access(inode, W_OK, true, &input.Context)
+	if !code.Ok() {
+		return
+	}
+	return inode.RemoveXAttr(attr)
+}
+
+func (self *Fs) Rename(input *RenameIn, oldName string, newName string) (code Status) {
+	inode := self.GetInode(input.NodeId)
+	defer inode.Release()
+
+	code = self.access(inode, W_OK|X_OK, true, &input.Context)
+	if !code.Ok() {
+		return
+	}
+
+	child, code := self.lookup(inode, oldName, &input.Context)
+	defer child.Release()
+	if !code.Ok() {
+		return
+	}
+
+	new_inode := self.GetInode(input.Newdir)
+	defer new_inode.Release()
+	code = self.access(new_inode, W_OK|X_OK, true, &input.Context)
+	if !code.Ok() {
+		return
+	}
+
+	new_child, code := self.lookup(new_inode, newName, &input.Context)
+	defer new_child.Release()
+	if code.Ok() {
+		ih := input.InHeader
+		ih.NodeId = input.Newdir
+		code = self.unlink(&ih, newName, nil)
+		if !code.Ok() {
+			return
+		}
+	}
+
+	linkin := LinkIn{InHeader: input.InHeader,
+		Oldnodeid: child.ino}
+	linkin.NodeId = new_inode.ino
+	code = self.Link(&linkin, newName, nil)
+	if !code.Ok() {
+		return
+	}
+
+	code = self.unlink(&input.InHeader, oldName, nil)
+	if !code.Ok() {
+		return
+	}
+	return OK
+}
+
+func (self *Fs) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
+	inode := self.GetInode(input.NodeId)
+	defer inode.Release()
+
+	code = self.access(inode, W_OK|X_OK, true, &input.Context)
+	if !code.Ok() {
+		return
+	}
+
+	child, code := self.lookup(inode, name, &input.Context)
+	defer child.Release()
+	if code.Ok() {
+		// code = EEXIST  // should be..
+		code = EPERM
+		return
+	}
+
+	inode.AddChild(name, child)
+	return OK
+
+}
+
+func (self *Fs) Access(input *AccessIn) (code Status) {
+	inode := self.GetInode(input.NodeId)
+	defer inode.Release()
+
+	return self.access(inode, input.Mask, true, &input.Context)
 }
 
 func (self *Fs) Mknod(input *MknodIn, name string, out *EntryOut) (code Status) {
@@ -335,46 +478,6 @@ func (self *Fs) Mknod(input *MknodIn, name string, out *EntryOut) (code Status) 
 }
 
 func (self *Fs) Symlink(input *InHeader, pointedTo string, linkName string, out *EntryOut) (code Status) {
-	// TBD
-	return ENOSYS
-}
-
-func (self *Fs) Rename(input *RenameIn, oldName string, newName string) (code Status) {
-	// TBD
-	return ENOSYS
-}
-
-func (self *Fs) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
-	// TBD
-	return ENOSYS
-}
-
-func (self *Fs) GetXAttrSize(input *InHeader, attr string) (size int, code Status) {
-	// TBD
-	return 0, ENOSYS
-}
-
-func (self *Fs) GetXAttrData(input *InHeader, attr string) (data []byte, code Status) {
-	// TBD
-	return nil, ENOATTR
-}
-
-func (self *Fs) SetXAttr(input *SetXAttrIn, attr string, data []byte) Status {
-	// TBD
-	return ENOSYS
-}
-
-func (self *Fs) ListXAttr(input *InHeader) (data []byte, code Status) {
-	// TBD
-	return nil, ENOSYS
-}
-
-func (self *Fs) RemoveXAttr(input *InHeader, attr string) Status {
-	// TBD
-	return ENOSYS
-}
-
-func (self *Fs) Access(input *AccessIn) (code Status) {
 	// TBD
 	return ENOSYS
 }

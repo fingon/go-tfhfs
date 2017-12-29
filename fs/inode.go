@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Fri Dec 29 13:00:44 2017 mstenber
- * Edit time:     102 min
+ * Last modified: Fri Dec 29 15:07:53 2017 mstenber
+ * Edit time:     116 min
  *
  */
 
@@ -35,19 +35,16 @@ func (self *InodeFile) ReadNextInode() (inode *Inode, name string) {
 	tr := self.Fs().GetTransaction()
 	lkp := self.lastKey
 	if lkp == nil {
-		lastKey := NewBlockKey(self.inode.ino, BST_DIR_NAME2INODE, "")
-		for i := uint64(0); i < self.pos; i++ {
-			nkeyp := tr.NextKey(ibtree.IBKey(lastKey))
-			if nkeyp == nil {
-				return nil, ""
-			}
-			nkey := BlockKey(*nkeyp)
-			if nkey.Ino() != lastKey.Ino() || nkey.SubType() != lastKey.SubType() {
-				return nil, ""
-			}
-			lastKey = nkey
-		}
-		lkp = &lastKey
+		i := uint64(0)
+		self.inode.IterateSubTypeKeys(BST_DIR_NAME2INODE,
+			func(key BlockKey) bool {
+				if i == self.pos {
+					lkp = &key
+					return false
+				}
+				i++
+				return true
+			})
 	}
 	nkeyp := tr.NextKey(ibtree.IBKey(*lkp))
 	if nkeyp == nil {
@@ -214,6 +211,61 @@ func (self *Inode) GetFile() *InodeFile {
 	return file
 }
 
+func (self *Inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
+	k := NewBlockKey(self.ino, BST_XATTR, attr)
+	tr := self.Fs().GetTransaction()
+	v := tr.Get(ibtree.IBKey(k))
+	if v == nil {
+		code = fuse.ENOATTR
+		return
+	}
+	data = []byte(*v)
+	code = fuse.OK
+	return
+}
+
+func (self *Inode) IterateSubTypeKeys(bst BlockSubType,
+	keycb func(key BlockKey) bool) {
+	tr := self.Fs().GetTransaction()
+	k := NewBlockKey(self.ino, bst, "")
+	for {
+		nkeyp := tr.NextKey(ibtree.IBKey(k))
+		if nkeyp == nil {
+			return
+		}
+		nkey := BlockKey(*nkeyp)
+		if nkey.Ino() != self.ino || nkey.SubType() != bst {
+			return
+		}
+		if !keycb(nkey) {
+			return
+		}
+		k = nkey
+	}
+
+}
+
+func (self *Inode) RemoveXAttr(attr string) (code fuse.Status) {
+	k := ibtree.IBKey(NewBlockKey(self.ino, BST_XATTR, attr))
+	tr := self.Fs().GetTransaction()
+	v := tr.Get(k)
+	if v == nil {
+		code = fuse.ENOATTR
+		return
+	}
+	tr.Delete(k)
+	self.Fs().CommitTransaction(tr)
+	return fuse.OK
+}
+
+func (self *Inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
+	k := NewBlockKey(self.ino, BST_XATTR, attr)
+	tr := self.Fs().GetTransaction()
+	tr.Set(ibtree.IBKey(k), string(data))
+	self.Fs().CommitTransaction(tr)
+	return fuse.OK
+}
+
 func (self *Inode) SetTimes(atime *time.Time, mtime *time.Time) fuse.Status {
 	meta := self.Meta()
 	if meta == nil {
@@ -347,23 +399,23 @@ func (self *InodeTracker) AddFile(file *InodeFile) {
 	self.fh2ifile[fh] = file
 }
 
-func (self *InodeTracker) getInode(ino uint64, create bool) *Inode {
+func (self *InodeTracker) getInode(ino uint64) *Inode {
 	n := self.ino2inode[ino]
 	if n == nil {
-		if create {
-			n = &Inode{ino: ino, tracker: self}
-			self.ino2inode[ino] = n
-		}
+		n = &Inode{ino: ino, tracker: self}
+		self.ino2inode[ino] = n
 	}
-	if n != nil {
-		n.refcnt++
-	}
+	n.refcnt++
 	return n
 }
 
 func (self *InodeTracker) GetInode(ino uint64) *Inode {
-	// TBD if create=false is ever useful..
-	return self.getInode(ino, true)
+	inode := self.getInode(ino)
+	if inode.Meta() == nil {
+		inode.Release()
+		return nil
+	}
+	return inode
 }
 
 func (self *InodeTracker) GetFile(fh uint64) *InodeFile {

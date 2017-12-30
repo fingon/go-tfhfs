@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Dec 29 13:42:46 2017 mstenber
-# Edit time:     45 min
+# Last modified: Sat Dec 30 15:23:49 2017 mstenber
+# Edit time:     46 min
 #
 #
 
@@ -61,9 +61,13 @@ update-deps:
 	for FILE in $(GREENPACKS); do greenpack $(GREENPACK_OPTS) -file $$FILE ; done
 	touch $@
 
-.done.buildable: .done.greenpack .done.get2
+.done.buildable: .done.greenpack .done.mlog .done.get2
 	touch $@
 
 .done.test: .done.buildable $(wildcard */*.go)
 	go test ./...
+	touch $@
+
+.done.mlog: $(wildcard */*.go)
+	python3 mlog/fix-print2.py */*.go
 	touch $@

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 13:41:33 2017 mstenber
- * Last modified: Sat Dec 30 16:10:36 2017 mstenber
- * Edit time:     77 min
+ * Last modified: Sat Dec 30 16:19:12 2017 mstenber
+ * Edit time:     83 min
  *
  */
 
@@ -43,27 +43,30 @@ const (
 	StateEnabled
 )
 
+// This can be used by anyone, with the atomic access
+var status int32 = StateUninitialized
+
+var mutex sync.Mutex
+
+// Everything else must be used only with mutex held
 var flagPattern *string
 var pattern string
 var patternRegexp *regexp.Regexp
-
-// This can be used by anyone, with the atomic access
-var status int32 = 0
-
-// The map must be used only with mutex held
-var mutex sync.Mutex
 var file2Debug map[string]*bool
-
-const maxDepth = 100
-
 var minDepth int
 var callers []uintptr
+
+const maxDepth = 100
 
 func init() {
 	flagPattern = flag.String("mlog", "", "Enable logging based on the given file/line regular expression")
 	Reset()
 }
 
+// Reset resets the module to its factory default state. It should not
+// really have much visible impact on users though; first subsequent
+// log call will re-initialize the internal datastructures and the
+// later ones will perform as normal.
 func Reset() {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -72,6 +75,9 @@ func Reset() {
 	callers = make([]uintptr, maxDepth)
 }
 
+// SetLogger allows overriding of the logger used as output when mlog
+// actually wants to forward Printf somewhere. The returned undo
+// function can be used to change the logger back to old one.
 func SetLogger(l *log.Logger) (undo func()) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -84,6 +90,9 @@ func SetLogger(l *log.Logger) (undo func()) {
 	}
 }
 
+// SetLogger allows setting the mlog pattern by hand, overriding the
+// environment variable-provided values. The returned undo function
+// can be used to change the state back to old one.
 func SetPattern(p string) (undo func()) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -96,6 +105,7 @@ func SetPattern(p string) (undo func()) {
 
 	}
 }
+
 func initializeWithPattern(p string) {
 	if p == "" {
 		// log.Printf("mlog disabled")

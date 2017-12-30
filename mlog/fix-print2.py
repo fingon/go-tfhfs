@@ -7,8 +7,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Sat Dec 30 15:17:06 2017 mstenber
-# Last modified: Sat Dec 30 15:22:54 2017 mstenber
-# Edit time:     5 min
+# Last modified: Sat Dec 30 15:58:26 2017 mstenber
+# Edit time:     6 min
 #
 """
 
@@ -24,6 +24,7 @@ will be "foo/bar" (no .go, hah hah).
 import os
 import re
 
+p_re = re.compile('(mlog\.Printf)\(')
 p2_re = re.compile('(mlog\.Printf2\(")[^"]+(")')
 
 
@@ -33,6 +34,8 @@ def rewrite_file(filename):
     tfilename = '%s.tmp.fp2' % filename
     with open(tfilename, 'w') as f:
         for line in open(filename):
+            line = p_re.sub(lambda m: '%s2("%s", ' %
+                            (m.group(1), bfilename), line)
             line = p2_re.sub(lambda m: m.group(
                 1) + bfilename + m.group(2), line)
             f.write(line)

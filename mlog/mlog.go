@@ -4,10 +4,15 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 13:41:33 2017 mstenber
- * Last modified: Sat Dec 30 15:49:39 2017 mstenber
- * Edit time:     68 min
+<<<<<<< HEAD
+ * Last modified: Sat Dec 30 15:52:53 2017 mstenber
+ * Edit time:     71 min
+=======
+ * Last modified: Sat Dec 30 15:15:38 2017 mstenber
+ * Edit time:     64 min
+>>>>>>> mlog: Added.
  *
- */
+*/
 
 // mlog is maybe-log, or Markus' log. It is basically small wrapper
 // (mlog only implements Printf) of standard 'log', with two major
@@ -102,7 +107,7 @@ func initializeWithPattern(p string) {
 		pattern = p
 		return
 	}
-	log.Printf("mlog enabled with pattern %v", p)
+	// log.Printf("mlog enabled with pattern %v", p)
 	patternRegexp = regexp.MustCompile(p)
 	file2Debug = make(map[string]*bool)
 	atomic.StoreInt32(&status, StateEnabled)

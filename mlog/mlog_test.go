@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 14:31:18 2017 mstenber
- * Last modified: Sat Dec 30 16:08:47 2017 mstenber
- * Edit time:     19 min
+ * Last modified: Sat Dec 30 16:28:52 2017 mstenber
+ * Edit time:     20 min
  *
  */
 
@@ -46,7 +46,7 @@ func TestMlog(t *testing.T) {
 func TestMLogRecursion(t *testing.T) {
 	var b bytes.Buffer
 	logger := log.New(&b, "", 0)
-	Reset()
+	reset()
 	defer SetLogger(logger)()
 	defer SetPattern(".")()
 	Printf("d0")

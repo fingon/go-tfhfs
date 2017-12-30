@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 13:41:33 2017 mstenber
- * Last modified: Sat Dec 30 16:19:12 2017 mstenber
- * Edit time:     83 min
+ * Last modified: Sat Dec 30 16:29:20 2017 mstenber
+ * Edit time:     88 min
  *
  */
 
@@ -60,14 +60,14 @@ const maxDepth = 100
 
 func init() {
 	flagPattern = flag.String("mlog", "", "Enable logging based on the given file/line regular expression")
-	Reset()
+	reset()
 }
 
 // Reset resets the module to its factory default state. It should not
 // really have much visible impact on users though; first subsequent
 // log call will re-initialize the internal datastructures and the
 // later ones will perform as normal.
-func Reset() {
+func reset() {
 	mutex.Lock()
 	defer mutex.Unlock()
 	atomic.StoreInt32(&status, StateUninitialized)

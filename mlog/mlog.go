@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 13:41:33 2017 mstenber
- * Last modified: Sat Dec 30 15:53:15 2017 mstenber
- * Edit time:     72 min
+ * Last modified: Sat Dec 30 16:10:36 2017 mstenber
+ * Edit time:     77 min
  *
  */
 
@@ -61,6 +61,7 @@ var callers []uintptr
 
 func init() {
 	flagPattern = flag.String("mlog", "", "Enable logging based on the given file/line regular expression")
+	Reset()
 }
 
 func Reset() {
@@ -68,7 +69,7 @@ func Reset() {
 	defer mutex.Unlock()
 	atomic.StoreInt32(&status, StateUninitialized)
 	minDepth = maxDepth
-	callers = make([]uintptr, 0, maxDepth)
+	callers = make([]uintptr, maxDepth)
 }
 
 func SetLogger(l *log.Logger) (undo func()) {
@@ -168,8 +169,8 @@ func Printf2(file string, format string, args ...interface{}) {
 	}
 	depth := 0
 	if debug {
-		c := callers[:0]
-		depth = runtime.Callers(1, c)
+		depth = runtime.Callers(1, callers)
+		// log.Printf("depth:%d minDepth:%d", depth, minDepth)
 		if depth < minDepth {
 			minDepth = depth
 		}
@@ -177,7 +178,7 @@ func Printf2(file string, format string, args ...interface{}) {
 
 		// TBD: something like this worth it, or not?
 		if depth > 0 {
-			format = fmt.Sprint(strings.Repeat(" ", depth), format)
+			format = fmt.Sprint(strings.Repeat(".", depth), format)
 		}
 		logger.Printf(format, args...)
 	}

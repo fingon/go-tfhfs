@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 14:31:18 2017 mstenber
- * Last modified: Sat Dec 30 15:36:44 2017 mstenber
- * Edit time:     16 min
+ * Last modified: Sat Dec 30 16:08:47 2017 mstenber
+ * Edit time:     19 min
  *
  */
 
@@ -41,6 +41,24 @@ func TestMlog(t *testing.T) {
 	add("", false)
 	add("zzzglorb", false)
 	add("mlog_test", true)
+}
+
+func TestMLogRecursion(t *testing.T) {
+	var b bytes.Buffer
+	logger := log.New(&b, "", 0)
+	Reset()
+	defer SetLogger(logger)()
+	defer SetPattern(".")()
+	Printf("d0")
+	func() {
+		Printf("d1")
+		func() {
+			Printf("d2")
+		}()
+		Printf("D1")
+	}()
+	Printf("D0")
+	assert.Equal(t, string(b.Bytes()), "d0\n.d1\n..d2\n.D1\nD0\n")
 }
 
 func BenchmarkMlogDisabled(b *testing.B) {

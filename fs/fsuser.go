@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Sat Dec 30 00:19:00 2017 mstenber
+ * Last modified: Sat Dec 30 15:29:49 2017 mstenber
  * Edit time:     77 min
  *
  */
@@ -22,12 +22,12 @@ package fs
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -139,12 +139,12 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 
 // ReadDir is clone of ioutil.ReadDir
 func (self *FSUser) ReadDir(dirname string) (ret []os.FileInfo, err error) {
-	log.Printf("ReadDir %s", dirname)
+	mlog.Printf2("fs/fsuser", "ReadDir %s", dirname)
 	l, err := self.ListDir(dirname)
 	if err != nil {
 		return
 	}
-	log.Printf(" ListDir:%v", l)
+	mlog.Printf2("fs/fsuser", " ListDir:%v", l)
 	ret = make([]os.FileInfo, len(l))
 	for i, n := range l {
 		ret[i], err = self.Stat(fmt.Sprintf("%s/%s", dirname, n))

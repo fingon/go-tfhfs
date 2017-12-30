@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Dec 29 23:50:25 2017 mstenber
+ * Last modified: Sat Dec 30 15:29:45 2017 mstenber
  * Edit time:     112 min
  *
  */
@@ -23,6 +23,7 @@ import (
 
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/ibtree"
+	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/hanwen/go-fuse/fuse"
 )
@@ -82,20 +83,20 @@ func (self *Fs) SaveNode(nd ibtree.IBNodeData) ibtree.BlockId {
 }
 
 func (self *Fs) GetTransaction() *ibtree.IBTransaction {
-	//log.Printf("GetTransaction of %p", self.treeRoot)
+	mlog.Printf2("fs/fs", "GetTransaction of %p", self.treeRoot)
 	return ibtree.NewTransaction(self.treeRoot)
 }
 
 func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
 	self.treeRoot, self.treeRootBlockId = t.Commit()
-	//log.Printf("CommitTransaction %p", self.treeRoot)
+	mlog.Printf2("fs/fs", "CommitTransaction %p", self.treeRoot)
 	self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 }
 
 // ListDir provides testing utility as output of ReadDir/ReadDirPlus
 // is binary garbage and I am too lazy to write a decoder for it.
 func (self *Fs) ListDir(ino uint64) (ret []string) {
-	//log.Printf("Fs.ListDir #%d", ino)
+	mlog.Printf2("fs/fs", "Fs.ListDir #%d", ino)
 	inode := self.GetInode(ino)
 	defer inode.Release()
 
@@ -108,7 +109,7 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 		}
 		file.pos++
 		defer inode.Release()
-		//log.Printf(" %s", name)
+		mlog.Printf2("fs/fs", " %s", name)
 		ret = append(ret, name)
 	}
 	return

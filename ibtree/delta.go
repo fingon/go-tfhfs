@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:53:36 2017 mstenber
- * Last modified: Thu Dec 28 19:09:15 2017 mstenber
- * Edit time:     51 min
+ * Last modified: Sat Dec 30 15:41:01 2017 mstenber
+ * Edit time:     52 min
  *
  */
 
@@ -45,8 +45,8 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		if c == nil && c0 == nil {
 			return
 		}
-		//log.Printf("@delta c0:%v@%v c:%v@%v",
-		//c0, st0.indexes[:st0.top+1],
+		//mlog.Printf2("ibtree/delta", "@delta c0:%v@%v c:%v@%v",
+		//	c0, st0.indexes[:st0.top+1],
 		//	c, st.indexes[:st.top+1])
 
 		n := st.node()

@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Fri Dec 29 14:25:58 2017 mstenber
+ * Last modified: Sat Dec 30 15:29:00 2017 mstenber
  * Edit time:     250 min
  *
  */
@@ -17,6 +17,7 @@ import (
 	"log"
 	"testing"
 
+	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/stvp/assert"
 )
 
@@ -94,12 +95,12 @@ func (self *DummyTree) checkNextKey(t *testing.T, r *IBNode, n int) {
 func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n, s int) {
 	if debug > 1 {
 		r.print(0)
-		log.Printf("checkTree [%d..%d[\n", s, n)
+		mlog.Printf2("ibtree/ibtree_test", "checkTree [%d..%d[\n", s, n)
 	}
 	for i := s - 2; i <= n+1; i++ {
 		var st IBStack
 		if debug > 1 {
-			log.Printf(" #%d\n", i)
+			mlog.Printf2("ibtree/ibtree_test", " #%d\n", i)
 		}
 		ss := self.idcb(i)
 		v := r.Get(ss, &st)
@@ -130,7 +131,7 @@ func EnsureDelta(t *testing.T, old, new *IBNode, del, upd, add int) {
 	var got_upd, got_add, got_del int
 	var previous *IBNodeDataChild
 	new.IterateDelta(old, func(c1, c2 *IBNodeDataChild) {
-		// log.Printf("c0:%v c:%v", c1, c2)
+		mlog.Printf2("ibtree/ibtree_test", "c0:%v c:%v", c1, c2)
 		c := c1
 		if c1 == nil {
 			c = c2
@@ -165,7 +166,7 @@ func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
 	for i := 0; i < n; i++ {
 		if debug > 1 {
 			self.checkTree(t, r, i) // previous tree should be ok
-			log.Printf("Inserting #%d\n", i)
+			mlog.Printf2("ibtree/ibtree_test", "Inserting #%d\n", i)
 		}
 		cnt := 0
 		if r != st.nodes[0] {
@@ -173,7 +174,7 @@ func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
 		}
 		r = st.iterateMutatingChildLeafFirst(func() {
 			if debug > 1 {
-				log.Printf("(iterating) Child %v %v", st.indexes, st.child())
+				mlog.Printf2("ibtree/ibtree_test", "(iterating) Child %v %v", st.indexes, st.child())
 			}
 			cnt++
 		})
@@ -202,7 +203,7 @@ func EmptyIBTreeForward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode {
 			dt.checkTree2(t, r, n, i)
 		}
 		if debug > 1 {
-			log.Printf("Deleting #%d\n", i)
+			mlog.Printf2("ibtree/ibtree_test", "Deleting #%d\n", i)
 		}
 		k := dt.idcb(i)
 		r = r.Delete(k, &st)
@@ -217,7 +218,7 @@ func EmptyIBTreeBackward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode 
 			dt.checkTree2(t, r, i+1, 0)
 		}
 		if debug > 1 {
-			log.Printf("Deleting #%d\n", i)
+			mlog.Printf2("ibtree/ibtree_test", "Deleting #%d\n", i)
 		}
 		k := dt.idcb(i)
 		r = r.Delete(IBKey(k), &st)
@@ -276,7 +277,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 	tree := DummyTree{idcb: paddedIBKey}.Init(nil)
 	n := 1000
 	r := tree.CreateIBTree(t, n)
-	log.Printf("TestIBTreeDeleteRange start")
+	mlog.Printf2("ibtree/ibtree_test", "TestIBTreeDeleteRange start")
 	r1 := r.DeleteRange(paddedIBKey(-1), paddedIBKey(-1), &IBStack{})
 	assert.Equal(t, r1, r)
 	r2 := r.DeleteRange(IBKey("z"), IBKey("z"), &IBStack{})
@@ -290,7 +291,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 		r.checkTreeStructure()
 		if debug > 1 {
 			r.print(0)
-			log.Printf("DeleteRange %d-%d\n", i0, i)
+			mlog.Printf2("ibtree/ibtree_test", "DeleteRange %d-%d\n", i0, i)
 		}
 		s1 := tree.idcb(i0)
 		s2 := tree.idcb(i)
@@ -308,7 +309,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 			s0 := tree.idcb(j0)
 			r0 := r.Get(s0, &st)
 			if debug > 0 {
-				log.Printf("Checking %d-%d\n", j0, j)
+				mlog.Printf2("ibtree/ibtree_test", "Checking %d-%d\n", j0, j)
 
 			}
 			if j0 < n {

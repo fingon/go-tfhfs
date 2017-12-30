@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Fri Dec 29 14:24:36 2017 mstenber
- * Edit time:     663 min
+ * Last modified: Sat Dec 30 15:38:40 2017 mstenber
+ * Edit time:     664 min
  *
  */
 
@@ -24,6 +24,8 @@ import (
 	"fmt"
 	"log"
 	"strings"
+
+	"github.com/fingon/go-tfhfs/mlog"
 )
 
 const hashSize = 32
@@ -148,13 +150,13 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	if key1 > key2 {
 		log.Panic("ibt.DeleteRange: first key more than second key", key1, key2)
 	}
-	//log.Printf("DeleteRange [%v..%v]", key1, key2)
+	mlog.Printf2("ibtree/ibtree", "DeleteRange [%v..%v]", key1, key2)
 	st2.top = 0
 	st := *st2
 	self.searchLesser(key1, &st)
-	//log.Printf("c1:%v @%v", st.child(), st.indexes)
+	mlog.Printf2("ibtree/ibtree", "c1:%v @%v", st.child(), st.indexes)
 	self.searchGreater(key2, st2)
-	//log.Printf("c2:%v @%v", st2.child(), st2.indexes)
+	mlog.Printf2("ibtree/ibtree", "c2:%v @%v", st2.child(), st2.indexes)
 	// No matches at all?
 	if st == *st2 {
 		return self
@@ -166,11 +168,11 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	if st.indexes == st2.indexes {
 		return self
 	}
-	//log.Printf("unique:%d", unique)
+	mlog.Printf2("ibtree/ibtree", "unique:%d", unique)
 	for st2.top > unique {
 		idx := st2.index()
 		if idx > 0 {
-			//log.Printf("removing @%d[<%d]", st2.top, idx)
+			mlog.Printf2("ibtree/ibtree", "removing @%d[<%d]", st2.top, idx)
 			st2.rewriteNodeChildrenWithCopyOf(st2.node().Children[idx:])
 		}
 		st2.pop()
@@ -179,7 +181,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 		cl := st.node().Children
 		idx := st.index()
 		if idx < (len(cl) - 1) {
-			//log.Printf("removing @%d[>%d]", st.top, idx)
+			mlog.Printf2("ibtree/ibtree", "removing @%d[>%d]", st.top, idx)
 			st.rewriteNodeChildrenWithCopyOf(cl[:(idx + 1)])
 		}
 		st.pop()
@@ -190,7 +192,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	cl := st2.node().Children
 	idx1 := st.indexes[st.top]
 	idx2 := st2.indexes[st.top]
-	//log.Printf("idx1:%d idx2:%d", idx1, idx2)
+	mlog.Printf2("ibtree/ibtree", "idx1:%d idx2:%d", idx1, idx2)
 	ncl := make([]*IBNodeDataChild, len(cl)-(idx2-idx1)+1)
 	copy(ncl, cl[:idx1])
 	ncl[idx1] = st.child()
@@ -323,7 +325,7 @@ func (self *IBNode) searchLesser(key IBKey, st *IBStack) {
 	self.search(key, st)
 	c := st.child()
 	if c != nil && c.Key == key {
-		//log.Printf("moving to previous leaf from %v", st.indexes)
+		mlog.Printf2("ibtree/ibtree", "moving to previous leaf from %v", st.indexes)
 		st.goPreviousLeaf()
 	}
 }
@@ -332,7 +334,7 @@ func (self *IBNode) searchGreater(key IBKey, st *IBStack) {
 	self.search(key, st)
 	c := st.child()
 	if c != nil && c.Key == key {
-		//log.Printf("moving to next leaf from %v", st.indexes)
+		mlog.Printf2("ibtree/ibtree", "moving to next leaf from %v", st.indexes)
 		st.goNextLeaf()
 	}
 }

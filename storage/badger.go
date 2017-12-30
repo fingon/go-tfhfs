@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Thu Dec 28 13:34:39 2017 mstenber
+ * Last modified: Sat Dec 30 15:29:34 2017 mstenber
  * Edit time:     94 min
  *
  */
@@ -15,6 +15,7 @@ import (
 	"log"
 
 	"github.com/dgraph-io/badger"
+	"github.com/fingon/go-tfhfs/mlog"
 )
 
 // BadgerBlockBackend provides on-disk storage.
@@ -87,7 +88,7 @@ func (self *BadgerBlockBackend) GetBlockById(id string) *Block {
 	if err != nil {
 		log.Fatal(err)
 	}
-	//log.Printf("b.GetBlockById %v", r)
+	mlog.Printf2("storage/badger", "b.GetBlockById %v", id)
 	return b
 }
 
@@ -159,7 +160,7 @@ func (self *BadgerBlockBackend) SetNameToBlockId(name, block_id string) {
 }
 
 func (self *BadgerBlockBackend) StoreBlock(b *Block) {
-	//log.Printf("StoreBlock %v", b)
+	mlog.Printf2("storage/badger", "StoreBlock %v", b)
 	self.updateBlock(b)
 	data := b.GetCodecData()
 	self.setKKValue([]byte("2"), []byte(b.Id), []byte(data))

@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Thu Dec 28 03:37:16 2017 mstenber
+ * Last modified: Sat Dec 30 15:29:15 2017 mstenber
  * Edit time:     100 min
  *
  */
@@ -18,13 +18,14 @@ import (
 	"testing"
 
 	"github.com/fingon/go-tfhfs/codec"
+	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/stvp/assert"
 )
 
 func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 	func() {
 		bs := factory()
-		log.Printf("ProdBlockBackend %v", bs)
+		mlog.Printf2("storage/storage_test", "ProdBlockBackend %v", bs)
 		defer bs.Close()
 
 		b1 := &Block{Id: "foo", Data: "data",
@@ -100,7 +101,7 @@ func ProdStorageOne(t *testing.T, s *Storage) {
 
 func ProdStorage(t *testing.T, factory func() BlockBackend) {
 	bs := factory()
-	log.Printf("ProdStorage %v", bs)
+	mlog.Printf2("storage/storage_test", "ProdStorage %v", bs)
 	defer bs.Close()
 
 	s := Storage{Backend: bs}.Init()

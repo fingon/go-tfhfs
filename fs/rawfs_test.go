@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Sat Dec 30 00:22:03 2017 mstenber
+ * Last modified: Sat Dec 30 15:29:57 2017 mstenber
  * Edit time:     26 min
  *
  */
@@ -12,9 +12,9 @@
 package fs
 
 import (
-	"log"
 	"testing"
 
+	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/hanwen/go-fuse/fuse"
 	"github.com/stvp/assert"
@@ -52,7 +52,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 
 	fi, err := root.Stat("/")
 	assert.Nil(t, err)
-	log.Printf("got %o", int(fi.Mode()))
+	mlog.Printf2("fs/rawfs_test", "got %o", int(fi.Mode()))
 	assert.True(t, fi.IsDir())
 
 	fi, err = root.Stat("/goat")

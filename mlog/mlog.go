@@ -4,15 +4,10 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 13:41:33 2017 mstenber
-<<<<<<< HEAD
- * Last modified: Sat Dec 30 15:52:53 2017 mstenber
- * Edit time:     71 min
-=======
- * Last modified: Sat Dec 30 15:15:38 2017 mstenber
- * Edit time:     64 min
->>>>>>> mlog: Added.
+ * Last modified: Sat Dec 30 15:53:15 2017 mstenber
+ * Edit time:     72 min
  *
-*/
+ */
 
 // mlog is maybe-log, or Markus' log. It is basically small wrapper
 // (mlog only implements Printf) of standard 'log', with two major

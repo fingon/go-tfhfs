@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Fri Dec 29 23:50:07 2017 mstenber
+ * Last modified: Sat Dec 30 15:29:52 2017 mstenber
  * Edit time:     145 min
  *
  */
@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/fingon/go-tfhfs/ibtree"
+	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
 )
@@ -34,15 +35,15 @@ func (self *InodeFile) ReadNextInode() (inode *Inode, name string) {
 	// return true if reading was successful (and pos got advanced)
 	tr := self.Fs().GetTransaction()
 	kp := self.lastKey
-	//log.Printf("Inode.ReadNextInode %v", kp == nil)
+	mlog.Printf2("fs/inode", "Inode.ReadNextInode %v", kp == nil)
 	if kp == nil {
 		i := uint64(0)
 		self.inode.IterateSubTypeKeys(BST_DIR_NAME2INODE,
 			func(key BlockKey) bool {
-				//log.Printf(" #%d %v", i, key.SubTypeData()[filenameHashSize:])
+				mlog.Printf2("fs/inode", " #%d %v", i, key.SubTypeData()[filenameHashSize:])
 				if i == self.pos {
 					kp = &key
-					//log.Printf(" found what we looked for")
+					mlog.Printf2("fs/inode", " found what we looked for")
 					return false
 				}
 				i++
@@ -51,14 +52,14 @@ func (self *InodeFile) ReadNextInode() (inode *Inode, name string) {
 	} else {
 		nkeyp := tr.NextKey(ibtree.IBKey(*kp))
 		if nkeyp == nil {
-			//log.Printf(" next missing")
+			mlog.Printf2("fs/inode", " next missing")
 			return nil, ""
 		}
 		nkey := BlockKey(*nkeyp)
 		kp = &nkey
 	}
 	if kp == nil {
-		//log.Printf(" empty")
+		mlog.Printf2("fs/inode", " empty")
 		return nil, ""
 	}
 	if kp.Ino() != self.inode.ino || kp.SubType() != BST_DIR_NAME2INODE {
@@ -72,11 +73,11 @@ func (self *InodeFile) ReadNextInode() (inode *Inode, name string) {
 }
 
 func (self *InodeFile) ReadDirEntry(l *fuse.DirEntryList) bool {
-	//log.Printf("InodeFile.ReadDirEntry")
+	mlog.Printf2("fs/inode", "InodeFile.ReadDirEntry")
 	inode, name := self.ReadNextInode()
 	defer inode.Release()
 	if inode == nil {
-		//log.Printf(" nothing found")
+		mlog.Printf2("fs/inode", " nothing found")
 		return false
 	}
 	defer inode.Release()
@@ -85,7 +86,7 @@ func (self *InodeFile) ReadDirEntry(l *fuse.DirEntryList) bool {
 	ok, _ := l.AddDirEntry(e)
 	if ok {
 		nkey := NewBlockKeyDirFilename(inode.ino, name)
-		//log.Printf(" #%d %s", self.pos, nkey)
+		mlog.Printf2("fs/inode", " #%d %s", self.pos, nkey)
 		self.pos++
 		self.lastKey = &nkey
 	}
@@ -125,7 +126,7 @@ func (self *InodeFile) Release() {
 }
 
 func (self *InodeFile) SetPos(pos uint64) {
-	//log.Printf("InodeFile.SetPos %d", pos)
+	mlog.Printf2("fs/inode", "InodeFile.SetPos %d", pos)
 	if self.pos == pos {
 		return
 	}
@@ -142,7 +143,7 @@ type Inode struct {
 }
 
 func (self *Inode) AddChild(name string, child *Inode) {
-	//log.Printf("Inode.AddChild %v = %v", name, child)
+	mlog.Printf2("fs/inode", "Inode.AddChild %v = %v", name, child)
 	tr := self.Fs().GetTransaction()
 	k := NewBlockKeyDirFilename(self.ino, name)
 	rk := NewBlockKeyReverseDirFilename(child.ino, self.ino, name)
@@ -340,11 +341,11 @@ func (self *Inode) Release() {
 }
 
 func (self *Inode) RemoveChildByName(name string) {
-	//log.Printf("Inode.RemoveChildByName %v", name)
+	mlog.Printf2("fs/inode", "Inode.RemoveChildByName %v", name)
 	child := self.GetChildByName(name)
 	defer child.Release()
 	if child == nil {
-		//log.Printf(" not found")
+		mlog.Printf2("fs/inode", " not found")
 		return
 	}
 	tr := self.Fs().GetTransaction()
@@ -360,7 +361,7 @@ func (self *Inode) RemoveChildByName(name string) {
 	meta.Nchildren--
 	self.SetMeta(meta)
 
-	//log.Printf(" Removed %v", child)
+	mlog.Printf2("fs/inode", " Removed %v", child)
 	self.Fs().CommitTransaction(tr)
 }
 
@@ -368,12 +369,12 @@ func (self *Inode) RemoveChildByName(name string) {
 // It is valid for the duration of the inode, within validity period anyway.
 func (self *Inode) Meta() *InodeMeta {
 	if self.meta == nil {
-		//log.Printf("Inode.Meta #%d", self.ino)
+		mlog.Printf2("fs/inode", "Inode.Meta #%d", self.ino)
 		k := NewBlockKey(self.ino, BST_META, "")
 		tr := self.Fs().GetTransaction()
 		v := tr.Get(ibtree.IBKey(k))
 		if v == nil {
-			//log.Printf(" not found")
+			mlog.Printf2("fs/inode", " not found")
 			return nil
 		}
 		var m InodeMeta
@@ -381,7 +382,7 @@ func (self *Inode) Meta() *InodeMeta {
 		if err != nil {
 			log.Panic(err)
 		}
-		//log.Printf(" = %v", &m)
+		mlog.Printf2("fs/inode", " = %v", &m)
 		self.meta = &m
 	}
 	return self.meta
@@ -396,7 +397,7 @@ func (self *Inode) SetMeta(meta *InodeMeta) {
 	}
 	tr.Set(ibtree.IBKey(k), string(b))
 	self.Fs().CommitTransaction(tr)
-	//log.Printf("Inode.SetMeta #%d = %v", self.ino, meta)
+	mlog.Printf2("fs/inode", "Inode.SetMeta #%d = %v", self.ino, meta)
 	self.meta = meta
 }
 

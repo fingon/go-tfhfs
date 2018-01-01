@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Sat Dec 30 15:29:49 2017 mstenber
- * Edit time:     77 min
+ * Last modified: Tue Jan  2 00:04:02 2018 mstenber
+ * Edit time:     94 min
  *
  */
 
@@ -20,8 +20,10 @@
 package fs
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,6 +134,13 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 	}
 	// We got _something_. No way to make sure it was fine. Oh well.
 	// Cheat using backdoor API.
+	err = s2e(self.fs.ReadDirPlus(&fuse.ReadIn{Fh: oo.Fh,
+		InHeader: self.InHeader}, del))
+	if err != nil {
+		return
+	}
+	// We got _something_. No way to make sure it was fine. Oh well.
+	// Cheat using backdoor API.
 	ret = self.fs.ListDir(eo.Ino)
 	self.fs.ReleaseDir(&fuse.ReleaseIn{Fh: oo.Fh, InHeader: self.InHeader})
 	return
@@ -202,4 +211,64 @@ func (self *FSUser) Remove(path string) (err error) {
 		err = s2e(self.fs.Unlink(&self.InHeader, basename))
 	}
 	return
+}
+
+func (self *FSUser) GetXAttr(path, attr string) (b []byte, err error) {
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	b, code := self.fs.GetXAttrData(&self.InHeader, attr)
+	err = s2e(code)
+	if err != nil {
+		return
+	}
+	l, code := self.fs.GetXAttrSize(&self.InHeader, attr)
+	err = s2e(code)
+	if err != nil {
+		return
+	}
+	if l != len(b) {
+		log.Panic("length mismatch in GetXAttrSize", l, len(b))
+	}
+	return
+}
+
+func (self *FSUser) ListXAttr(path string) (s []string, err error) {
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	b, code := self.fs.ListXAttr(&self.InHeader)
+	err = s2e(code)
+	if err != nil {
+		return
+	}
+	bl := bytes.Split(b, []byte{0})
+	s = make([]string, len(bl)-1) // always at least one extra
+	for i, v := range bl[:len(bl)-1] {
+		s[i] = string(v)
+	}
+	return
+}
+
+func (self *FSUser) RemoveXAttr(path, attr string) (err error) {
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	return s2e(self.fs.RemoveXAttr(&self.InHeader, attr))
+}
+
+func (self *FSUser) SetXAttr(path, attr string, data []byte) (err error) {
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	return s2e(self.fs.SetXAttr(&fuse.SetXAttrIn{InHeader: self.InHeader,
+		Size: uint32(len(data))}, attr, data))
 }

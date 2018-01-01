@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Sat Dec 30 15:29:57 2017 mstenber
- * Edit time:     26 min
+ * Last modified: Tue Jan  2 00:07:53 2018 mstenber
+ * Edit time:     33 min
  *
  */
 
@@ -107,6 +107,44 @@ func ProdFs(t *testing.T, fs *Fs) {
 	var sfo fuse.StatfsOut
 	code := fs.StatFs(&root.InHeader, &sfo)
 	assert.True(t, code.Ok())
+
+	// Initially no xattr - list should be empty
+
+	l, err := root.ListXAttr("/public")
+	assert.Nil(t, err)
+	assert.Equal(t, len(l), 0)
+
+	_, err = root.GetXAttr("/public", "foo")
+	assert.True(t, err != nil)
+
+	// Set xattr
+
+	err = root.SetXAttr("/public", "foo", []byte("bar"))
+	assert.Nil(t, err)
+
+	// Xattr should be accessible
+
+	b, err := root.GetXAttr("/public", "foo")
+	assert.Nil(t, err)
+	assert.Equal(t, string(b), "bar")
+
+	l, err = root.ListXAttr("/public")
+	assert.Nil(t, err)
+	assert.Equal(t, len(l), 1)
+	assert.Equal(t, string(l[0]), "foo")
+
+	// Remove xattr - it should be gone
+
+	err = root.RemoveXAttr("/public", "foo")
+	assert.Nil(t, err)
+
+	l, err = root.ListXAttr("/public")
+	assert.Nil(t, err)
+	assert.Equal(t, len(l), 0)
+
+	_, err = root.GetXAttr("/public", "foo")
+	assert.True(t, err != nil)
+
 }
 
 func TestFs(t *testing.T) {

@@ -6,8 +6,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Tue Jan  2 15:24:47 2018 mstenber
-# Last modified: Tue Jan  2 15:37:48 2018 mstenber
-# Edit time:     9 min
+# Last modified: Tue Jan  2 16:07:32 2018 mstenber
+# Edit time:     12 min
 #
 
 STORAGEDIR=/tmp/sanity-tfhfs-storage
@@ -44,4 +44,6 @@ echo baz > baz
 ls -l $MOUNTDIR
 GOT=`ls -l $MOUNTDIR | wc -l`
 [ $GOT = "5" ] || out "not 5 lines in ls ($GOT)"
+cp /bin/ls $MOUNTDIR || out "ls cp failed"
+cmp -s /bin/ls $MOUNTDIR/ls || out "copied ls differs"
 

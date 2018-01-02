@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Fri Dec 29 14:16:20 2017 mstenber
- * Edit time:     17 min
+ * Last modified: Tue Jan  2 17:35:36 2018 mstenber
+ * Edit time:     21 min
  *
  */
 
@@ -42,4 +42,8 @@ func main() {
 		log.Panic(err)
 	}
 	server.Serve()
+
+	// We're going out. Flush the filesystem.
+	// (TBD: This should be done regularly)
+	badgerfs.StorageFlush()
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Tue Jan  2 16:41:56 2018 mstenber
- * Edit time:     200 min
+ * Last modified: Tue Jan  2 17:16:51 2018 mstenber
+ * Edit time:     201 min
  *
  */
 
@@ -135,7 +135,7 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 
 	meta := inode.Meta()
 	newmeta := meta.InodeMetaData
-	if input.Valid&(FATTR_ATIME|FATTR_MTIME|FATTR_ATIME_NOW|FATTR_MTIME_NOW) != 0 {
+	if input.Valid&(FATTR_ATIME|FATTR_MTIME|FATTR_ATIME_NOW|FATTR_MTIME_NOW|FATTR_CTIME) != 0 {
 		var atime, ctime, mtime *time.Time
 
 		now := time.Now()

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  2 16:50:58 2018 mstenber
- * Edit time:     91 min
+ * Last modified: Tue Jan  2 17:55:42 2018 mstenber
+ * Edit time:     96 min
  *
  */
 
@@ -239,14 +239,24 @@ func TestFs(t *testing.T) {
 		t.Run(s,
 			func(t *testing.T) {
 				t.Parallel()
+				rootName := "toor"
 				backend := storage.InMemoryBlockBackend{}.Init()
 				st := storage.Storage{Backend: backend}.Init()
-				fs := NewFs(st, "xxx")
+				fs := NewFs(st, rootName)
 				if gen != nil {
 					fs.generator = gen
 
 				}
 				ProdFs(t, fs)
+				fs.StorageFlush()
+				root := NewFSUser(fs)
+				_, err := root.Stat("/public")
+				assert.Nil(t, err)
+
+				fs2 := NewFs(st, rootName)
+				root2 := NewFSUser(fs2)
+				_, err = root2.Stat("/public")
+				assert.Nil(t, err)
 			})
 	}
 	add("seq+1", &DummyGenerator{index: 2, incr: 1})

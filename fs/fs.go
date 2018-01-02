@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  2 15:00:17 2018 mstenber
- * Edit time:     121 min
+ * Last modified: Tue Jan  2 17:52:15 2018 mstenber
+ * Edit time:     129 min
  *
  */
 
@@ -46,13 +46,8 @@ type Fs struct {
 
 var _ fuse.RawFileSystem = &Fs{}
 
-// ibtree.IBTreeBackend API
-func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
-	b := self.storage.GetBlockById(string(id))
-	if b == nil {
-		return nil
-	}
-	bd := []byte(b.GetData())
+func (self *Fs) LoadNodeFromString(data string) *ibtree.IBNodeData {
+	bd := []byte(data)
 	dt := BlockDataType(bd[0])
 	if dt != BDT_NODE {
 		return nil
@@ -63,6 +58,15 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 		log.Panic(err)
 	}
 	return nd
+}
+
+// ibtree.IBTreeBackend API
+func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
+	b := self.storage.GetBlockById(string(id))
+	if b == nil {
+		return nil
+	}
+	return self.LoadNodeFromString(b.GetData())
 }
 
 func (self *Fs) getBlockDataId(blockType BlockDataType, data string) ibtree.BlockId {
@@ -130,8 +134,8 @@ func (self *Fs) hasExternalReferences(id string) bool {
 	return self.bidMap[id]
 }
 
-func (self *Fs) iterateReferencesCallback(id string, cb storage.BlockReferenceCallback) {
-	nd := self.LoadNode(ibtree.BlockId(id))
+func (self *Fs) iterateReferencesCallback(data string, cb storage.BlockReferenceCallback) {
+	nd := self.LoadNodeFromString(data)
 	if nd == nil {
 		return
 	}
@@ -151,8 +155,11 @@ func (self *Fs) iterateReferencesCallback(id string, cb storage.BlockReferenceCa
 }
 
 func (self *Fs) StorageFlush() int {
+	self.storage.SetNameToBlockId(self.rootName,
+		string(self.treeRootBlockId))
 	rv := self.storage.Flush()
 	self.bidMap = make(map[string]bool)
+
 	return rv
 }
 
@@ -164,8 +171,8 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	st.HasExternalReferencesCallback = func(id string) bool {
 		return fs.hasExternalReferences(id)
 	}
-	st.IterateReferencesCallback = func(id string, cb storage.BlockReferenceCallback) {
-		fs.iterateReferencesCallback(id, cb)
+	st.IterateReferencesCallback = func(data string, cb storage.BlockReferenceCallback) {
+		fs.iterateReferencesCallback(data, cb)
 	}
 	rootbid := st.GetBlockIdByName(rootName)
 	if rootbid != "" {

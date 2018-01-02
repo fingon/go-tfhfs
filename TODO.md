@@ -29,3 +29,7 @@
 * persistent (= immutable) btree with peds-based sub-vectors (or maybe not,
   TBD - go get github.com/tobgu/peds/cmd/peds)
 
+# Pending someday todo #
+
+* report to Apple that their ls implementation crashes with dates far
+  enough in future? :p

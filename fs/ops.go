@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Tue Jan  2 21:38:59 2018 mstenber
- * Edit time:     202 min
+ * Last modified: Tue Jan  2 22:22:49 2018 mstenber
+ * Edit time:     207 min
  *
  */
 
@@ -193,7 +193,10 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 	oldmode := meta.StMode
 	mode := oldmode
 	if input.Valid&FATTR_MODE != 0 {
-		mode = uint32(07777) & input.Mode
+		mode = input.Mode
+		// accept any mode bits, OS knows best?
+		// (with OS X some relatively high bit modes are required,
+		// e.g. 0100xxx seems to be needed at least for cp to work even)
 	}
 	mode = mode & ^mode_filter
 	newmeta.StMode = mode

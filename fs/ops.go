@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Tue Jan  2 22:22:49 2018 mstenber
- * Edit time:     207 min
+ * Last modified: Wed Jan  3 00:10:47 2018 mstenber
+ * Edit time:     217 min
  *
  */
 
@@ -211,6 +211,7 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 			inode.SetSize(input.Size)
 		}
 
+		newmeta.SetCTimeNow()
 		meta.InodeMetaData = newmeta
 		inode.SetMeta(meta)
 	}
@@ -235,6 +236,10 @@ func (self *Fs) OpenDir(input *OpenIn, out *OpenOut) (code Status) {
 		return
 	}
 
+	meta := inode.Meta()
+	meta.SetATimeNow()
+	// inode.SetMeta(meta)
+
 	out.Fh = inode.GetFile(uint32(os.O_RDONLY)).fh
 	return OK
 
@@ -255,6 +260,15 @@ func (self *Fs) Open(input *OpenIn, out *OpenOut) (code Status) {
 	code = self.access(inode, flags, false, &input.Context)
 	if !code.Ok() {
 		return
+	}
+
+	meta := inode.Meta()
+	if flags&W_OK != 0 {
+		meta.SetMTimeNow()
+		inode.SetMeta(meta)
+	} else {
+		meta.SetATimeNow()
+		// skip save for now
 	}
 
 	if input.Flags&uint32(os.O_TRUNC) != 0 {
@@ -310,7 +324,7 @@ func (self *Fs) create(input *InHeader, name string, meta *InodeMeta, allowRepla
 	defer child.Release()
 	if child != nil {
 		if !allowReplace {
-			code = EPERM // XXX should be EEXIST
+			code = Status(syscall.EEXIST)
 			return
 		}
 		code = self.Unlink(input, name)
@@ -494,8 +508,7 @@ func (self *Fs) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
 	child, code := self.lookup(inode, name, &input.Context)
 	defer child.Release()
 	if code.Ok() {
-		// code = EEXIST  // should be..
-		code = EPERM
+		code = Status(syscall.EEXIST)
 		return
 	}
 
@@ -528,7 +541,7 @@ func (self *Fs) Create(input *CreateIn, name string, out *CreateOut) (code Statu
 	// first create file
 	var meta InodeMeta
 	meta.SetCreateIn(input)
-	child, code := self.create(&input.InHeader, name, &meta, true)
+	child, code := self.create(&input.InHeader, name, &meta, input.Flags&uint32(os.O_EXCL) == 0)
 	if !code.Ok() {
 		return
 	}

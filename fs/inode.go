@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Jan  2 21:50:42 2018 mstenber
- * Edit time:     209 min
+ * Last modified: Wed Jan  3 00:07:27 2018 mstenber
+ * Edit time:     212 min
  *
  */
 
@@ -38,7 +38,7 @@ func (self *inode) AddChild(name string, child *inode) {
 	tr.Set(ibtree.IBKey(k), string(util.Uint64Bytes(child.ino)))
 	tr.Set(ibtree.IBKey(rk), "")
 	meta := child.Meta()
-	meta.SetMTimeNow()
+	meta.SetCTimeNow()
 	meta.StNlink++
 	child.SetMeta(meta)
 
@@ -233,7 +233,7 @@ func (self *inode) RemoveChildByName(name string) {
 	tr.Delete(ibtree.IBKey(rk))
 	meta := child.Meta()
 	meta.StNlink--
-	meta.SetMTimeNow()
+	meta.SetCTimeNow()
 	child.SetMeta(meta)
 
 	meta = self.Meta()
@@ -463,9 +463,9 @@ func (self *InodeMetaData) SetATimeNow() {
 }
 
 func (self *InodeMetaData) SetCTimeNow() {
-	self.setTimesNow(false, true, false)
+	self.setTimesNow(true, true, false)
 }
 
 func (self *InodeMetaData) SetMTimeNow() {
-	self.setTimesNow(false, false, true)
+	self.setTimesNow(true, false, true)
 }

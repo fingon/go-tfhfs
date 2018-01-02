@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Sat Dec 30 15:23:49 2017 mstenber
-# Edit time:     46 min
+# Last modified: Tue Jan  2 21:23:56 2018 mstenber
+# Edit time:     48 min
 #
 #
 
@@ -34,6 +34,12 @@ test: .done.test
 
 tfhfs: .done.test tfhfs.go $(wildcard */*.go)
 	go build -o tfhfs tfhfs.go
+
+tfhfs-darwin: .done.test tfhfs.go $(wildcard */*.go)
+	GOOS=darwin go build -o tfhfs-darwin tfhfs.go
+
+tfhfs-linux: .done.test tfhfs.go $(wildcard */*.go)
+	GOOS=linux go build -o tfhfs-linux tfhfs.go
 
 update-deps:
 	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -u . ); done

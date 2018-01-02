@@ -4,3 +4,5 @@ coverage.out
 *_gen.go
 *_gen_test.go
 /tfhfs
+/tfhfs-darwin
+/tfhfs-linux

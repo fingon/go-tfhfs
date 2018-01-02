@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 00:34:54 2017 mstenber
- * Last modified: Fri Dec 29 14:45:51 2017 mstenber
- * Edit time:     13 min
+ * Last modified: Tue Jan  2 10:22:19 2018 mstenber
+ * Edit time:     15 min
  *
  */
 
@@ -51,4 +51,10 @@ func NewBlockKeyDirFilename(ino uint64, filename string) BlockKey {
 func NewBlockKeyReverseDirFilename(ino, dirIno uint64, filename string) BlockKey {
 	b := util.ConcatBytes(util.Uint64Bytes(dirIno), []byte(filename))
 	return NewBlockKey(ino, BST_FILE_INODEFILENAME, string(b))
+}
+
+func NewBlockKeyOffset(ino uint64, offset uint64) BlockKey {
+	offset = offset / dataExtentSize
+	b := util.Uint64Bytes(offset)
+	return NewBlockKey(ino, BST_FILE_OFFSET2EXTENT, string(b))
 }

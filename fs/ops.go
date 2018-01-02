@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Sat Dec 30 00:20:16 2017 mstenber
- * Edit time:     150 min
+ * Last modified: Tue Jan  2 13:43:39 2018 mstenber
+ * Edit time:     194 min
  *
  */
 
@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fingon/go-tfhfs/mlog"
 	. "github.com/hanwen/go-fuse/fuse"
 )
 
@@ -72,6 +73,7 @@ func (self *Fs) access(inode *Inode, mode uint32, orOwn bool, ctx *Context) Stat
 
 // lookup gets child of a parent.
 func (self *Fs) lookup(parent *Inode, name string, ctx *Context) (child *Inode, code Status) {
+	mlog.Printf2("fs/ops", "ops.lookup %v %s", parent.ino, name)
 	code = self.access(parent, X_OK, false, ctx)
 	if !code.Ok() {
 		return
@@ -199,6 +201,10 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 			code = EPERM
 			return
 		}
+		if input.Valid&FATTR_SIZE != 0 {
+			inode.SetSize(input.Size)
+		}
+
 		meta.InodeMetaData = newmeta
 		inode.SetMeta(meta)
 		// Eventually: truncate data if size decreases
@@ -224,21 +230,33 @@ func (self *Fs) OpenDir(input *OpenIn, out *OpenOut) (code Status) {
 		return
 	}
 
-	out.Fh = inode.GetFile().fh
+	out.Fh = inode.GetFile(uint32(os.O_RDONLY)).fh
 	return OK
 
 }
 
 func (self *Fs) Open(input *OpenIn, out *OpenOut) (code Status) {
 	inode := self.GetInode(input.NodeId)
+	mlog.Printf2("fs/ops", "ops.Open %v", input.NodeId)
 	defer inode.Release()
 
-	code = self.access(inode, R_OK, false, &input.Context)
+	flags := uint32(0)
+	if input.Flags&uint32(os.O_RDONLY|os.O_RDWR) != 0 {
+		flags |= R_OK
+	}
+	if input.Flags&uint32(os.O_WRONLY|os.O_RDWR) != 0 {
+		flags |= W_OK
+	}
+	code = self.access(inode, flags, false, &input.Context)
 	if !code.Ok() {
 		return
 	}
 
-	out.Fh = inode.GetFile().fh
+	if input.Flags&uint32(os.O_TRUNC) != 0 {
+		inode.SetSize(0)
+	}
+
+	out.Fh = inode.GetFile(input.Flags).fh
 	return OK
 }
 
@@ -273,7 +291,8 @@ func (self *Fs) Readlink(input *InHeader) (out []byte, code Status) {
 	return
 }
 
-func (self *Fs) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) {
+func (self *Fs) create(input *InHeader, name string, meta *InodeMeta, allowReplace bool) (child *Inode, code Status) {
+	mlog.Printf2("fs/ops", " create %v", name)
 	inode := self.GetInode(input.NodeId)
 	defer inode.Release()
 
@@ -282,19 +301,33 @@ func (self *Fs) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) 
 		return
 	}
 
-	child := inode.GetChildByName(name)
+	child = inode.GetChildByName(name)
 	defer child.Release()
 	if child != nil {
-		code = EPERM // XXX should be EEXIST
-		return
+		if !allowReplace {
+			code = EPERM // XXX should be EEXIST
+			return
+		}
+		code = self.Unlink(input, name)
+		if !code.Ok() {
+			return
+		}
 	}
 
+	child = self.CreateInode()
+	child.SetMeta(meta)
+	inode.AddChild(name, child)
+	return
+}
+
+func (self *Fs) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) {
 	var meta InodeMeta
 	meta.SetMkdirIn(input)
-	child = self.CreateInode()
+	child, code := self.create(&input.InHeader, name, &meta, false)
+	if !code.Ok() {
+		return
+	}
 	defer child.Release()
-	child.SetMeta(&meta)
-	inode.AddChild(name, child)
 	child.FillEntryOut(out)
 	return OK
 }
@@ -322,11 +355,13 @@ func (self *Fs) unlink(input *InHeader, name string, isdir *bool) (code Status) 
 }
 
 func (self *Fs) Unlink(input *InHeader, name string) (code Status) {
+	mlog.Printf2("fs/ops", "ops.Unlink %s", name)
 	b := false
 	return self.unlink(input, name, &b)
 }
 
 func (self *Fs) Rmdir(input *InHeader, name string) (code Status) {
+	mlog.Printf2("fs/ops", "ops.Rmdir %s", name)
 	b := true
 	return self.unlink(input, name, &b)
 }
@@ -471,34 +506,73 @@ func (self *Fs) Access(input *AccessIn) (code Status) {
 	return self.access(inode, input.Mask, true, &input.Context)
 }
 
-func (self *Fs) Mknod(input *MknodIn, name string, out *EntryOut) (code Status) {
-	// TBD
-	return ENOSYS
+func (self *Fs) Read(input *ReadIn, buf []byte) (ReadResult, Status) {
+	// Check perm?
+	file := self.GetFile(input.Fh)
+	return file.Read(buf, input.Offset)
 }
 
-func (self *Fs) Symlink(input *InHeader, pointedTo string, linkName string, out *EntryOut) (code Status) {
-	// TBD
-	return ENOSYS
+func (self *Fs) Write(input *WriteIn, data []byte) (written uint32, code Status) {
+	// Check perm?
+	file := self.GetFile(input.Fh)
+	return file.Write(data, input.Offset)
 }
 
 func (self *Fs) Create(input *CreateIn, name string, out *CreateOut) (code Status) {
-	// TBD
-	return ENOSYS
+	mlog.Printf2("fs/ops", "ops.Create %s", name)
+	// first create file
+	var meta InodeMeta
+	meta.SetCreateIn(input)
+	child, code := self.create(&input.InHeader, name, &meta, true)
+	if !code.Ok() {
+		return
+	}
+	defer child.Release()
+
+	// then open the file.
+	ih := input.InHeader
+	ih.NodeId = child.ino
+	var oo OpenOut
+	code = self.Open(&OpenIn{InHeader: ih, Flags: input.Flags}, &oo)
+	if !code.Ok() {
+		return
+	}
+	child.FillEntryOut(&out.EntryOut)
+	out.OpenOut = oo
+	return OK
 }
 
-func (self *Fs) Read(input *ReadIn, buf []byte) (ReadResult, Status) {
-	// TBD
-	return nil, ENOSYS
+func (self *Fs) Mknod(input *MknodIn, name string, out *EntryOut) (code Status) {
+	var meta InodeMeta
+	meta.SetMknodIn(input)
+	child, code := self.create(&input.InHeader, name, &meta, false)
+	if !code.Ok() {
+		return
+	}
+	defer child.Release()
+	child.FillEntryOut(out)
+	return OK
+}
+
+func (self *Fs) Symlink(input *InHeader, pointedTo string, linkName string, out *EntryOut) (code Status) {
+	meta := InodeMeta{InodeMetaData: InodeMetaData{StUid: input.Uid,
+		StGid:  input.Gid,
+		StMode: S_IFLNK | 0777,
+		StSize: uint64(len(pointedTo)),
+	},
+		Data: []byte(pointedTo)}
+	child, code := self.create(input, linkName, &meta, false)
+	if !code.Ok() {
+		return
+	}
+	defer child.Release()
+	child.FillEntryOut(out)
+	return OK
 }
 
 func (self *Fs) Flock(input *FlockIn, flags int) Status {
 	// TBD
 	return ENOSYS
-}
-
-func (self *Fs) Write(input *WriteIn, data []byte) (written uint32, code Status) {
-	// TBD
-	return 0, ENOSYS
 }
 
 func (self *Fs) Flush(input *FlushIn) Status {

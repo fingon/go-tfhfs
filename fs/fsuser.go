@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Tue Jan  2 00:04:02 2018 mstenber
- * Edit time:     94 min
+ * Last modified: Tue Jan  2 13:13:54 2018 mstenber
+ * Edit time:     144 min
  *
  */
 
@@ -23,6 +23,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -97,12 +98,15 @@ func NewFSUser(fs *Fs) *FSUser {
 }
 
 func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
+	mlog.Printf2("fs/fsuser", "lookup %v", path)
 	inode := uint64(fuse.FUSE_ROOT_ID)
+	oinode := inode
 	for _, name := range strings.Split(path, "/") {
 		if name == "" {
 			continue
 		}
 		self.NodeId = inode
+		mlog.Printf2("fs/fsuser", " %v", name)
 		err = s2e(self.fs.Lookup(&self.InHeader, name, eo))
 		if err != nil {
 			return
@@ -110,7 +114,9 @@ func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
 		inode = eo.Ino
 	}
 	self.NodeId = inode
-	err = s2e(self.fs.Lookup(&self.InHeader, ".", eo))
+	if inode == oinode {
+		err = s2e(self.fs.Lookup(&self.InHeader, ".", eo))
+	}
 	return
 }
 
@@ -180,6 +186,7 @@ func (self *FSUser) Mkdir(path string, perm os.FileMode) (err error) {
 
 // Stat is clone of os.Stat
 func (self *FSUser) Stat(path string) (fi os.FileInfo, err error) {
+	mlog.Printf2("fs/fsuser", "Stat %v", path)
 	var eo fuse.EntryOut
 	err = self.lookup(path, &eo)
 	if err != nil {
@@ -271,4 +278,122 @@ func (self *FSUser) SetXAttr(path, attr string, data []byte) (err error) {
 	}
 	return s2e(self.fs.SetXAttr(&fuse.SetXAttrIn{InHeader: self.InHeader,
 		Size: uint32(len(data))}, attr, data))
+}
+
+type FSFile struct {
+	path string
+	fh   uint64
+	u    *FSUser
+	pos  int64
+}
+
+func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *FSFile, err error) {
+	mlog.Printf2("fs/fsuser", "OpenFile %s f:%x perm:%x", path, flag, perm)
+	var eo fuse.EntryOut
+	var oo fuse.OpenOut
+	if flag&uint32(os.O_CREATE) != 0 {
+		dirname, basename := filepath.Split(path)
+		err = self.lookup(dirname, &eo)
+		if err != nil {
+			return
+		}
+		ci := fuse.CreateIn{InHeader: self.InHeader, Flags: flag, Mode: perm}
+		var co fuse.CreateOut
+		err = s2e(self.fs.Create(&ci, basename, &co))
+		oo = co.OpenOut
+	} else {
+		err = self.lookup(path, &eo)
+		if err != nil {
+			return
+		}
+		oi := fuse.OpenIn{InHeader: self.InHeader, Flags: flag, Mode: perm}
+		err = s2e(self.fs.Open(&oi, &oo))
+	}
+	if err != nil {
+		return
+	}
+	f = &FSFile{path: path, fh: oo.Fh, u: self}
+	return
+}
+
+func (self *FSFile) Close() {
+	ri := fuse.ReleaseIn{Fh: self.fh}
+	self.u.fs.Release(&ri)
+}
+
+func (self *FSFile) Seek(ofs int64, whence int) (ret int64, err error) {
+	var fi os.FileInfo
+	mlog.Printf2("fs/fsuser", "Seek %v %v", ofs, whence)
+	fi, err = self.u.Stat(self.path)
+	if err != nil {
+		return
+	}
+	ret = ofs
+	switch whence {
+	case 0:
+		// relative to start
+
+	case 1:
+		// relative to current offset
+		ret += self.pos
+	case 2:
+		// relative to the end of it
+		ret += fi.Size()
+	}
+	if ret < 0 {
+		err = errors.New("seek before start")
+		return
+	}
+	if ret >= fi.Size() {
+		err = errors.New("seek after end")
+		return
+	}
+	self.pos = ret
+	return
+}
+
+func (self *FSFile) Read(b []byte) (n int, err error) {
+	mlog.Printf2("fs/fsuser", "Read %d bytes @%v", len(b), self.pos)
+	for n < len(b) {
+		ri := fuse.ReadIn{Fh: self.fh,
+			Offset: uint64(self.pos),
+			Size:   uint32(len(b) - n)}
+		r, code := self.u.fs.Read(&ri, b[n:])
+		err = s2e(code)
+		if err != nil {
+			return
+		}
+		rb, _ := r.Bytes(nil)
+		if len(rb) == 0 {
+			mlog.Printf2("fs/fsuser", " nothing was read, abort")
+			break
+		}
+		copy(b[n:], rb)
+		n += len(rb)
+		self.pos += int64(len(rb))
+	}
+	if n == 0 {
+		mlog.Printf2("fs/fsuser", " encountered EOF on first read")
+		err = io.EOF
+	}
+	return
+}
+
+func (self *FSFile) Write(b []byte) (n int, err error) {
+	mlog.Printf2("fs/fsuser", "Write %d bytes @%v", len(b)-n, self.pos)
+	for n < len(b) {
+		wi := fuse.WriteIn{Fh: self.fh,
+			Offset: uint64(self.pos),
+			Size:   uint32(len(b) - n)}
+		n32, code := self.u.fs.Write(&wi, b[n:])
+		err = s2e(code)
+		if err != nil {
+			return
+		}
+		n += int(n32)
+		self.pos += int64(n32)
+		mlog.Printf2("fs/fsuser", " pos now %v", self.pos)
+	}
+	return
+
 }

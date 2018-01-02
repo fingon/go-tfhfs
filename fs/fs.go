@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Sat Dec 30 15:29:45 2017 mstenber
+ * Last modified: Tue Jan  2 11:11:20 2018 mstenber
  * Edit time:     112 min
  *
  */
@@ -20,6 +20,7 @@ package fs
 import (
 	"crypto/sha256"
 	"log"
+	"os"
 
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/ibtree"
@@ -100,7 +101,7 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 	inode := self.GetInode(ino)
 	defer inode.Release()
 
-	file := inode.GetFile()
+	file := inode.GetFile(uint32(os.O_RDONLY))
 	defer file.Release()
 	for {
 		inode, name := file.ReadNextInode()

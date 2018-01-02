@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Sat Dec 30 15:29:52 2017 mstenber
- * Edit time:     145 min
+ * Last modified: Tue Jan  2 14:18:01 2018 mstenber
+ * Edit time:     167 min
  *
  */
 
@@ -22,118 +22,6 @@ import (
 	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
 )
-
-type InodeFile struct {
-	inode   *Inode
-	fh      uint64
-	pos     uint64
-	lastKey *BlockKey
-}
-
-func (self *InodeFile) ReadNextInode() (inode *Inode, name string) {
-	// dentry at lastName (if set) or pos (if not set);
-	// return true if reading was successful (and pos got advanced)
-	tr := self.Fs().GetTransaction()
-	kp := self.lastKey
-	mlog.Printf2("fs/inode", "Inode.ReadNextInode %v", kp == nil)
-	if kp == nil {
-		i := uint64(0)
-		self.inode.IterateSubTypeKeys(BST_DIR_NAME2INODE,
-			func(key BlockKey) bool {
-				mlog.Printf2("fs/inode", " #%d %v", i, key.SubTypeData()[filenameHashSize:])
-				if i == self.pos {
-					kp = &key
-					mlog.Printf2("fs/inode", " found what we looked for")
-					return false
-				}
-				i++
-				return true
-			})
-	} else {
-		nkeyp := tr.NextKey(ibtree.IBKey(*kp))
-		if nkeyp == nil {
-			mlog.Printf2("fs/inode", " next missing")
-			return nil, ""
-		}
-		nkey := BlockKey(*nkeyp)
-		kp = &nkey
-	}
-	if kp == nil {
-		mlog.Printf2("fs/inode", " empty")
-		return nil, ""
-	}
-	if kp.Ino() != self.inode.ino || kp.SubType() != BST_DIR_NAME2INODE {
-		return nil, ""
-	}
-	inop := tr.Get(ibtree.IBKey(*kp))
-	ino := binary.BigEndian.Uint64([]byte(*inop))
-	name = string(kp.SubTypeData()[filenameHashSize:])
-	inode = self.inode.tracker.GetInode(ino)
-	return
-}
-
-func (self *InodeFile) ReadDirEntry(l *fuse.DirEntryList) bool {
-	mlog.Printf2("fs/inode", "InodeFile.ReadDirEntry")
-	inode, name := self.ReadNextInode()
-	defer inode.Release()
-	if inode == nil {
-		mlog.Printf2("fs/inode", " nothing found")
-		return false
-	}
-	defer inode.Release()
-	meta := inode.Meta()
-	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
-	ok, _ := l.AddDirEntry(e)
-	if ok {
-		nkey := NewBlockKeyDirFilename(inode.ino, name)
-		mlog.Printf2("fs/inode", " #%d %s", self.pos, nkey)
-		self.pos++
-		self.lastKey = &nkey
-	}
-	return ok
-}
-
-func (self *InodeFile) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool {
-	inode, name := self.ReadNextInode()
-	defer inode.Release()
-	if inode == nil {
-		return false
-	}
-	defer inode.Release()
-	meta := inode.Meta()
-	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
-	entry, _ := l.AddDirLookupEntry(e)
-	if entry == nil {
-		return false
-	}
-	*entry = fuse.EntryOut{}
-	self.Fs().Lookup(&input.InHeader, name, entry)
-
-	// Move on with things
-	self.pos++
-	nkey := NewBlockKeyDirFilename(inode.ino, name)
-	self.lastKey = &nkey
-	return true
-}
-
-func (self *InodeFile) Fs() *Fs {
-	return self.inode.Fs()
-}
-
-func (self *InodeFile) Release() {
-	delete(self.inode.tracker.fh2ifile, self.fh)
-	self.inode.Release()
-}
-
-func (self *InodeFile) SetPos(pos uint64) {
-	mlog.Printf2("fs/inode", "InodeFile.SetPos %d", pos)
-	if self.pos == pos {
-		return
-	}
-	self.pos = pos
-	// TBD - does this need something else too?
-	self.lastKey = nil
-}
 
 type Inode struct {
 	ino     uint64
@@ -176,6 +64,7 @@ func (self *Inode) FillAttr(out *fuse.Attr) fuse.Status {
 	out.Ctime = meta.StCtimeNs
 	out.Mtime = meta.StMtimeNs
 	out.Mode = meta.StMode
+	out.Rdev = meta.StRdev
 	out.Nlink = meta.StNlink
 	// TBD rdev?
 	// EntryOut.Attr.Owner
@@ -206,22 +95,28 @@ func (self *Inode) FillEntryOut(out *fuse.EntryOut) fuse.Status {
 	out.EntryValidNsec = 0
 	out.AttrValidNsec = 0
 
+	// Implicitly refer to us as well
+	self.Refer()
+
 	return self.FillAttr(&out.Attr)
 }
 
 func (self *Inode) GetChildByName(name string) *Inode {
+	mlog.Printf2("fs/inode", "GetChildByName %s", name)
 	k := NewBlockKeyDirFilename(self.ino, name)
 	tr := self.Fs().GetTransaction()
 	v := tr.Get(ibtree.IBKey(k))
 	if v == nil {
+		mlog.Printf2("fs/inode", " not in tree")
 		return nil
 	}
 	ino := binary.BigEndian.Uint64([]byte(*v))
+	mlog.Printf2("fs/inode", " inode %v", ino)
 	return self.tracker.GetInode(ino)
 }
 
-func (self *Inode) GetFile() *InodeFile {
-	file := &InodeFile{inode: self}
+func (self *Inode) GetFile(flags uint32) *InodeFH {
+	file := &InodeFH{inode: self, flags: flags}
 	self.tracker.AddFile(file)
 	self.Refer()
 	return file
@@ -401,21 +296,60 @@ func (self *Inode) SetMeta(meta *InodeMeta) {
 	self.meta = meta
 }
 
+func (self *Inode) SetSize(size uint64) {
+	meta := self.Meta()
+	shrink := false
+	if size == meta.StSize {
+		return
+	} else if size < meta.StSize && meta.StSize > dataExtentSize {
+		shrink = true
+	}
+	meta.StSize = size
+	if size > embeddedSize {
+		meta.Data = []byte{}
+	}
+	self.SetMeta(meta)
+	if shrink {
+		tr := self.Fs().GetTransaction()
+		nextKey := NewBlockKeyOffset(self.ino, size+dataExtentSize)
+		mlog.Printf2("fs/inode", "SetSize shrinking inode %v - %x+ gone", self.ino, nextKey)
+		lastKey := NewBlockKeyOffset(self.ino, 1<<62)
+		tr.DeleteRange(ibtree.IBKey(nextKey), ibtree.IBKey(lastKey))
+		self.Fs().CommitTransaction(tr)
+	}
+
+}
+
+type InodeNumberGenerator interface {
+	CreateInodeNumber() uint64
+}
+
+type RandomInodeNumberGenerator struct {
+}
+
+func (self *RandomInodeNumberGenerator) CreateInodeNumber() uint64 {
+	return rand.Uint64()
+}
+
 type InodeTracker struct {
+	generator InodeNumberGenerator
 	ino2inode map[uint64]*Inode
-	fh2ifile  map[uint64]*InodeFile
+	fh2ifile  map[uint64]*InodeFH
 	fs        *Fs
 	nextFh    uint64
 }
 
 func (self *InodeTracker) Init(fs *Fs) {
 	self.ino2inode = make(map[uint64]*Inode)
-	self.fh2ifile = make(map[uint64]*InodeFile)
+	self.fh2ifile = make(map[uint64]*InodeFH)
 	self.fs = fs
 	self.nextFh = 1
+	if self.generator == nil {
+		self.generator = &RandomInodeNumberGenerator{}
+	}
 }
 
-func (self *InodeTracker) AddFile(file *InodeFile) {
+func (self *InodeTracker) AddFile(file *InodeFH) {
 	self.nextFh++
 	fh := self.nextFh
 	file.fh = fh
@@ -433,21 +367,26 @@ func (self *InodeTracker) getInode(ino uint64) *Inode {
 }
 
 func (self *InodeTracker) GetInode(ino uint64) *Inode {
+	mlog.Printf2("fs/inode", "GetInode %v", ino)
 	inode := self.getInode(ino)
 	if inode.Meta() == nil {
+		mlog.Printf2("fs/inode", " no meta")
 		inode.Release()
 		return nil
 	}
+	mlog.Printf2("fs/inode", " valid")
 	return inode
 }
 
-func (self *InodeTracker) GetFile(fh uint64) *InodeFile {
+func (self *InodeTracker) GetFile(fh uint64) *InodeFH {
 	return self.fh2ifile[fh]
 }
 
 func (self *InodeTracker) CreateInode() *Inode {
+	mlog.Printf2("fs/inode", "CreateInode")
 	for {
-		ino := rand.Uint64()
+		ino := self.generator.CreateInodeNumber()
+		mlog.Printf2("fs/inode", " %v", ino)
 		if self.ino2inode[ino] != nil {
 			continue
 		}
@@ -472,4 +411,18 @@ func (self *InodeMeta) SetMkdirIn(input *fuse.MkdirIn) {
 	self.StMode = input.Mode | fuse.S_IFDIR
 	// TBD: Umask?
 
+}
+
+func (self *InodeMeta) SetCreateIn(input *fuse.CreateIn) {
+	self.StUid = input.Uid
+	self.StGid = input.Gid
+	self.StMode = input.Mode | fuse.S_IFREG
+	// TBD: Umask?
+}
+
+func (self *InodeMeta) SetMknodIn(input *fuse.MknodIn) {
+	self.StUid = input.Uid
+	self.StGid = input.Gid
+	self.StMode = input.Mode
+	self.StRdev = input.Rdev
 }

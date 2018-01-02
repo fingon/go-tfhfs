@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Fri Dec 29 13:01:33 2017 mstenber
- * Edit time:     18 min
+ * Last modified: Tue Jan  2 09:43:56 2018 mstenber
+ * Edit time:     19 min
  *
  */
 
@@ -48,6 +48,7 @@ type InodeMetaData struct {
 	// int64 st_ino = 1;
 	// ^ part of key, not data
 	StMode    uint32
+	StRdev    uint32
 	StUid     uint32
 	StGid     uint32
 	StAtimeNs uint64

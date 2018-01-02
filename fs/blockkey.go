@@ -18,43 +18,43 @@ import (
 	"github.com/fingon/go-tfhfs/util"
 )
 
-type BlockKey string
+type blockKey string
 
-func (self BlockKey) SubType() BlockSubType {
+func (self blockKey) SubType() BlockSubType {
 	return BlockSubType(self[blockSubTypeOffset])
 }
 
-func (self BlockKey) Ino() uint64 {
+func (self blockKey) Ino() uint64 {
 	b := []byte(self[:inodeDataLength])
 	return binary.BigEndian.Uint64(b)
 }
 
-func (self BlockKey) SubTypeData() string {
+func (self blockKey) SubTypeData() string {
 	return string(self[inodeDataLength+1:])
 }
 
-func NewBlockKey(ino uint64, st BlockSubType, data string) BlockKey {
+func NewblockKey(ino uint64, st BlockSubType, data string) blockKey {
 	b := util.ConcatBytes(util.Uint64Bytes(ino), []byte{byte(st)},
 		[]byte(data))
-	return BlockKey(b)
+	return blockKey(b)
 }
 
-func NewBlockKeyDirFilename(ino uint64, filename string) BlockKey {
+func NewblockKeyDirFilename(ino uint64, filename string) blockKey {
 	h := fnv.New32()
 	h.Write([]byte(filename))
 	n := h.Sum32()
 	b0 := util.Uint32Bytes(n)
 	b := util.ConcatBytes(b0, []byte(filename))
-	return NewBlockKey(ino, BST_DIR_NAME2INODE, string(b))
+	return NewblockKey(ino, BST_DIR_NAME2INODE, string(b))
 }
 
-func NewBlockKeyReverseDirFilename(ino, dirIno uint64, filename string) BlockKey {
+func NewblockKeyReverseDirFilename(ino, dirIno uint64, filename string) blockKey {
 	b := util.ConcatBytes(util.Uint64Bytes(dirIno), []byte(filename))
-	return NewBlockKey(ino, BST_FILE_INODEFILENAME, string(b))
+	return NewblockKey(ino, BST_FILE_INODEFILENAME, string(b))
 }
 
-func NewBlockKeyOffset(ino uint64, offset uint64) BlockKey {
+func NewblockKeyOffset(ino uint64, offset uint64) blockKey {
 	offset = offset / dataExtentSize
 	b := util.Uint64Bytes(offset)
-	return NewBlockKey(ino, BST_FILE_OFFSET2EXTENT, string(b))
+	return NewblockKey(ino, BST_FILE_OFFSET2EXTENT, string(b))
 }

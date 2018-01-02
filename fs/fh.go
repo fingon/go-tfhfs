@@ -22,9 +22,9 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-// InodeFH represents a single open instance of a file/directory.
-type InodeFH struct {
-	inode *Inode
+// inodeFH represents a single open instance of a file/directory.
+type inodeFH struct {
+	inode *inode
 	fh    uint64
 	flags uint32
 
@@ -32,19 +32,19 @@ type InodeFH struct {
 	pos uint64
 
 	// last key in directory at pos (if any)
-	lastKey *BlockKey
+	lastKey *blockKey
 }
 
-func (self *InodeFH) ReadNextInode() (inode *Inode, name string) {
+func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 	// dentry at lastName (if set) or pos (if not set);
 	// return true if reading was successful (and pos got advanced)
 	tr := self.Fs().GetTransaction()
 	kp := self.lastKey
-	mlog.Printf2("fs/fh", "fh.ReadNextInode %v", kp == nil)
+	mlog.Printf2("fs/fh", "fh.ReadNextinode %v", kp == nil)
 	if kp == nil {
 		i := uint64(0)
 		self.inode.IterateSubTypeKeys(BST_DIR_NAME2INODE,
-			func(key BlockKey) bool {
+			func(key blockKey) bool {
 				mlog.Printf2("fs/fh", " #%d %v", i, key.SubTypeData()[filenameHashSize:])
 				if i == self.pos {
 					kp = &key
@@ -61,7 +61,7 @@ func (self *InodeFH) ReadNextInode() (inode *Inode, name string) {
 			mlog.Printf2("fs/fh", " next missing")
 			return nil, ""
 		}
-		nkey := BlockKey(*nkeyp)
+		nkey := blockKey(*nkeyp)
 		kp = &nkey
 	}
 	if kp == nil {
@@ -76,13 +76,13 @@ func (self *InodeFH) ReadNextInode() (inode *Inode, name string) {
 	ino := binary.BigEndian.Uint64([]byte(*inop))
 	name = string(kp.SubTypeData()[filenameHashSize:])
 	mlog.Printf2("fs/fh", " got %v %s", ino, name)
-	inode = self.inode.tracker.GetInode(ino)
+	inode = self.inode.tracker.Getinode(ino)
 	return
 }
 
-func (self *InodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
+func (self *inodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
 	mlog.Printf2("fs/fh", "fh.ReadDirEntry fh:%v inode:%v", self.fh, self.inode.ino)
-	inode, name := self.ReadNextInode()
+	inode, name := self.ReadNextinode()
 	defer inode.Release()
 	if inode == nil {
 		mlog.Printf2("fs/fh", " nothing found")
@@ -93,7 +93,7 @@ func (self *InodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
 	ok, _ := l.AddDirEntry(e)
 	if ok {
-		nkey := NewBlockKeyDirFilename(self.inode.ino, name)
+		nkey := NewblockKeyDirFilename(self.inode.ino, name)
 		mlog.Printf2("fs/fh", " #%d %x", self.pos, nkey)
 		self.pos++
 		self.lastKey = &nkey
@@ -103,8 +103,8 @@ func (self *InodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
 	return ok
 }
 
-func (self *InodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool {
-	inode, name := self.ReadNextInode()
+func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool {
+	inode, name := self.ReadNextinode()
 	defer inode.Release()
 	if inode == nil {
 		return false
@@ -122,32 +122,32 @@ func (self *InodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool 
 
 	// Move on with things
 	self.pos++
-	nkey := NewBlockKeyDirFilename(self.inode.ino, name)
+	nkey := NewblockKeyDirFilename(self.inode.ino, name)
 	self.lastKey = &nkey
 	return true
 }
 
-func (self *InodeFH) Fs() *Fs {
+func (self *inodeFH) Fs() *Fs {
 	return self.inode.Fs()
 }
 
-func (self *InodeFH) Release() {
+func (self *inodeFH) Release() {
 	delete(self.inode.tracker.fh2ifile, self.fh)
 	self.inode.Release()
 }
 
-func (self *InodeFH) SetPos(pos uint64) {
+func (self *inodeFH) SetPos(pos uint64) {
 	if self.pos == pos {
 		mlog.Printf2("fs/fh", "fh.SetPos still at %d", pos)
 		return
 	}
-	mlog.Printf2("fs/fh", "InodeFH.SetPos %d", pos)
+	mlog.Printf2("fs/fh", "inodeFH.SetPos %d", pos)
 	self.pos = pos
 	// TBD - does this need something else too?
 	self.lastKey = nil
 }
 
-func (self *InodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code fuse.Status) {
+func (self *inodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code fuse.Status) {
 	mlog.Printf2("fs/fh", "fh.Read %v @%v", len(buf), offset)
 	end := offset + uint64(len(buf))
 	meta := self.inode.Meta()
@@ -161,7 +161,7 @@ func (self *InodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 	if size <= embeddedSize {
 		b = meta.Data
 	} else {
-		k := NewBlockKeyOffset(self.inode.ino, offset)
+		k := NewblockKeyOffset(self.inode.ino, offset)
 		e := offset / dataExtentSize
 		offset -= e * dataExtentSize
 		end -= e * dataExtentSize
@@ -206,7 +206,7 @@ func (self *InodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 	return
 }
 
-func (self *InodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse.Status) {
+func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse.Status) {
 	mlog.Printf2("fs/fh", "fh.Write %v @%v", len(buf), offset)
 	var r fuse.ReadResult
 
@@ -265,7 +265,7 @@ func (self *InodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 			meta.Data = []byte{}
 			self.inode.SetMeta(meta)
 		}
-		k := NewBlockKeyOffset(self.inode.ino, offset)
+		k := NewblockKeyOffset(self.inode.ino, offset)
 		tr := self.Fs().GetTransaction()
 		bid := self.Fs().getBlockDataId(BDT_EXTENT, string(buf))
 		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(buf), bid)

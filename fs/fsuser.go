@@ -280,14 +280,14 @@ func (self *FSUser) SetXAttr(path, attr string, data []byte) (err error) {
 		Size: uint32(len(data))}, attr, data))
 }
 
-type FSFile struct {
+type fsFile struct {
 	path string
 	fh   uint64
 	u    *FSUser
 	pos  int64
 }
 
-func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *FSFile, err error) {
+func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *fsFile, err error) {
 	mlog.Printf2("fs/fsuser", "OpenFile %s f:%x perm:%x", path, flag, perm)
 	var eo fuse.EntryOut
 	var oo fuse.OpenOut
@@ -312,16 +312,16 @@ func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *FSFile, 
 	if err != nil {
 		return
 	}
-	f = &FSFile{path: path, fh: oo.Fh, u: self}
+	f = &fsFile{path: path, fh: oo.Fh, u: self}
 	return
 }
 
-func (self *FSFile) Close() {
+func (self *fsFile) Close() {
 	ri := fuse.ReleaseIn{Fh: self.fh}
 	self.u.fs.Release(&ri)
 }
 
-func (self *FSFile) Seek(ofs int64, whence int) (ret int64, err error) {
+func (self *fsFile) Seek(ofs int64, whence int) (ret int64, err error) {
 	var fi os.FileInfo
 	mlog.Printf2("fs/fsuser", "Seek %v %v", ofs, whence)
 	fi, err = self.u.Stat(self.path)
@@ -352,7 +352,7 @@ func (self *FSFile) Seek(ofs int64, whence int) (ret int64, err error) {
 	return
 }
 
-func (self *FSFile) Read(b []byte) (n int, err error) {
+func (self *fsFile) Read(b []byte) (n int, err error) {
 	mlog.Printf2("fs/fsuser", "Read %d bytes @%v", len(b), self.pos)
 	for n < len(b) {
 		ri := fuse.ReadIn{Fh: self.fh,
@@ -379,7 +379,7 @@ func (self *FSFile) Read(b []byte) (n int, err error) {
 	return
 }
 
-func (self *FSFile) Write(b []byte) (n int, err error) {
+func (self *fsFile) Write(b []byte) (n int, err error) {
 	mlog.Printf2("fs/fsuser", "Write %d bytes @%v", len(b)-n, self.pos)
 	for n < len(b) {
 		wi := fuse.WriteIn{Fh: self.fh,

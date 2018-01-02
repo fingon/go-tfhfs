@@ -44,7 +44,7 @@ func (self *Fs) StatFs(input *InHeader, out *StatfsOut) Status {
 	return OK
 }
 
-func (self *Fs) access(inode *Inode, mode uint32, orOwn bool, ctx *Context) Status {
+func (self *Fs) access(inode *inode, mode uint32, orOwn bool, ctx *Context) Status {
 	if inode == nil {
 		return ENOENT
 	}
@@ -72,7 +72,7 @@ func (self *Fs) access(inode *Inode, mode uint32, orOwn bool, ctx *Context) Stat
 }
 
 // lookup gets child of a parent.
-func (self *Fs) lookup(parent *Inode, name string, ctx *Context) (child *Inode, code Status) {
+func (self *Fs) lookup(parent *inode, name string, ctx *Context) (child *inode, code Status) {
 	mlog.Printf2("fs/ops", "ops.lookup %v %s", parent.ino, name)
 	code = self.access(parent, X_OK, false, ctx)
 	if !code.Ok() {
@@ -95,7 +95,7 @@ func (self *Fs) lookup(parent *Inode, name string, ctx *Context) (child *Inode, 
 }
 
 func (self *Fs) Lookup(input *InHeader, name string, out *EntryOut) (code Status) {
-	parent := self.GetInode(input.NodeId)
+	parent := self.Getinode(input.NodeId)
 	defer parent.Release()
 
 	child, code := self.lookup(parent, name, &input.Context)
@@ -108,11 +108,11 @@ func (self *Fs) Lookup(input *InHeader, name string, out *EntryOut) (code Status
 }
 
 func (self *Fs) Forget(nodeID, nlookup uint64) {
-	self.GetInode(nodeID).Forget(nlookup)
+	self.Getinode(nodeID).Forget(nlookup)
 }
 
 func (self *Fs) GetAttr(input *GetAttrIn, out *AttrOut) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	if inode == nil {
 		return ENOENT
 	}
@@ -127,7 +127,7 @@ func (self *Fs) GetAttr(input *GetAttrIn, out *AttrOut) (code Status) {
 }
 
 func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	if inode == nil {
 		return ENOENT
 	}
@@ -227,7 +227,7 @@ func (self *Fs) ReleaseDir(input *ReleaseIn) {
 }
 
 func (self *Fs) OpenDir(input *OpenIn, out *OpenOut) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, R_OK|X_OK, false, &input.Context)
@@ -241,7 +241,7 @@ func (self *Fs) OpenDir(input *OpenIn, out *OpenOut) (code Status) {
 }
 
 func (self *Fs) Open(input *OpenIn, out *OpenOut) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	mlog.Printf2("fs/ops", "ops.Open %v", input.NodeId)
 	defer inode.Release()
 
@@ -282,7 +282,7 @@ func (self *Fs) ReadDirPlus(input *ReadIn, l *DirEntryList) Status {
 }
 
 func (self *Fs) Readlink(input *InHeader) (out []byte, code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, R_OK, false, &input.Context)
@@ -296,9 +296,9 @@ func (self *Fs) Readlink(input *InHeader) (out []byte, code Status) {
 	return
 }
 
-func (self *Fs) create(input *InHeader, name string, meta *InodeMeta, allowReplace bool) (child *Inode, code Status) {
+func (self *Fs) create(input *InHeader, name string, meta *InodeMeta, allowReplace bool) (child *inode, code Status) {
 	mlog.Printf2("fs/ops", " create %v", name)
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK|X_OK, false, &input.Context)
@@ -319,7 +319,7 @@ func (self *Fs) create(input *InHeader, name string, meta *InodeMeta, allowRepla
 		}
 	}
 
-	child = self.CreateInode()
+	child = self.Createinode()
 	child.SetMeta(meta)
 	inode.AddChild(name, child)
 	return
@@ -338,7 +338,7 @@ func (self *Fs) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) 
 }
 
 func (self *Fs) unlink(input *InHeader, name string, isdir *bool) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	child, code := self.lookup(inode, name, &input.Context)
@@ -380,7 +380,7 @@ func (self *Fs) GetXAttrSize(input *InHeader, attr string) (size int, code Statu
 }
 
 func (self *Fs) GetXAttrData(input *InHeader, attr string) (data []byte, code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, R_OK, false, &input.Context)
@@ -392,7 +392,7 @@ func (self *Fs) GetXAttrData(input *InHeader, attr string) (data []byte, code St
 }
 
 func (self *Fs) SetXAttr(input *SetXAttrIn, attr string, data []byte) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK, true, &input.Context)
@@ -404,7 +404,7 @@ func (self *Fs) SetXAttr(input *SetXAttrIn, attr string, data []byte) (code Stat
 }
 
 func (self *Fs) ListXAttr(input *InHeader) (data []byte, code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, R_OK, false, &input.Context)
@@ -413,7 +413,7 @@ func (self *Fs) ListXAttr(input *InHeader) (data []byte, code Status) {
 	}
 	b := bytes.NewBuffer([]byte{})
 	inode.IterateSubTypeKeys(BST_XATTR,
-		func(key BlockKey) bool {
+		func(key blockKey) bool {
 			b.Write([]byte(key.SubTypeData()))
 			b.WriteByte(0)
 			return true
@@ -424,7 +424,7 @@ func (self *Fs) ListXAttr(input *InHeader) (data []byte, code Status) {
 }
 
 func (self *Fs) RemoveXAttr(input *InHeader, attr string) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK, true, &input.Context)
@@ -435,7 +435,7 @@ func (self *Fs) RemoveXAttr(input *InHeader, attr string) (code Status) {
 }
 
 func (self *Fs) Rename(input *RenameIn, oldName string, newName string) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK|X_OK, true, &input.Context)
@@ -449,7 +449,7 @@ func (self *Fs) Rename(input *RenameIn, oldName string, newName string) (code St
 		return
 	}
 
-	new_inode := self.GetInode(input.Newdir)
+	new_inode := self.Getinode(input.Newdir)
 	defer new_inode.Release()
 	code = self.access(new_inode, W_OK|X_OK, true, &input.Context)
 	if !code.Ok() {
@@ -483,7 +483,7 @@ func (self *Fs) Rename(input *RenameIn, oldName string, newName string) (code St
 }
 
 func (self *Fs) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK|X_OK, true, &input.Context)
@@ -505,7 +505,7 @@ func (self *Fs) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
 }
 
 func (self *Fs) Access(input *AccessIn) (code Status) {
-	inode := self.GetInode(input.NodeId)
+	inode := self.Getinode(input.NodeId)
 	defer inode.Release()
 
 	return self.access(inode, input.Mask, true, &input.Context)

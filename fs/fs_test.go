@@ -22,12 +22,12 @@ import (
 	"github.com/stvp/assert"
 )
 
-func TestBlockKey(t *testing.T) {
+func TestblockKey(t *testing.T) {
 	t.Parallel()
 	ino := uint64(42)
 	bst := BST_META
 	bstd := "foo"
-	k := NewBlockKey(ino, bst, bstd)
+	k := NewblockKey(ino, bst, bstd)
 	assert.Equal(t, k.Ino(), ino)
 	assert.Equal(t, k.SubType(), bst)
 	assert.Equal(t, k.SubTypeData(), bstd)
@@ -43,7 +43,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 
 	tr := ibtree.NewTransaction(fs.treeRoot)
 	for i := 0; i < n; i++ {
-		k := ibtree.IBKey(NewBlockKey(uint64(i), BST_META, ""))
+		k := ibtree.IBKey(NewblockKey(uint64(i), BST_META, ""))
 		tr.Set(k, fmt.Sprintf("v%d", i))
 	}
 	fs.treeRoot, _ = tr.Commit()
@@ -53,7 +53,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tr := ibtree.NewTransaction(fs.treeRoot)
 			j := rand.Int() % n
-			k := ibtree.IBKey(NewBlockKey(uint64(j), BST_META, ""))
+			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.Get(k)
 		}
 	})
@@ -63,7 +63,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			j := rand.Int() % n
-			k := ibtree.IBKey(NewBlockKey(uint64(j), BST_META, ""))
+			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.Get(k)
 		}
 	})
@@ -73,7 +73,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tr := ibtree.NewTransaction(fs.treeRoot)
 			j := rand.Int() % n
-			k := ibtree.IBKey(NewBlockKey(uint64(j), BST_META, ""))
+			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.Set(k, fmt.Sprintf("V%d%d", j, i))
 			tr.Commit()
 		}
@@ -84,7 +84,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tr := ibtree.NewTransaction(fs.treeRoot)
 			j := rand.Int() % n
-			k := ibtree.IBKey(NewBlockKey(uint64(j), BST_META, ""))
+			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.Delete(k)
 			tr.Commit()
 		}

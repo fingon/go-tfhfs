@@ -229,7 +229,7 @@ type DummyGenerator struct {
 	incr  int64
 }
 
-func (self *DummyGenerator) CreateInodeNumber() uint64 {
+func (self *DummyGenerator) CreateinodeNumber() uint64 {
 	self.index = uint64(int64(self.index) + self.incr)
 	return self.index
 }
@@ -243,7 +243,7 @@ func TestFs(t *testing.T) {
 		assert.Nil(t, err)
 
 	}
-	add := func(s string, gen InodeNumberGenerator) {
+	add := func(s string, gen inodeNumberGenerator) {
 		t.Run(s,
 			func(t *testing.T) {
 				t.Parallel()

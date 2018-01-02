@@ -23,18 +23,18 @@ import (
 	"github.com/hanwen/go-fuse/fuse"
 )
 
-type Inode struct {
+type inode struct {
 	ino     uint64
-	tracker *InodeTracker
+	tracker *inodeTracker
 	refcnt  uint64
 	meta    *InodeMeta
 }
 
-func (self *Inode) AddChild(name string, child *Inode) {
-	mlog.Printf2("fs/inode", "Inode.AddChild %v = %v", name, child)
+func (self *inode) AddChild(name string, child *inode) {
+	mlog.Printf2("fs/inode", "inode.AddChild %v = %v", name, child)
 	tr := self.Fs().GetTransaction()
-	k := NewBlockKeyDirFilename(self.ino, name)
-	rk := NewBlockKeyReverseDirFilename(child.ino, self.ino, name)
+	k := NewblockKeyDirFilename(self.ino, name)
+	rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
 	tr.Set(ibtree.IBKey(k), string(util.Uint64Bytes(child.ino)))
 	tr.Set(ibtree.IBKey(rk), "")
 	meta := child.Meta()
@@ -50,7 +50,7 @@ func (self *Inode) AddChild(name string, child *Inode) {
 	self.Fs().CommitTransaction(tr)
 }
 
-func (self *Inode) Fs() *Fs {
+func (self *inode) Fs() *Fs {
 	return self.tracker.fs
 }
 
@@ -59,7 +59,7 @@ func unixNanoToFuse(t uint64, seconds *uint64, parts *uint32) {
 	*parts = uint32(t % uint64(time.Second))
 }
 
-func (self *Inode) FillAttr(out *fuse.Attr) fuse.Status {
+func (self *inode) FillAttr(out *fuse.Attr) fuse.Status {
 	// EntryOut.Attr
 	meta := self.Meta()
 	if meta == nil {
@@ -79,7 +79,7 @@ func (self *Inode) FillAttr(out *fuse.Attr) fuse.Status {
 	return fuse.OK
 }
 
-func (self *Inode) FillAttrOut(out *fuse.AttrOut) fuse.Status {
+func (self *inode) FillAttrOut(out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = attrValidity
 	out.AttrValidNsec = 0
 	if out.Nlink == 0 {
@@ -91,7 +91,7 @@ func (self *Inode) FillAttrOut(out *fuse.AttrOut) fuse.Status {
 	return self.FillAttr(&out.Attr)
 }
 
-func (self *Inode) FillEntryOut(out *fuse.EntryOut) fuse.Status {
+func (self *inode) FillEntryOut(out *fuse.EntryOut) fuse.Status {
 	// EntryOut
 	out.NodeId = self.ino
 	out.Generation = 0
@@ -106,9 +106,9 @@ func (self *Inode) FillEntryOut(out *fuse.EntryOut) fuse.Status {
 	return self.FillAttr(&out.Attr)
 }
 
-func (self *Inode) GetChildByName(name string) *Inode {
+func (self *inode) GetChildByName(name string) *inode {
 	mlog.Printf2("fs/inode", "GetChildByName %s", name)
-	k := NewBlockKeyDirFilename(self.ino, name)
+	k := NewblockKeyDirFilename(self.ino, name)
 	tr := self.Fs().GetTransaction()
 	v := tr.Get(ibtree.IBKey(k))
 	if v == nil {
@@ -117,18 +117,18 @@ func (self *Inode) GetChildByName(name string) *Inode {
 	}
 	ino := binary.BigEndian.Uint64([]byte(*v))
 	mlog.Printf2("fs/inode", " inode %v", ino)
-	return self.tracker.GetInode(ino)
+	return self.tracker.Getinode(ino)
 }
 
-func (self *Inode) GetFile(flags uint32) *InodeFH {
-	file := &InodeFH{inode: self, flags: flags}
+func (self *inode) GetFile(flags uint32) *inodeFH {
+	file := &inodeFH{inode: self, flags: flags}
 	self.tracker.AddFile(file)
 	self.Refer()
 	return file
 }
 
-func (self *Inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
-	k := NewBlockKey(self.ino, BST_XATTR, attr)
+func (self *inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
+	k := NewblockKey(self.ino, BST_XATTR, attr)
 	tr := self.Fs().GetTransaction()
 	v := tr.Get(ibtree.IBKey(k))
 	if v == nil {
@@ -140,16 +140,16 @@ func (self *Inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
 	return
 }
 
-func (self *Inode) IterateSubTypeKeys(bst BlockSubType,
-	keycb func(key BlockKey) bool) {
+func (self *inode) IterateSubTypeKeys(bst BlockSubType,
+	keycb func(key blockKey) bool) {
 	tr := self.Fs().GetTransaction()
-	k := NewBlockKey(self.ino, bst, "")
+	k := NewblockKey(self.ino, bst, "")
 	for {
 		nkeyp := tr.NextKey(ibtree.IBKey(k))
 		if nkeyp == nil {
 			return
 		}
-		nkey := BlockKey(*nkeyp)
+		nkey := blockKey(*nkeyp)
 		if nkey.Ino() != self.ino || nkey.SubType() != bst {
 			return
 		}
@@ -161,8 +161,8 @@ func (self *Inode) IterateSubTypeKeys(bst BlockSubType,
 
 }
 
-func (self *Inode) RemoveXAttr(attr string) (code fuse.Status) {
-	k := ibtree.IBKey(NewBlockKey(self.ino, BST_XATTR, attr))
+func (self *inode) RemoveXAttr(attr string) (code fuse.Status) {
+	k := ibtree.IBKey(NewblockKey(self.ino, BST_XATTR, attr))
 	mlog.Printf2("fs/inode", "RemoveXAttr %s - deleting %x", attr, k)
 	tr := self.Fs().GetTransaction()
 	v := tr.Get(k)
@@ -175,8 +175,8 @@ func (self *Inode) RemoveXAttr(attr string) (code fuse.Status) {
 	return fuse.OK
 }
 
-func (self *Inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
-	k := NewBlockKey(self.ino, BST_XATTR, attr)
+func (self *inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
+	k := NewblockKey(self.ino, BST_XATTR, attr)
 	mlog.Printf2("fs/inode", "SetXAttr %s - setting %x", attr, k)
 	tr := self.Fs().GetTransaction()
 	tr.Set(ibtree.IBKey(k), string(data))
@@ -184,26 +184,26 @@ func (self *Inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
 	return fuse.OK
 }
 
-func (self *Inode) IsDir() bool {
+func (self *inode) IsDir() bool {
 	meta := self.Meta()
 	return meta != nil && (meta.StMode&fuse.S_IFDIR) != 0
 }
 
-func (self *Inode) IsFile() bool {
+func (self *inode) IsFile() bool {
 	meta := self.Meta()
 	return meta != nil && (meta.StMode&fuse.S_IFREG) != 0
 }
 
-func (self *Inode) IsLink() bool {
+func (self *inode) IsLink() bool {
 	meta := self.Meta()
 	return meta != nil && (meta.StMode&fuse.S_IFLNK) != 0
 }
 
-func (self *Inode) Refer() {
+func (self *inode) Refer() {
 	self.refcnt++
 }
 
-func (self *Inode) Forget(refcnt uint64) {
+func (self *inode) Forget(refcnt uint64) {
 	self.refcnt -= refcnt
 	if self.refcnt == 0 {
 		// TBD if there's something else that should be done?
@@ -211,14 +211,14 @@ func (self *Inode) Forget(refcnt uint64) {
 	}
 }
 
-func (self *Inode) Release() {
+func (self *inode) Release() {
 	if self == nil {
 		return
 	}
 	self.Forget(1)
 }
 
-func (self *Inode) RemoveChildByName(name string) {
+func (self *inode) RemoveChildByName(name string) {
 	mlog.Printf2("fs/inode", "inode.RemoveChildByName %v", name)
 	child := self.GetChildByName(name)
 	defer child.Release()
@@ -227,8 +227,8 @@ func (self *Inode) RemoveChildByName(name string) {
 		return
 	}
 	tr := self.Fs().GetTransaction()
-	k := NewBlockKeyDirFilename(self.ino, name)
-	rk := NewBlockKeyReverseDirFilename(child.ino, self.ino, name)
+	k := NewblockKeyDirFilename(self.ino, name)
+	rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
 	tr.Delete(ibtree.IBKey(k))
 	tr.Delete(ibtree.IBKey(rk))
 	meta := child.Meta()
@@ -251,10 +251,10 @@ func (self *Inode) RemoveChildByName(name string) {
 
 // Meta caches the current metadata for particular inode.
 // It is valid for the duration of the inode, within validity period anyway.
-func (self *Inode) Meta() *InodeMeta {
+func (self *inode) Meta() *InodeMeta {
 	if self.meta == nil {
-		mlog.Printf2("fs/inode", "Inode.Meta #%d", self.ino)
-		k := NewBlockKey(self.ino, BST_META, "")
+		mlog.Printf2("fs/inode", "inode.Meta #%d", self.ino)
+		k := NewblockKey(self.ino, BST_META, "")
 		tr := self.Fs().GetTransaction()
 		v := tr.Get(ibtree.IBKey(k))
 		if v == nil {
@@ -272,7 +272,7 @@ func (self *Inode) Meta() *InodeMeta {
 	return self.meta
 }
 
-func (self *Inode) SetMeta(meta *InodeMeta) {
+func (self *inode) SetMeta(meta *InodeMeta) {
 	times := 0
 
 	if meta.StAtimeNs == 0 {
@@ -287,7 +287,7 @@ func (self *Inode) SetMeta(meta *InodeMeta) {
 	if times != 0 {
 		meta.setTimesNow(times&1 != 0, times&2 != 0, times&4 != 0)
 	}
-	k := NewBlockKey(self.ino, BST_META, "")
+	k := NewblockKey(self.ino, BST_META, "")
 	tr := self.Fs().GetTransaction()
 	b, err := meta.MarshalMsg(nil)
 	if err != nil {
@@ -295,11 +295,11 @@ func (self *Inode) SetMeta(meta *InodeMeta) {
 	}
 	tr.Set(ibtree.IBKey(k), string(b))
 	self.Fs().CommitTransaction(tr)
-	mlog.Printf2("fs/inode", "Inode.SetMeta #%d = %v", self.ino, meta)
+	mlog.Printf2("fs/inode", "inode.SetMeta #%d = %v", self.ino, meta)
 	self.meta = meta
 }
 
-func (self *Inode) SetSize(size uint64) {
+func (self *inode) SetSize(size uint64) {
 	meta := self.Meta()
 	shrink := false
 	if size == meta.StSize {
@@ -314,64 +314,64 @@ func (self *Inode) SetSize(size uint64) {
 	self.SetMeta(meta)
 	if shrink {
 		tr := self.Fs().GetTransaction()
-		nextKey := NewBlockKeyOffset(self.ino, size+dataExtentSize)
+		nextKey := NewblockKeyOffset(self.ino, size+dataExtentSize)
 		mlog.Printf2("fs/inode", "SetSize shrinking inode %v - %x+ gone", self.ino, nextKey)
-		lastKey := NewBlockKeyOffset(self.ino, 1<<62)
+		lastKey := NewblockKeyOffset(self.ino, 1<<62)
 		tr.DeleteRange(ibtree.IBKey(nextKey), ibtree.IBKey(lastKey))
 		self.Fs().CommitTransaction(tr)
 	}
 
 }
 
-type InodeNumberGenerator interface {
-	CreateInodeNumber() uint64
+type inodeNumberGenerator interface {
+	CreateinodeNumber() uint64
 }
 
-type RandomInodeNumberGenerator struct {
+type randomInodeNumberGenerator struct {
 }
 
-func (self *RandomInodeNumberGenerator) CreateInodeNumber() uint64 {
+func (self *randomInodeNumberGenerator) CreateinodeNumber() uint64 {
 	return rand.Uint64()
 }
 
-type InodeTracker struct {
-	generator InodeNumberGenerator
-	ino2inode map[uint64]*Inode
-	fh2ifile  map[uint64]*InodeFH
+type inodeTracker struct {
+	generator inodeNumberGenerator
+	ino2inode map[uint64]*inode
+	fh2ifile  map[uint64]*inodeFH
 	fs        *Fs
 	nextFh    uint64
 }
 
-func (self *InodeTracker) Init(fs *Fs) {
-	self.ino2inode = make(map[uint64]*Inode)
-	self.fh2ifile = make(map[uint64]*InodeFH)
+func (self *inodeTracker) Init(fs *Fs) {
+	self.ino2inode = make(map[uint64]*inode)
+	self.fh2ifile = make(map[uint64]*inodeFH)
 	self.fs = fs
 	self.nextFh = 1
 	if self.generator == nil {
-		self.generator = &RandomInodeNumberGenerator{}
+		self.generator = &randomInodeNumberGenerator{}
 	}
 }
 
-func (self *InodeTracker) AddFile(file *InodeFH) {
+func (self *inodeTracker) AddFile(file *inodeFH) {
 	self.nextFh++
 	fh := self.nextFh
 	file.fh = fh
 	self.fh2ifile[fh] = file
 }
 
-func (self *InodeTracker) getInode(ino uint64) *Inode {
+func (self *inodeTracker) getinode(ino uint64) *inode {
 	n := self.ino2inode[ino]
 	if n == nil {
-		n = &Inode{ino: ino, tracker: self}
+		n = &inode{ino: ino, tracker: self}
 		self.ino2inode[ino] = n
 	}
 	n.refcnt++
 	return n
 }
 
-func (self *InodeTracker) GetInode(ino uint64) *Inode {
-	mlog.Printf2("fs/inode", "GetInode %v", ino)
-	inode := self.getInode(ino)
+func (self *inodeTracker) Getinode(ino uint64) *inode {
+	mlog.Printf2("fs/inode", "Getinode %v", ino)
+	inode := self.getinode(ino)
 	if inode.Meta() == nil {
 		mlog.Printf2("fs/inode", " no meta")
 		inode.Release()
@@ -381,21 +381,21 @@ func (self *InodeTracker) GetInode(ino uint64) *Inode {
 	return inode
 }
 
-func (self *InodeTracker) GetFileByFh(fh uint64) *InodeFH {
+func (self *inodeTracker) GetFileByFh(fh uint64) *inodeFH {
 	return self.fh2ifile[fh]
 }
 
-func (self *InodeTracker) CreateInode() *Inode {
-	mlog.Printf2("fs/inode", "CreateInode")
+func (self *inodeTracker) Createinode() *inode {
+	mlog.Printf2("fs/inode", "Createinode")
 	for {
-		ino := self.generator.CreateInodeNumber()
+		ino := self.generator.CreateinodeNumber()
 		mlog.Printf2("fs/inode", " %v", ino)
 		if ino == 0 || self.ino2inode[ino] != nil {
 			continue
 		}
 
 		// Potentially interesting. See if it is on disk.
-		inode := self.getInode(ino)
+		inode := self.getinode(ino)
 		if inode.Meta() != nil {
 			inode.Release()
 			continue

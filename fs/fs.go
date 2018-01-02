@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  2 22:58:31 2018 mstenber
- * Edit time:     144 min
+ * Last modified: Tue Jan  2 23:38:49 2018 mstenber
+ * Edit time:     147 min
  *
  */
 
@@ -34,7 +34,7 @@ const inodeDataLength = 8
 const blockSubTypeOffset = inodeDataLength
 
 type Fs struct {
-	InodeTracker
+	inodeTracker
 	server          *fuse.Server
 	tree            *ibtree.IBTree
 	storage         *storage.Storage
@@ -46,23 +46,9 @@ type Fs struct {
 
 var _ fuse.RawFileSystem = &Fs{}
 
-func (self *Fs) LoadNodeFromString(data string) *ibtree.IBNodeData {
-	bd := []byte(data)
-	dt := BlockDataType(bd[0])
-	switch dt {
-	case BDT_EXTENT:
-		break
-	case BDT_NODE:
-		nd := &ibtree.IBNodeData{}
-		_, err := nd.UnmarshalMsg(bd[1:])
-		if err != nil {
-			log.Panic(err)
-		}
-		return nd
-	default:
-		log.Panicf("LoadNodeFromString - wrong dt:%v", dt)
-	}
-	return nil
+func (self *Fs) Close() {
+	self.StorageFlush()
+	self.storage.Backend.Close()
 }
 
 // ibtree.IBTreeBackend API
@@ -72,23 +58,16 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 	if b == nil {
 		return nil
 	}
-	return self.LoadNodeFromString(b.GetData())
+	return self.loadNodeFromString(b.GetData())
 }
 
-func (self *Fs) getBlockDataId(blockType BlockDataType, data string) ibtree.BlockId {
-	b := []byte(data)
-	h := sha256.Sum256(b)
-	bid := h[:]
-	nb := make([]byte, len(b)+1)
-	nb[0] = byte(blockType)
-	copy(nb[1:], b)
-	block := self.storage.ReferOrStoreBlock(string(bid), string(nb))
-	self.storage.ReleaseBlockId(block.Id)
-	// By default this won't increase references; however, stuff
-	// that happens 'elsewhere' (e.g. taking root reference) does,
-	// and due to thattransitively, also this does.
-	self.bidMap[block.Id] = true
-	return ibtree.BlockId(block.Id)
+func (self *Fs) StorageFlush() int {
+	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
+	// ^ done in each commit, so pointless here?
+	rv := self.storage.Flush()
+	self.bidMap = make(map[string]bool)
+
+	return rv
 }
 
 // ibtree.IBTreeBackend API
@@ -116,13 +95,13 @@ func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
 // is binary garbage and I am too lazy to write a decoder for it.
 func (self *Fs) ListDir(ino uint64) (ret []string) {
 	mlog.Printf2("fs/fs", "Fs.ListDir #%d", ino)
-	inode := self.GetInode(ino)
+	inode := self.Getinode(ino)
 	defer inode.Release()
 
 	file := inode.GetFile(uint32(os.O_RDONLY))
 	defer file.Release()
 	for {
-		inode, name := file.ReadNextInode()
+		inode, name := file.ReadNextinode()
 		if inode == nil {
 			return
 		}
@@ -134,45 +113,9 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 	return
 }
 
-// These are pre-flush references to blocks; I didn't come up with
-// better scheme than this, so we keep that and clear it at flush
-// time.
-func (self *Fs) hasExternalReferences(id string) bool {
-	return self.bidMap[id]
-}
-
-func (self *Fs) iterateReferencesCallback(data string, cb storage.BlockReferenceCallback) {
-	nd := self.LoadNodeFromString(data)
-	if nd == nil {
-		return
-	}
-	if !nd.Leafy {
-		for _, c := range nd.Children {
-			cb(c.Value)
-		}
-		return
-	}
-	for _, c := range nd.Children {
-		k := BlockKey(c.Key)
-		switch k.SubType() {
-		case BST_FILE_OFFSET2EXTENT:
-			cb(c.Value)
-		}
-	}
-}
-
-func (self *Fs) StorageFlush() int {
-	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
-	// ^ done in each commit, so pointless here?
-	rv := self.storage.Flush()
-	self.bidMap = make(map[string]bool)
-
-	return rv
-}
-
 func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
-	fs.InodeTracker.Init(fs)
+	fs.inodeTracker.Init(fs)
 	fs.tree = ibtree.IBTree{}.Init(fs)
 	fs.bidMap = make(map[string]bool)
 	st.HasExternalReferencesCallback = func(id string) bool {
@@ -189,8 +132,8 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	}
 	if fs.treeRoot == nil {
 		fs.treeRoot = fs.tree.NewRoot()
-		// getInode succeeds always; Get does not
-		root := fs.getInode(fuse.FUSE_ROOT_ID)
+		// getinode succeeds always; Get does not
+		root := fs.getinode(fuse.FUSE_ROOT_ID)
 		var meta InodeMeta
 		meta.StMode = 0777 | fuse.S_IFDIR
 		meta.StNlink++ // root has always built-in link
@@ -208,4 +151,66 @@ func NewBadgerCryptoFs(storedir, password, salt, rootName string) *Fs {
 
 	st := storage.Storage{Codec: c, Backend: backend}.Init()
 	return NewFs(st, rootName)
+}
+
+// These are pre-flush references to blocks; I didn't come up with
+// better scheme than this, so we keep that and clear it at flush
+// time.
+func (self *Fs) hasExternalReferences(id string) bool {
+	return self.bidMap[id]
+}
+
+func (self *Fs) iterateReferencesCallback(data string, cb storage.BlockReferenceCallback) {
+	nd := self.loadNodeFromString(data)
+	if nd == nil {
+		return
+	}
+	if !nd.Leafy {
+		for _, c := range nd.Children {
+			cb(c.Value)
+		}
+		return
+	}
+	for _, c := range nd.Children {
+		k := blockKey(c.Key)
+		switch k.SubType() {
+		case BST_FILE_OFFSET2EXTENT:
+			cb(c.Value)
+		}
+	}
+}
+
+func (self *Fs) getBlockDataId(blockType BlockDataType, data string) ibtree.BlockId {
+	b := []byte(data)
+	h := sha256.Sum256(b)
+	bid := h[:]
+	nb := make([]byte, len(b)+1)
+	nb[0] = byte(blockType)
+	copy(nb[1:], b)
+	block := self.storage.ReferOrStoreBlock(string(bid), string(nb))
+	self.storage.ReleaseBlockId(block.Id)
+	// By default this won't increase references; however, stuff
+	// that happens 'elsewhere' (e.g. taking root reference) does,
+	// and due to thattransitively, also this does.
+	self.bidMap[block.Id] = true
+	return ibtree.BlockId(block.Id)
+}
+
+func (self *Fs) loadNodeFromString(data string) *ibtree.IBNodeData {
+	bd := []byte(data)
+	dt := BlockDataType(bd[0])
+	switch dt {
+	case BDT_EXTENT:
+		break
+	case BDT_NODE:
+		nd := &ibtree.IBNodeData{}
+		_, err := nd.UnmarshalMsg(bd[1:])
+		if err != nil {
+			log.Panic(err)
+		}
+		return nd
+	default:
+		log.Panicf("loadNodeFromString - wrong dt:%v", dt)
+	}
+	return nil
 }

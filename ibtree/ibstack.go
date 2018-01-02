@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Tue Jan  2 14:20:06 2018 mstenber
- * Edit time:     127 min
+ * Last modified: Tue Jan  2 18:20:53 2018 mstenber
+ * Edit time:     129 min
  *
  */
 package ibtree
@@ -216,7 +216,8 @@ func (self *IBStack) mergeTo(ofs int, sib *IBNode) {
 
 	clen2 := len(self.node().Children)
 	if clen1 <= clen2 {
-		self.node().print(0)
+		defer mlog.SetPattern(".")()
+		self.node().PrintToMLog()
 		log.Panic("broken mergeTo, bad! (p1)")
 	}
 
@@ -240,7 +241,8 @@ func (self *IBStack) mergeTo(ofs int, sib *IBNode) {
 	self.pop()
 	clen3 := len(self.node().Children)
 	if clen2 != clen3 {
-		self.node().print(0)
+		defer mlog.SetPattern(".")()
+		self.node().PrintToMLog()
 		log.Panic("broken mergeTo, bad!")
 	}
 }
@@ -514,7 +516,6 @@ func (self *IBStack) addChildAt(child *IBNodeDataChild) {
 		// mlog.Printf2("ibtree/ibstack", "Adding sibling leaf with key %v", nextc[0].Key)
 		self.pop()
 		self.nextIndex()
-		// next.print(2)
 		// mlog.Printf2("ibtree/ibstack", "top:%d idx:%d", self.top, self.indexes[self.top])
 		self.addChildAt(nextchild)
 		return

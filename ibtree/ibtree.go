@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Sat Dec 30 15:38:40 2017 mstenber
- * Edit time:     664 min
+ * Last modified: Tue Jan  2 18:23:11 2018 mstenber
+ * Edit time:     667 min
  *
  */
 
@@ -277,13 +277,12 @@ func (self *IBNode) childNode(idx int) *IBNode {
 	return &IBNode{tree: self.tree, blockId: &bid, IBNodeData: *nd}
 }
 
-func (self *IBNode) print(indent int) {
+func (self *IBNode) PrintToMLog() {
 	// Sanity check - could someday get rid of this
-	prefix := strings.Repeat("  ", indent)
 	for i, v := range self.Children {
-		fmt.Printf("%s[%d]: %s\n", prefix, i, v.Key)
+		mlog.Printf("[%d]: %x", i, v.Key)
 		if !self.Leafy && v.childNode != nil {
-			v.childNode.print(indent + 2)
+			v.childNode.PrintToMLog()
 		}
 	}
 
@@ -304,7 +303,8 @@ func (self *IBNode) checkTreeStructure() {
 			if i > 0 {
 				k0 := n.Children[i-1].Key
 				if k0 >= c.Key {
-					self.print(0)
+					defer mlog.SetPattern(".")()
+					self.PrintToMLog()
 					log.Panic("tree broke: ", k0, " >= ", c.Key)
 				}
 			}

@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Sat Dec 30 15:29:00 2017 mstenber
+ * Last modified: Tue Jan  2 18:20:40 2018 mstenber
  * Edit time:     250 min
  *
  */
@@ -94,7 +94,7 @@ func (self *DummyTree) checkNextKey(t *testing.T, r *IBNode, n int) {
 
 func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n, s int) {
 	if debug > 1 {
-		r.print(0)
+		r.PrintToMLog()
 		mlog.Printf2("ibtree/ibtree_test", "checkTree [%d..%d[\n", s, n)
 	}
 	for i := s - 2; i <= n+1; i++ {
@@ -290,7 +290,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 		removed := i - i0 + 1
 		r.checkTreeStructure()
 		if debug > 1 {
-			r.print(0)
+			r.PrintToMLog()
 			mlog.Printf2("ibtree/ibtree_test", "DeleteRange %d-%d\n", i0, i)
 		}
 		s1 := tree.idcb(i0)
@@ -298,7 +298,7 @@ func TestIBTreeDeleteRange(t *testing.T) {
 		or := r
 		r = r.DeleteRange(s1, s2, &st)
 		if debug > 1 {
-			r.print(0)
+			r.PrintToMLog()
 		}
 		EnsureDelta2(t, or, r, removed, 0, 0)
 

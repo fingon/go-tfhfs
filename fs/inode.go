@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Jan  2 14:26:39 2018 mstenber
- * Edit time:     169 min
+ * Last modified: Tue Jan  2 15:47:50 2018 mstenber
+ * Edit time:     171 min
  *
  */
 
@@ -260,6 +260,10 @@ func (self *Inode) RemoveChildByName(name string) {
 
 	mlog.Printf2("fs/inode", " Removed %v", child)
 	self.Fs().CommitTransaction(tr)
+
+	if self.Fs().server != nil {
+		self.Fs().server.DeleteNotify(self.ino, child.ino, name)
+	}
 }
 
 // Meta caches the current metadata for particular inode.

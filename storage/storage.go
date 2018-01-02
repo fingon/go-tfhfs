@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan  2 14:55:11 2018 mstenber
- * Edit time:     249 min
+ * Last modified: Tue Jan  2 15:11:51 2018 mstenber
+ * Edit time:     252 min
  *
  */
 
@@ -14,7 +14,7 @@ package storage
 import (
 	"log"
 	"sort"
-	"time"
+	"sync/atomic"
 	"unsafe"
 
 	"github.com/fingon/go-tfhfs/codec"
@@ -52,8 +52,8 @@ type Block struct {
 	// something has changed locally.
 	stored *BlockMetadata
 
-	// Time info if any
-	t time.Time
+	// Last usage time (in Storage.t units)
+	t uint64
 }
 
 func (self *Block) GetData() string {
@@ -217,6 +217,7 @@ type Storage struct {
 	names                          map[string]*oldNewStruct
 	cache_bid2block                map[string]*Block
 	cache_size, maximum_cache_size int
+	t                              uint64
 }
 
 // Init sets up the default values to be usable
@@ -355,7 +356,7 @@ func (self *Storage) gocBlockById(id string) *Block {
 		self.cache_size += b.getCacheSize()
 		self.cache_bid2block[id] = b
 	}
-	b.t = time.Now()
+	b.t = atomic.AddUint64(&self.t, uint64(1))
 	return b
 }
 
@@ -442,7 +443,7 @@ func (self *Storage) shrinkCache() {
 		i = i + 1
 	}
 	sort.Slice(arr, func(i, j int) bool {
-		return arr[i].t.After(arr[j].t)
+		return arr[i].t > arr[j].t
 	})
 	i = 0
 	goal := self.maximum_cache_size * 3 / 4

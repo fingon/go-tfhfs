@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Tue Jan  2 18:27:33 2018 mstenber
- * Edit time:     251 min
+ * Last modified: Tue Jan  2 20:35:35 2018 mstenber
+ * Edit time:     252 min
  *
  */
 
@@ -354,8 +354,7 @@ func TestIBTreeStorage(t *testing.T) {
 	assert.Equal(t, be.loads, 1)
 	tree.checkTree(t, r, n)
 	c2 := r.nestedNodeCount()
-	assert.True(t, c1 != c2)
-	assert.Equal(t, c2, 1)
+	assert.Equal(t, c1, c2)
 	//assert.Equal(t, c2, be.loads)
 	// loads is 'shotload', checkTree does .. plenty.
 	os := be.saves

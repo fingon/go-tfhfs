@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Tue Jan  2 18:50:41 2018 mstenber
+ * Last modified: Tue Jan  2 20:34:06 2018 mstenber
  * Edit time:     130 min
  *
  */
@@ -93,6 +93,7 @@ func (self *IBStack) rewriteAtIndex(replace bool, child *IBNodeDataChild) {
 func (self *IBStack) rewriteNodeChildren(children []*IBNodeDataChild) {
 	// mlog.Printf2("ibtree/ibstack", "rewriteNodeChildren")
 	n := self.node().copy()
+	n.blockId = nil
 	n.Children = children
 	self.nodes[self.top] = n
 	// This invalidates sub-trees (if any)

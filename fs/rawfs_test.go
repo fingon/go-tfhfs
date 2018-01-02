@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  2 18:33:02 2018 mstenber
+ * Last modified: Tue Jan  2 20:35:56 2018 mstenber
  * Edit time:     100 min
  *
  */
@@ -81,7 +81,6 @@ func ProdFsFile(t *testing.T, u *FSUser) {
 	_, err := u.OpenFile("/public/file", uint32(os.O_RDONLY), 0777)
 	assert.True(t, err != nil)
 	assert.Equal(t, len(u.fs.fh2ifile), 0, "failed open should not add files")
-	return
 
 	// Small writes for small blocks
 	tn := 3*embeddedSize + 5

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Tue Jan  2 20:00:21 2018 mstenber
- * Edit time:     683 min
+ * Last modified: Tue Jan  2 20:34:21 2018 mstenber
+ * Edit time:     690 min
  *
  */
 
@@ -116,6 +116,7 @@ func (self *IBNode) Commit() (*IBNode, BlockId) {
 	// Iterate through the tree, updating the nodes as we go.
 
 	if self.blockId != nil {
+		mlog.Printf2("ibtree/ibtree", "in.Commit, unchanged")
 		return self, *self.blockId
 	}
 
@@ -137,6 +138,7 @@ func (self *IBNode) Commit() (*IBNode, BlockId) {
 
 	bid := self.tree.backend.SaveNode(n.IBNodeData)
 	n.blockId = &bid
+	mlog.Printf2("ibtree/ibtree", "in.Commit, new bid %x..", bid[:10])
 	return n, bid
 }
 
@@ -275,9 +277,13 @@ func (self *IBNode) PrintToMLogDirty() {
 	// Sanity check - could someday get rid of this
 	for i, v := range self.Children {
 		mlog.Printf2("ibtree/ibtree", "[%d]: %x", i, v.Key)
-		if !self.Leafy && v.childNode != nil {
-			mlog.Printf2("ibtree/ibtree", "     bid:%x..", v.Value[:8])
-			v.childNode.PrintToMLogDirty()
+		if !self.Leafy {
+			if v.childNode != nil {
+				v.childNode.PrintToMLogDirty()
+			} else {
+				mlog.Printf2("ibtree/ibtree", "     bid:%x..", v.Value[:8])
+
+			}
 		}
 	}
 

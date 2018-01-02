@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Jan  2 15:47:50 2018 mstenber
- * Edit time:     171 min
+ * Last modified: Tue Jan  2 16:56:09 2018 mstenber
+ * Edit time:     192 min
  *
  */
 
@@ -38,10 +38,12 @@ func (self *Inode) AddChild(name string, child *Inode) {
 	tr.Set(ibtree.IBKey(k), string(util.Uint64Bytes(child.ino)))
 	tr.Set(ibtree.IBKey(rk), "")
 	meta := child.Meta()
+	meta.SetMTimeNow()
 	meta.StNlink++
 	child.SetMeta(meta)
 
 	meta = self.Meta()
+	meta.SetMTimeNow()
 	meta.Nchildren++
 	self.SetMeta(meta)
 
@@ -52,6 +54,11 @@ func (self *Inode) Fs() *Fs {
 	return self.tracker.fs
 }
 
+func unixNanoToFuse(t uint64, seconds *uint64, parts *uint32) {
+	*seconds = t / uint64(time.Second)
+	*parts = uint32(t % uint64(time.Second))
+}
+
 func (self *Inode) FillAttr(out *fuse.Attr) fuse.Status {
 	// EntryOut.Attr
 	meta := self.Meta()
@@ -60,9 +67,9 @@ func (self *Inode) FillAttr(out *fuse.Attr) fuse.Status {
 	}
 	out.Size = meta.StSize
 	out.Blocks = meta.StSize / blockSize
-	out.Atime = meta.StAtimeNs
-	out.Ctime = meta.StCtimeNs
-	out.Mtime = meta.StMtimeNs
+	unixNanoToFuse(meta.StAtimeNs, &out.Atime, &out.Atimensec)
+	unixNanoToFuse(meta.StCtimeNs, &out.Ctime, &out.Ctimensec)
+	unixNanoToFuse(meta.StMtimeNs, &out.Mtime, &out.Mtimensec)
 	out.Mode = meta.StMode
 	out.Rdev = meta.StRdev
 	out.Nlink = meta.StNlink
@@ -179,30 +186,6 @@ func (self *Inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
 	return fuse.OK
 }
 
-func (self *Inode) SetTimes(atime *time.Time, mtime *time.Time) fuse.Status {
-	meta := self.Meta()
-	if meta == nil {
-		return fuse.ENOENT
-	}
-	if atime != nil {
-		meta.StAtimeNs = uint64(atime.UnixNano())
-	}
-	if mtime != nil {
-		meta.StMtimeNs = uint64(mtime.UnixNano())
-	}
-	return fuse.OK
-}
-
-func (self *Inode) UpdateAtime() {
-	now := time.Now()
-	self.SetTimes(&now, nil)
-}
-
-func (self *Inode) UpdateMtime() {
-	now := time.Now()
-	self.SetTimes(&now, &now)
-}
-
 func (self *Inode) IsDir() bool {
 	meta := self.Meta()
 	return meta != nil && (meta.StMode&fuse.S_IFDIR) != 0
@@ -252,10 +235,12 @@ func (self *Inode) RemoveChildByName(name string) {
 	tr.Delete(ibtree.IBKey(rk))
 	meta := child.Meta()
 	meta.StNlink--
+	meta.SetMTimeNow()
 	child.SetMeta(meta)
 
 	meta = self.Meta()
 	meta.Nchildren--
+	meta.SetMTimeNow()
 	self.SetMeta(meta)
 
 	mlog.Printf2("fs/inode", " Removed %v", child)
@@ -290,6 +275,20 @@ func (self *Inode) Meta() *InodeMeta {
 }
 
 func (self *Inode) SetMeta(meta *InodeMeta) {
+	times := 0
+
+	if meta.StAtimeNs == 0 {
+		times |= 1
+	}
+	if meta.StCtimeNs == 0 {
+		times |= 2
+	}
+	if meta.StMtimeNs == 0 {
+		times |= 4
+	}
+	if times != 0 {
+		meta.setTimesNow(times&1 != 0, times&2 != 0, times&4 != 0)
+	}
 	k := NewBlockKey(self.ino, BST_META, "")
 	tr := self.Fs().GetTransaction()
 	b, err := meta.MarshalMsg(nil)
@@ -411,24 +410,64 @@ func (self *InodeTracker) CreateInode() *Inode {
 
 // Misc utility stuff
 
-func (self *InodeMeta) SetMkdirIn(input *fuse.MkdirIn) {
+func (self *InodeMetaData) SetMkdirIn(input *fuse.MkdirIn) {
 	self.StUid = input.Uid
 	self.StGid = input.Gid
-	self.StMode = input.Mode | fuse.S_IFDIR
-	// TBD: Umask?
-
+	self.StMode = input.Mode | fuse.S_IFDIR & ^input.Umask
 }
 
-func (self *InodeMeta) SetCreateIn(input *fuse.CreateIn) {
+func (self *InodeMetaData) SetCreateIn(input *fuse.CreateIn) {
 	self.StUid = input.Uid
 	self.StGid = input.Gid
 	self.StMode = input.Mode | fuse.S_IFREG
-	// TBD: Umask?
+	// & ^input.Umask
+	// (Linux-only -> CBA for now)
 }
 
-func (self *InodeMeta) SetMknodIn(input *fuse.MknodIn) {
+func (self *InodeMetaData) SetMknodIn(input *fuse.MknodIn) {
 	self.StUid = input.Uid
 	self.StGid = input.Gid
 	self.StMode = input.Mode
 	self.StRdev = input.Rdev
+}
+
+func (self *InodeMetaData) setTimeValues(atime, ctime, mtime *time.Time) {
+	if atime != nil {
+		self.StAtimeNs = uint64(atime.UnixNano())
+	}
+	if ctime != nil {
+		self.StCtimeNs = uint64(ctime.UnixNano())
+	}
+	if mtime != nil {
+		self.StMtimeNs = uint64(mtime.UnixNano())
+	}
+
+}
+
+func (self *InodeMetaData) setTimesNow(uatime, uctime, umtime bool) {
+	now := time.Now()
+	var atime, ctime, mtime *time.Time
+	if uatime {
+		atime = &now
+	}
+	if umtime {
+		mtime = &now
+	}
+	if uctime {
+		ctime = &now
+	}
+	self.setTimeValues(atime, ctime, mtime)
+
+}
+
+func (self *InodeMetaData) SetATimeNow() {
+	self.setTimesNow(true, false, false)
+}
+
+func (self *InodeMetaData) SetCTimeNow() {
+	self.setTimesNow(false, true, false)
+}
+
+func (self *InodeMetaData) SetMTimeNow() {
+	self.setTimesNow(false, false, true)
 }

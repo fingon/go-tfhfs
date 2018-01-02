@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Tue Jan  2 13:43:39 2018 mstenber
- * Edit time:     194 min
+ * Last modified: Tue Jan  2 16:41:56 2018 mstenber
+ * Edit time:     200 min
  *
  */
 
@@ -133,8 +133,10 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 	}
 	defer inode.Release()
 
+	meta := inode.Meta()
+	newmeta := meta.InodeMetaData
 	if input.Valid&(FATTR_ATIME|FATTR_MTIME|FATTR_ATIME_NOW|FATTR_MTIME_NOW) != 0 {
-		var atime, mtime *time.Time
+		var atime, ctime, mtime *time.Time
 
 		now := time.Now()
 
@@ -157,14 +159,15 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 				mtime = &t
 			}
 		}
-		code = self.access(inode, W_OK, true, &input.Context)
-		if code.Ok() {
-			code = inode.SetTimes(atime, mtime)
+
+		if input.Valid&FATTR_CTIME != 0 {
+			t := time.Unix(int64(input.Ctime),
+				int64(input.Ctimensec))
+			ctime = &t
 		}
+		newmeta.setTimeValues(atime, ctime, mtime)
 	}
 
-	meta := inode.Meta()
-	newmeta := meta.InodeMetaData
 	mode_filter := uint32(0)
 
 	// FATTR_FH?
@@ -207,7 +210,6 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 
 		meta.InodeMetaData = newmeta
 		inode.SetMeta(meta)
-		// Eventually: truncate data if size decreases
 	}
 	code = inode.FillAttrOut(out)
 	return

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  2 15:02:08 2018 mstenber
- * Edit time:     87 min
+ * Last modified: Tue Jan  2 16:50:58 2018 mstenber
+ * Edit time:     91 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
@@ -40,6 +41,9 @@ func ProdFsFile1(t *testing.T, u *FSUser, tn, wsize, rsize int) {
 	}
 
 	fi, err := u.Stat("/public/file")
+	since := time.Now().Sub(fi.ModTime())
+	assert.True(t, since >= 0, "modtime not in past")
+	assert.True(t, since.Minutes() < 1, "modtime too much in past")
 	assert.Nil(t, err)
 	mlog.Printf2("fs/rawfs_test", " write size %v", fi.Size())
 

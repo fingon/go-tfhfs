@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Tue Jan  2 18:20:53 2018 mstenber
- * Edit time:     129 min
+ * Last modified: Tue Jan  2 18:50:41 2018 mstenber
+ * Edit time:     130 min
  *
  */
 package ibtree
@@ -217,7 +217,7 @@ func (self *IBStack) mergeTo(ofs int, sib *IBNode) {
 	clen2 := len(self.node().Children)
 	if clen1 <= clen2 {
 		defer mlog.SetPattern(".")()
-		self.node().PrintToMLog()
+		self.node().PrintToMLogDirty()
 		log.Panic("broken mergeTo, bad! (p1)")
 	}
 
@@ -242,7 +242,7 @@ func (self *IBStack) mergeTo(ofs int, sib *IBNode) {
 	clen3 := len(self.node().Children)
 	if clen2 != clen3 {
 		defer mlog.SetPattern(".")()
-		self.node().PrintToMLog()
+		self.node().PrintToMLogDirty()
 		log.Panic("broken mergeTo, bad!")
 	}
 }
@@ -329,6 +329,9 @@ func (self *IBStack) commit() *IBNode {
 	}
 
 	self.smallCount = 0
+
+	mlog.Printf2("ibtree/ibstack", "is.commit done")
+	self.node().PrintToMLogDirty()
 
 	return n
 }

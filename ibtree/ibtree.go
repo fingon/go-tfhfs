@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Tue Jan  2 18:23:11 2018 mstenber
- * Edit time:     667 min
+ * Last modified: Tue Jan  2 18:47:55 2018 mstenber
+ * Edit time:     675 min
  *
  */
 
@@ -73,16 +73,18 @@ func (self IBTree) Init(backend IBTreeBackend) *IBTree {
 }
 
 func (self *IBTree) LoadRoot(bid BlockId) *IBNode {
+	mlog.Printf2("ibtree/ibtree", "t.LoadRoot %x", bid)
 	data := self.backend.LoadNode(bid)
 	if data == nil {
 		return nil
 	}
-	return &IBNode{tree: self, IBNodeData: *data}
+	return &IBNode{tree: self, IBNodeData: *data, blockId: &bid}
 }
 
 // NewRoot creates a new node; by default, it is essentially new tree
 // of its own. IBTree is really just factory for root nodes.
 func (self *IBTree) NewRoot() *IBNode {
+	mlog.Printf2("ibtree/ibtree", "t.NewRoot")
 	return &IBNode{tree: self, IBNodeData: IBNodeData{Leafy: true}}
 }
 
@@ -277,12 +279,28 @@ func (self *IBNode) childNode(idx int) *IBNode {
 	return &IBNode{tree: self.tree, blockId: &bid, IBNodeData: *nd}
 }
 
-func (self *IBNode) PrintToMLog() {
+func (self *IBNode) PrintToMLogDirty() {
 	// Sanity check - could someday get rid of this
 	for i, v := range self.Children {
-		mlog.Printf("[%d]: %x", i, v.Key)
+		mlog.Printf2("ibtree/ibtree", "[%d]: %x", i, v.Key)
 		if !self.Leafy && v.childNode != nil {
-			v.childNode.PrintToMLog()
+			mlog.Printf2("ibtree/ibtree", "     bid:%x..", v.Value[:8])
+			v.childNode.PrintToMLogDirty()
+		}
+	}
+
+}
+
+func (self *IBNode) PrintToMLogAll() {
+	// Sanity check - could someday get rid of this
+	for i, v := range self.Children {
+		mlog.Printf2("ibtree/ibtree", "[%d]: %x", i, v.Key)
+		if !self.Leafy {
+			mlog.Printf2("ibtree/ibtree", "     bid:%x..", v.Value[:8])
+			cn := self.childNode(i)
+			if cn != nil {
+				cn.PrintToMLogAll()
+			}
 		}
 	}
 
@@ -304,7 +322,7 @@ func (self *IBNode) checkTreeStructure() {
 				k0 := n.Children[i-1].Key
 				if k0 >= c.Key {
 					defer mlog.SetPattern(".")()
-					self.PrintToMLog()
+					self.PrintToMLogDirty()
 					log.Panic("tree broke: ", k0, " >= ", c.Key)
 				}
 			}

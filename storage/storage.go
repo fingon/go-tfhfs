@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan  2 18:09:44 2018 mstenber
+ * Last modified: Tue Jan  2 18:46:47 2018 mstenber
  * Edit time:     263 min
  *
  */
@@ -233,7 +233,7 @@ func (self Storage) Init() *Storage {
 }
 
 func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
-	mlog.Printf("flushBlockName %s=%x", k, v.new_value)
+	mlog.Printf2("storage/storage", "flushBlockName %s=%x", k, v.new_value)
 	if v.old_value != "" {
 		self.ReleaseBlockId(v.old_value)
 	}
@@ -247,7 +247,7 @@ func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
 
 func (self *Storage) Flush() int {
 	mlog.Printf2("storage/storage", "st.Flush")
-	mlog.Printf(" cache size:%v", self.cache_size)
+	mlog.Printf2("storage/storage", " cache size:%v", self.cache_size)
 	self.Backend.SetInFlush(true)
 	defer self.Backend.SetInFlush(false)
 	oops := -1
@@ -261,7 +261,7 @@ func (self *Storage) Flush() int {
 	}
 	// Main flush in Python prototype; handles deletion
 	for ops != oops {
-		mlog.Printf(" flush (delete)")
+		mlog.Printf2("storage/storage", " flush (delete)")
 		oops = ops
 		s := self.referenced_refcnt0_blocks
 		if s == nil {
@@ -277,7 +277,7 @@ func (self *Storage) Flush() int {
 
 	// flush_dirty_stored_blocks in Python
 	for len(self.dirty_bid2block) > 0 {
-		mlog.Printf(" flush_dirty_stored_blocks")
+		mlog.Printf2("storage/storage", " flush_dirty_stored_blocks")
 		dirty := self.dirty_bid2block
 		self.dirty_bid2block = make(map[string]*Block)
 		nonzero_blocks := make([]*Block, 0)
@@ -302,12 +302,12 @@ func (self *Storage) Flush() int {
 	if self.maximum_cache_size > 0 && self.cache_size > self.maximum_cache_size {
 		self.shrinkCache()
 	}
-	mlog.Printf(" ops:%v, cache size:%v", ops, self.cache_size)
+	mlog.Printf2("storage/storage", " ops:%v, cache size:%v", ops, self.cache_size)
 	return ops
 }
 
 func (self *Storage) GetBlockById(id string) *Block {
-	mlog.Printf2("storage/storage", "GetBlockById %x", id)
+	mlog.Printf2("storage/storage", "st.GetBlockById %x", id)
 	b := self.gocBlockById(id)
 	if self.blockValid(b) {
 		return b
@@ -451,7 +451,7 @@ func (self *Storage) deleteBlockIfNoExtRef(b *Block) bool {
 }
 
 func (self *Storage) shrinkCache() {
-	mlog.Printf("shrinkCache")
+	mlog.Printf2("storage/storage", "shrinkCache")
 	n := len(self.cache_bid2block)
 	arr := make([]*Block, n)
 	i := 0

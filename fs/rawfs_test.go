@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  2 18:24:21 2018 mstenber
+ * Last modified: Tue Jan  2 18:33:02 2018 mstenber
  * Edit time:     100 min
  *
  */
@@ -237,7 +237,8 @@ func (self *DummyGenerator) CreateInodeNumber() uint64 {
 
 func TestFs(t *testing.T) {
 	check := func(t *testing.T, fs *Fs) {
-		fs.treeRoot.PrintToMLog()
+		mlog.Printf2("fs/rawfs_test", "Root: %s = %x", fs.rootName, fs.treeRootBlockId)
+		fs.treeRoot.PrintToMLogAll()
 		root := NewFSUser(fs)
 		_, err := root.Stat("/public")
 		assert.Nil(t, err)
@@ -247,7 +248,7 @@ func TestFs(t *testing.T) {
 		t.Run(s,
 			func(t *testing.T) {
 				t.Parallel()
-				mlog.Printf("starting")
+				mlog.Printf2("fs/rawfs_test", "starting")
 				rootName := "toor"
 				backend := storage.InMemoryBlockBackend{}.Init()
 				st := storage.Storage{Backend: backend}.Init()
@@ -259,10 +260,10 @@ func TestFs(t *testing.T) {
 				ProdFs(t, fs)
 				fs.StorageFlush()
 
-				mlog.Printf("checking current state valid")
+				mlog.Printf2("fs/rawfs_test", "checking current state valid")
 				check(t, fs)
 
-				mlog.Printf("omstart from storage")
+				mlog.Printf2("fs/rawfs_test", "omstart from storage")
 				fs2 := NewFs(st, rootName)
 				check(t, fs2)
 			})

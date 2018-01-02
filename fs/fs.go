@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  2 18:08:31 2018 mstenber
- * Edit time:     129 min
+ * Last modified: Tue Jan  2 18:45:50 2018 mstenber
+ * Edit time:     134 min
  *
  */
 
@@ -62,6 +62,7 @@ func (self *Fs) LoadNodeFromString(data string) *ibtree.IBNodeData {
 
 // ibtree.IBTreeBackend API
 func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
+	mlog.Printf2("fs/fs", "fs.LoadNode %x", id)
 	b := self.storage.GetBlockById(string(id))
 	if b == nil {
 		return nil
@@ -101,7 +102,8 @@ func (self *Fs) GetTransaction() *ibtree.IBTransaction {
 
 func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
 	self.treeRoot, self.treeRootBlockId = t.Commit()
-	// mlog.Printf2("fs/fs", "CommitTransaction %p", self.treeRoot)
+	mlog.Printf2("fs/fs", "CommitTransaction %p", self.treeRoot)
+	self.treeRoot.PrintToMLogDirty()
 	self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 }
 
@@ -155,8 +157,8 @@ func (self *Fs) iterateReferencesCallback(data string, cb storage.BlockReference
 }
 
 func (self *Fs) StorageFlush() int {
-	self.storage.SetNameToBlockId(self.rootName,
-		string(self.treeRootBlockId))
+	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
+	// ^ done in each commit, so pointless here?
 	rv := self.storage.Flush()
 	self.bidMap = make(map[string]bool)
 
@@ -176,7 +178,9 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	}
 	rootbid := st.GetBlockIdByName(rootName)
 	if rootbid != "" {
-		fs.treeRoot = fs.tree.LoadRoot(ibtree.BlockId(rootbid))
+		bid := ibtree.BlockId(rootbid)
+		fs.treeRoot = fs.tree.LoadRoot(bid)
+		fs.treeRootBlockId = bid
 	}
 	if fs.treeRoot == nil {
 		fs.treeRoot = fs.tree.NewRoot()

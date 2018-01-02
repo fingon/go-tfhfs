@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  2 17:52:15 2018 mstenber
+ * Last modified: Tue Jan  2 18:08:31 2018 mstenber
  * Edit time:     129 min
  *
  */
@@ -95,13 +95,13 @@ func (self *Fs) SaveNode(nd ibtree.IBNodeData) ibtree.BlockId {
 }
 
 func (self *Fs) GetTransaction() *ibtree.IBTransaction {
-	mlog.Printf2("fs/fs", "GetTransaction of %p", self.treeRoot)
+	// mlog.Printf2("fs/fs", "GetTransaction of %p", self.treeRoot)
 	return ibtree.NewTransaction(self.treeRoot)
 }
 
 func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
 	self.treeRoot, self.treeRootBlockId = t.Commit()
-	mlog.Printf2("fs/fs", "CommitTransaction %p", self.treeRoot)
+	// mlog.Printf2("fs/fs", "CommitTransaction %p", self.treeRoot)
 	self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 }
 

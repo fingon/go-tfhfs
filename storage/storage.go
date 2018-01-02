@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan  2 15:11:51 2018 mstenber
- * Edit time:     252 min
+ * Last modified: Tue Jan  2 18:09:44 2018 mstenber
+ * Edit time:     263 min
  *
  */
 
@@ -232,8 +232,22 @@ func (self Storage) Init() *Storage {
 	return &self
 }
 
+func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
+	mlog.Printf("flushBlockName %s=%x", k, v.new_value)
+	if v.old_value != "" {
+		self.ReleaseBlockId(v.old_value)
+	}
+	self.Backend.SetNameToBlockId(k, v.new_value)
+	if v.new_value != "" {
+		self.ReferBlockId(v.new_value)
+	}
+	v.old_value = v.new_value
+
+}
+
 func (self *Storage) Flush() int {
 	mlog.Printf2("storage/storage", "st.Flush")
+	mlog.Printf(" cache size:%v", self.cache_size)
 	self.Backend.SetInFlush(true)
 	defer self.Backend.SetInFlush(false)
 	oops := -1
@@ -241,13 +255,13 @@ func (self *Storage) Flush() int {
 	// _flush_names in Python prototype
 	for k, v := range self.names {
 		if v.old_value != v.new_value {
-			self.Backend.SetNameToBlockId(k, v.new_value)
-			v.old_value = v.new_value
+			self.flushBlockName(k, v)
 			ops = ops + 1
 		}
 	}
 	// Main flush in Python prototype; handles deletion
 	for ops != oops {
+		mlog.Printf(" flush (delete)")
 		oops = ops
 		s := self.referenced_refcnt0_blocks
 		if s == nil {
@@ -263,6 +277,7 @@ func (self *Storage) Flush() int {
 
 	// flush_dirty_stored_blocks in Python
 	for len(self.dirty_bid2block) > 0 {
+		mlog.Printf(" flush_dirty_stored_blocks")
 		dirty := self.dirty_bid2block
 		self.dirty_bid2block = make(map[string]*Block)
 		nonzero_blocks := make([]*Block, 0)
@@ -287,6 +302,7 @@ func (self *Storage) Flush() int {
 	if self.maximum_cache_size > 0 && self.cache_size > self.maximum_cache_size {
 		self.shrinkCache()
 	}
+	mlog.Printf(" ops:%v, cache size:%v", ops, self.cache_size)
 	return ops
 }
 
@@ -435,6 +451,7 @@ func (self *Storage) deleteBlockIfNoExtRef(b *Block) bool {
 }
 
 func (self *Storage) shrinkCache() {
+	mlog.Printf("shrinkCache")
 	n := len(self.cache_bid2block)
 	arr := make([]*Block, n)
 	i := 0

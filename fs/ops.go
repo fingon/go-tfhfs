@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Tue Jan  2 17:16:51 2018 mstenber
- * Edit time:     201 min
+ * Last modified: Tue Jan  2 21:38:59 2018 mstenber
+ * Edit time:     202 min
  *
  */
 
@@ -216,11 +216,11 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 }
 
 func (self *Fs) Release(input *ReleaseIn) {
-	self.GetFile(input.Fh).Release()
+	self.GetFileByFh(input.Fh).Release()
 }
 
 func (self *Fs) ReleaseDir(input *ReleaseIn) {
-	self.GetFile(input.Fh).Release()
+	self.GetFileByFh(input.Fh).Release()
 }
 
 func (self *Fs) OpenDir(input *OpenIn, out *OpenOut) (code Status) {
@@ -263,7 +263,7 @@ func (self *Fs) Open(input *OpenIn, out *OpenOut) (code Status) {
 }
 
 func (self *Fs) ReadDir(input *ReadIn, l *DirEntryList) Status {
-	dir := self.GetFile(input.Fh)
+	dir := self.GetFileByFh(input.Fh)
 	dir.SetPos(input.Offset)
 	for dir.ReadDirEntry(l) {
 	}
@@ -271,7 +271,7 @@ func (self *Fs) ReadDir(input *ReadIn, l *DirEntryList) Status {
 }
 
 func (self *Fs) ReadDirPlus(input *ReadIn, l *DirEntryList) Status {
-	dir := self.GetFile(input.Fh)
+	dir := self.GetFileByFh(input.Fh)
 	dir.SetPos(input.Offset)
 	for dir.ReadDirPlus(input, l) {
 	}
@@ -510,13 +510,13 @@ func (self *Fs) Access(input *AccessIn) (code Status) {
 
 func (self *Fs) Read(input *ReadIn, buf []byte) (ReadResult, Status) {
 	// Check perm?
-	file := self.GetFile(input.Fh)
+	file := self.GetFileByFh(input.Fh)
 	return file.Read(buf, input.Offset)
 }
 
 func (self *Fs) Write(input *WriteIn, data []byte) (written uint32, code Status) {
 	// Check perm?
-	file := self.GetFile(input.Fh)
+	file := self.GetFileByFh(input.Fh)
 	return file.Write(data, input.Offset)
 }
 

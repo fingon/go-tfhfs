@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Jan  2 18:15:18 2018 mstenber
- * Edit time:     198 min
+ * Last modified: Tue Jan  2 21:50:42 2018 mstenber
+ * Edit time:     209 min
  *
  */
 
@@ -65,18 +65,17 @@ func (self *Inode) FillAttr(out *fuse.Attr) fuse.Status {
 	if meta == nil {
 		return fuse.ENOENT
 	}
+	out.Ino = self.ino
 	out.Size = meta.StSize
 	out.Blocks = meta.StSize / blockSize
 	unixNanoToFuse(meta.StAtimeNs, &out.Atime, &out.Atimensec)
 	unixNanoToFuse(meta.StCtimeNs, &out.Ctime, &out.Ctimensec)
 	unixNanoToFuse(meta.StMtimeNs, &out.Mtime, &out.Mtimensec)
 	out.Mode = meta.StMode
-	out.Rdev = meta.StRdev
 	out.Nlink = meta.StNlink
-	// TBD rdev?
-	// EntryOut.Attr.Owner
 	out.Uid = meta.StUid
 	out.Gid = meta.StGid
+	out.Rdev = meta.StRdev
 	return fuse.OK
 }
 
@@ -84,7 +83,7 @@ func (self *Inode) FillAttrOut(out *fuse.AttrOut) fuse.Status {
 	out.AttrValid = attrValidity
 	out.AttrValidNsec = 0
 	if out.Nlink == 0 {
-		out.Nlink = 1
+		// out.Nlink = 1
 		// original hanwen's work does this, is this really
 		// necessary? (allegedly new kernels have issues with
 		// nlink=0 + link)
@@ -94,7 +93,6 @@ func (self *Inode) FillAttrOut(out *fuse.AttrOut) fuse.Status {
 
 func (self *Inode) FillEntryOut(out *fuse.EntryOut) fuse.Status {
 	// EntryOut
-	out.Ino = self.ino
 	out.NodeId = self.ino
 	out.Generation = 0
 	out.EntryValid = entryValidity
@@ -383,7 +381,7 @@ func (self *InodeTracker) GetInode(ino uint64) *Inode {
 	return inode
 }
 
-func (self *InodeTracker) GetFile(fh uint64) *InodeFH {
+func (self *InodeTracker) GetFileByFh(fh uint64) *InodeFH {
 	return self.fh2ifile[fh]
 }
 
@@ -392,7 +390,7 @@ func (self *InodeTracker) CreateInode() *Inode {
 	for {
 		ino := self.generator.CreateInodeNumber()
 		mlog.Printf2("fs/inode", " %v", ino)
-		if self.ino2inode[ino] != nil {
+		if ino == 0 || self.ino2inode[ino] != nil {
 			continue
 		}
 

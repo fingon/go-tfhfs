@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  2 18:45:50 2018 mstenber
- * Edit time:     134 min
+ * Last modified: Tue Jan  2 21:57:18 2018 mstenber
+ * Edit time:     137 min
  *
  */
 
@@ -188,6 +188,7 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 		root := fs.getInode(fuse.FUSE_ROOT_ID)
 		var meta InodeMeta
 		meta.StMode = 0777 | fuse.S_IFDIR
+		meta.StNlink++ // root has always built-in link
 		root.SetMeta(&meta)
 	}
 	return fs

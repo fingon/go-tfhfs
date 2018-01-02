@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Tue Jan  2 13:59:10 2018 mstenber
- * Edit time:     52 min
+ * Last modified: Tue Jan  2 14:52:19 2018 mstenber
+ * Edit time:     67 min
  *
  */
 
@@ -14,6 +14,7 @@ package fs
 import (
 	"bytes"
 	"encoding/binary"
+	"log"
 
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
@@ -162,9 +163,19 @@ func (self *InodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 			end = dataExtentSize
 		}
 		tr := self.Fs().GetTransaction()
-		vp := tr.Get(ibtree.IBKey(k))
-		if vp != nil {
-			b = []byte(*vp)
+		bidp := tr.Get(ibtree.IBKey(k))
+		if bidp == nil {
+			mlog.Printf2("fs/fh", "Key %x not found at all", k)
+		} else {
+			bl := self.Fs().storage.GetBlockById(*bidp)
+			if bl == nil {
+				log.Panicf("Block %x not found at all", *bidp)
+			}
+			b = []byte(bl.GetData())
+			if b[0] != byte(BDT_EXTENT) {
+				log.Panicf("Wrong extent type in read")
+			}
+			b = b[1:]
 		}
 	}
 
@@ -242,6 +253,7 @@ func (self *InodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		meta.Data = buf
 		meta.StSize = uint64(len(buf))
 		self.inode.SetMeta(meta)
+		mlog.Printf2("fs/fh", " meta %d bytes", len(buf))
 	} else {
 		if len(meta.Data) > 0 {
 			meta.Data = []byte{}
@@ -249,7 +261,10 @@ func (self *InodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		}
 		k := NewBlockKeyOffset(self.inode.ino, offset)
 		tr := self.Fs().GetTransaction()
-		tr.Set(ibtree.IBKey(k), string(buf))
+		bid := self.Fs().getBlockDataId(BDT_EXTENT, string(buf))
+		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(buf), bid)
+		mlog.Printf2("fs/fh", " %x", buf)
+		tr.Set(ibtree.IBKey(k), string(bid))
 		self.Fs().CommitTransaction(tr)
 		self.inode.SetSize(end)
 	}

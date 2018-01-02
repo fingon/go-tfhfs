@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Jan  2 14:18:01 2018 mstenber
- * Edit time:     167 min
+ * Last modified: Tue Jan  2 14:26:39 2018 mstenber
+ * Edit time:     169 min
  *
  */
 
@@ -158,6 +158,7 @@ func (self *Inode) IterateSubTypeKeys(bst BlockSubType,
 
 func (self *Inode) RemoveXAttr(attr string) (code fuse.Status) {
 	k := ibtree.IBKey(NewBlockKey(self.ino, BST_XATTR, attr))
+	mlog.Printf2("fs/inode", "RemoveXAttr %s - deleting %x", attr, k)
 	tr := self.Fs().GetTransaction()
 	v := tr.Get(k)
 	if v == nil {
@@ -171,6 +172,7 @@ func (self *Inode) RemoveXAttr(attr string) (code fuse.Status) {
 
 func (self *Inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
 	k := NewBlockKey(self.ino, BST_XATTR, attr)
+	mlog.Printf2("fs/inode", "SetXAttr %s - setting %x", attr, k)
 	tr := self.Fs().GetTransaction()
 	tr.Set(ibtree.IBKey(k), string(data))
 	self.Fs().CommitTransaction(tr)
@@ -236,7 +238,7 @@ func (self *Inode) Release() {
 }
 
 func (self *Inode) RemoveChildByName(name string) {
-	mlog.Printf2("fs/inode", "Inode.RemoveChildByName %v", name)
+	mlog.Printf2("fs/inode", "inode.RemoveChildByName %v", name)
 	child := self.GetChildByName(name)
 	defer child.Release()
 	if child == nil {

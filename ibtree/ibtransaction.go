@@ -4,12 +4,14 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Fri Dec 29 14:24:53 2017 mstenber
- * Edit time:     12 min
+ * Last modified: Tue Jan  2 14:28:51 2018 mstenber
+ * Edit time:     13 min
  *
  */
 
 package ibtree
+
+import "github.com/fingon/go-tfhfs/mlog"
 
 // IBTransaction is convenience API for dealing with the chaining of
 // things in the ibtree. While API wise it is same as dealing with
@@ -29,6 +31,7 @@ func NewTransaction(root *IBNode) *IBTransaction {
 }
 
 func (self *IBTransaction) Delete(key IBKey) {
+	mlog.Printf2("ibtree/ibtransaction", "tr.Delete %x", key)
 	self.stack.node().Delete(key, &self.stack)
 }
 func (self *IBTransaction) Commit() (*IBNode, BlockId) {
@@ -36,6 +39,7 @@ func (self *IBTransaction) Commit() (*IBNode, BlockId) {
 }
 
 func (self *IBTransaction) DeleteRange(key1, key2 IBKey) {
+	mlog.Printf2("ibtree/ibtransaction", "tr.DeleteRange %x-%x", key1, key2)
 	self.stack.node().DeleteRange(key1, key2, &self.stack)
 }
 
@@ -48,5 +52,6 @@ func (self *IBTransaction) NextKey(key IBKey) *IBKey {
 }
 
 func (self *IBTransaction) Set(key IBKey, value string) {
+	mlog.Printf2("ibtree/ibtransaction", "tr.Set %x %d bytes", key, len(value))
 	self.stack.node().Set(key, value, &self.stack)
 }

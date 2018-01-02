@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Sat Dec 30 15:55:29 2017 mstenber
- * Edit time:     126 min
+ * Last modified: Tue Jan  2 14:20:06 2018 mstenber
+ * Edit time:     127 min
  *
  */
 package ibtree
@@ -271,7 +271,7 @@ func (self *IBStack) commit() *IBNode {
 		n1 := self.childNode(idx - 1)
 		n2 := self.childNode(idx + 1)
 		ofs := -1
-		mlog.Printf2("ibtree/ibstack", "s:%s n1:%s n2:%s", s, n1, n2)
+		mlog.Printf2("ibtree/ibstack", "s:%x n1:%s n2:%s", s, n1, n2)
 		if n1 != nil && n2 != nil {
 			if n1.Msgsize() < n2.Msgsize() {
 				n1 = n2

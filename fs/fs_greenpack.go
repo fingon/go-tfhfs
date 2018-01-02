@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Tue Jan  2 09:43:56 2018 mstenber
- * Edit time:     19 min
+ * Last modified: Tue Jan  2 14:43:53 2018 mstenber
+ * Edit time:     20 min
  *
  */
 
@@ -14,8 +14,8 @@ package fs
 type BlockDataType byte
 
 const (
-	BDT_NODE   BlockDataType = 1
-	BDT_EXTENT BlockDataType = 2
+	BDT_NODE   BlockDataType = 7
+	BDT_EXTENT BlockDataType = 42
 )
 
 type BlockSubType byte

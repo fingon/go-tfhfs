@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  2 11:11:20 2018 mstenber
- * Edit time:     112 min
+ * Last modified: Tue Jan  2 15:00:17 2018 mstenber
+ * Edit time:     121 min
  *
  */
 
@@ -41,6 +41,7 @@ type Fs struct {
 	rootName        string
 	treeRoot        *ibtree.IBNode
 	treeRootBlockId ibtree.BlockId
+	bidMap          map[string]bool
 }
 
 var _ fuse.RawFileSystem = &Fs{}
@@ -64,23 +65,29 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 	return nd
 }
 
-// ibtree.IBTreeBackend API
-func (self *Fs) SaveNode(nd ibtree.IBNodeData) ibtree.BlockId {
-	b, err := nd.MarshalMsg(nil)
-	if err != nil {
-		log.Panic(err)
-	}
+func (self *Fs) getBlockDataId(blockType BlockDataType, data string) ibtree.BlockId {
+	b := []byte(data)
 	h := sha256.Sum256(b)
 	bid := h[:]
 	nb := make([]byte, len(b)+1)
-	nb[0] = byte(BDT_NODE)
+	nb[0] = byte(blockType)
 	copy(nb[1:], b)
 	block := self.storage.ReferOrStoreBlock(string(bid), string(nb))
 	self.storage.ReleaseBlockId(block.Id)
 	// By default this won't increase references; however, stuff
 	// that happens 'elsewhere' (e.g. taking root reference) does,
 	// and due to thattransitively, also this does.
+	self.bidMap[block.Id] = true
 	return ibtree.BlockId(block.Id)
+}
+
+// ibtree.IBTreeBackend API
+func (self *Fs) SaveNode(nd ibtree.IBNodeData) ibtree.BlockId {
+	b, err := nd.MarshalMsg(nil)
+	if err != nil {
+		log.Panic(err)
+	}
+	return self.getBlockDataId(BDT_NODE, string(b))
 }
 
 func (self *Fs) GetTransaction() *ibtree.IBTransaction {
@@ -116,10 +123,11 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 	return
 }
 
-// We don't refer to blocks at all (TBD: Get rid of the feature? it is
-// relic of Python era?)
+// These are pre-flush references to blocks; I didn't come up with
+// better scheme than this, so we keep that and clear it at flush
+// time.
 func (self *Fs) hasExternalReferences(id string) bool {
-	return false
+	return self.bidMap[id]
 }
 
 func (self *Fs) iterateReferencesCallback(id string, cb storage.BlockReferenceCallback) {
@@ -142,10 +150,17 @@ func (self *Fs) iterateReferencesCallback(id string, cb storage.BlockReferenceCa
 	}
 }
 
+func (self *Fs) StorageFlush() int {
+	rv := self.storage.Flush()
+	self.bidMap = make(map[string]bool)
+	return rv
+}
+
 func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
 	fs.InodeTracker.Init(fs)
 	fs.tree = ibtree.IBTree{}.Init(fs)
+	fs.bidMap = make(map[string]bool)
 	st.HasExternalReferencesCallback = func(id string) bool {
 		return fs.hasExternalReferences(id)
 	}

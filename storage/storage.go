@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Dec 28 13:19:27 2017 mstenber
- * Edit time:     247 min
+ * Last modified: Tue Jan  2 14:55:11 2018 mstenber
+ * Edit time:     249 min
  *
  */
 
@@ -18,6 +18,7 @@ import (
 	"unsafe"
 
 	"github.com/fingon/go-tfhfs/codec"
+	"github.com/fingon/go-tfhfs/mlog"
 )
 
 // Block is externally usable read-only structure that is handled
@@ -231,6 +232,7 @@ func (self Storage) Init() *Storage {
 }
 
 func (self *Storage) Flush() int {
+	mlog.Printf2("storage/storage", "st.Flush")
 	self.Backend.SetInFlush(true)
 	defer self.Backend.SetInFlush(false)
 	oops := -1
@@ -288,6 +290,7 @@ func (self *Storage) Flush() int {
 }
 
 func (self *Storage) GetBlockById(id string) *Block {
+	mlog.Printf2("storage/storage", "GetBlockById %x", id)
 	b := self.gocBlockById(id)
 	if self.blockValid(b) {
 		return b
@@ -375,14 +378,18 @@ func (self *Storage) updateBlockDataDependencies(data string, add bool, st Block
 
 func (self *Storage) blockValid(b *Block) bool {
 	if b == nil {
+		mlog.Printf2("storage/storage", "blockValid - not, nil")
 		return false
 	}
 	if b.RefCount == 0 {
 		if self.HasExternalReferencesCallback != nil && self.HasExternalReferencesCallback(b.Id) {
+			mlog.Printf2("storage/storage", "blockValid - yes, transient refs")
 			return true
 		}
+		mlog.Printf2("storage/storage", "blockValid - no")
 		return false
 	}
+	mlog.Printf2("storage/storage", "blockValid - yes, stored refs")
 	return true
 }
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  2 14:15:42 2018 mstenber
- * Edit time:     86 min
+ * Last modified: Tue Jan  2 15:02:08 2018 mstenber
+ * Edit time:     87 min
  *
  */
 
@@ -234,7 +234,7 @@ func TestFs(t *testing.T) {
 	add := func(s string, gen InodeNumberGenerator) {
 		t.Run(s,
 			func(t *testing.T) {
-				// t.Parallel()
+				t.Parallel()
 				backend := storage.InMemoryBlockBackend{}.Init()
 				st := storage.Storage{Backend: backend}.Init()
 				fs := NewFs(st, "xxx")

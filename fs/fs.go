@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  2 21:57:18 2018 mstenber
- * Edit time:     137 min
+ * Last modified: Tue Jan  2 22:58:31 2018 mstenber
+ * Edit time:     144 min
  *
  */
 
@@ -49,15 +49,20 @@ var _ fuse.RawFileSystem = &Fs{}
 func (self *Fs) LoadNodeFromString(data string) *ibtree.IBNodeData {
 	bd := []byte(data)
 	dt := BlockDataType(bd[0])
-	if dt != BDT_NODE {
-		return nil
+	switch dt {
+	case BDT_EXTENT:
+		break
+	case BDT_NODE:
+		nd := &ibtree.IBNodeData{}
+		_, err := nd.UnmarshalMsg(bd[1:])
+		if err != nil {
+			log.Panic(err)
+		}
+		return nd
+	default:
+		log.Panicf("LoadNodeFromString - wrong dt:%v", dt)
 	}
-	nd := &ibtree.IBNodeData{}
-	_, err := nd.UnmarshalMsg(bd[1:])
-	if err != nil {
-		log.Panic(err)
-	}
-	return nd
+	return nil
 }
 
 // ibtree.IBTreeBackend API

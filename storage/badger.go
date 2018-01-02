@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Tue Jan  2 21:04:32 2018 mstenber
- * Edit time:     94 min
+ * Last modified: Tue Jan  2 22:47:38 2018 mstenber
+ * Edit time:     97 min
  *
  */
 
@@ -88,7 +88,7 @@ func (self *BadgerBlockBackend) GetBlockById(id string) *Block {
 	if err != nil {
 		log.Fatal(err)
 	}
-	mlog.Printf2("storage/badger", "b.GetBlockById %v", id)
+	mlog.Printf2("storage/badger", "b.GetBlockById %x", id)
 	return b
 }
 
@@ -160,9 +160,9 @@ func (self *BadgerBlockBackend) SetNameToBlockId(name, block_id string) {
 }
 
 func (self *BadgerBlockBackend) StoreBlock(b *Block) {
-	mlog.Printf2("storage/badger", "StoreBlock %x", b.Id)
-	self.updateBlock(b)
 	data := b.GetCodecData()
+	mlog.Printf2("storage/badger", "StoreBlock %x (%d b)", b.Id, len(data))
+	self.updateBlock(b)
 	self.setKKValue([]byte("2"), []byte(b.Id), []byte(data))
 }
 

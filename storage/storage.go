@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan  2 18:46:47 2018 mstenber
- * Edit time:     263 min
+ * Last modified: Tue Jan  2 23:14:02 2018 mstenber
+ * Edit time:     277 min
  *
  */
 
@@ -58,9 +58,11 @@ type Block struct {
 
 func (self *Block) GetData() string {
 	if self.Data == "" {
-		if self.backend != nil {
+		if self.storage == nil {
+			mlog.Printf2("storage/storage", "b.GetData - calling be.GetBlockData")
 			self.Data = self.backend.GetBlockData(self)
 		} else {
+			mlog.Printf2("storage/storage", "b.GetData - calling s.be.GetBlockData")
 			data := self.storage.Backend.GetBlockData(self)
 			self.SetCodecData(data)
 		}
@@ -82,6 +84,7 @@ func (self *Block) GetCodecData() string {
 
 func (self *Block) SetCodecData(s string) {
 	if self.storage == nil {
+		mlog.Printf2("storage/storage", "SetCodecData skipped, storage not set")
 		self.Data = s
 		return
 	}
@@ -363,6 +366,7 @@ func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Blo
 
 /// Private
 func (self *Storage) gocBlockById(id string) *Block {
+	mlog.Printf2("storage/storage", "st.gocBlockById %x", id)
 	b, ok := self.cache_bid2block[id]
 	if !ok {
 		b = self.getBlockById(id)

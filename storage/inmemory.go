@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Fri Dec 29 17:21:48 2017 mstenber
+ * Last modified: Wed Jan  3 00:31:15 2018 mstenber
  * Edit time:     59 min
  *
  */
@@ -49,12 +49,12 @@ func (self *InMemoryBlockBackend) GetBlockIdByName(name string) string {
 	return self.name2Id[name]
 }
 
-func (self *InMemoryBlockBackend) GetBytesAvailable() int {
-	return -1
+func (self *InMemoryBlockBackend) GetBytesAvailable() uint64 {
+	return 0
 }
 
-func (self *InMemoryBlockBackend) GetBytesUsed() int {
-	return -1
+func (self *InMemoryBlockBackend) GetBytesUsed() uint64 {
+	return 0
 }
 
 func (self *InMemoryBlockBackend) SetInFlush(value bool) {

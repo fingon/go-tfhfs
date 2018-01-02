@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan  2 23:14:02 2018 mstenber
- * Edit time:     277 min
+ * Last modified: Wed Jan  3 00:31:36 2018 mstenber
+ * Edit time:     278 min
  *
  */
 
@@ -177,10 +177,10 @@ type BlockBackend interface {
 	GetBlockIdByName(name string) string
 
 	// GetBytesAvailable returns number of bytes available.
-	GetBytesAvailable() int
+	GetBytesAvailable() uint64
 
 	// GetBytesUsed returns number of bytes used.
-	GetBytesUsed() int
+	GetBytesUsed() uint64
 
 	// Update inflush status
 	SetInFlush(bool)

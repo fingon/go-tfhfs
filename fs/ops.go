@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Wed Jan  3 00:10:47 2018 mstenber
- * Edit time:     217 min
+ * Last modified: Wed Jan  3 00:45:20 2018 mstenber
+ * Edit time:     227 min
  *
  */
 
@@ -34,13 +34,15 @@ func (self *Fs) SetDebug(dbg bool) {
 }
 
 func (self *Fs) StatFs(input *InHeader, out *StatfsOut) Status {
-	bsize := blockSize
+	bsize := uint64(blockSize)
 	out.Bsize = uint32(bsize)
-	avail := self.storage.Backend.GetBytesAvailable()
-	out.Bfree = uint64(avail / bsize)
-	out.Bavail = uint64(avail / bsize)
-	used := self.storage.Backend.GetBytesUsed()
-	out.Blocks = uint64(used / bsize)
+	out.Frsize = uint32(bsize)
+	avail := self.storage.Backend.GetBytesAvailable() / bsize
+	out.Bfree = avail
+	out.Bavail = avail
+	used := self.storage.Backend.GetBytesUsed() / bsize
+	total := used + avail
+	out.Blocks = total
 	return OK
 }
 

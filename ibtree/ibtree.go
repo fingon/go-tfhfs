@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Tue Jan  2 20:34:21 2018 mstenber
- * Edit time:     690 min
+ * Last modified: Wed Jan  3 10:46:24 2018 mstenber
+ * Edit time:     694 min
  *
  */
 
@@ -274,6 +274,9 @@ func (self *IBNode) childNode(idx int) *IBNode {
 }
 
 func (self *IBNode) PrintToMLogDirty() {
+	if !mlog.IsEnabled() {
+		return
+	}
 	// Sanity check - could someday get rid of this
 	for i, v := range self.Children {
 		mlog.Printf2("ibtree/ibtree", "[%d]: %x", i, v.Key)
@@ -290,6 +293,9 @@ func (self *IBNode) PrintToMLogDirty() {
 }
 
 func (self *IBNode) PrintToMLogAll() {
+	if !mlog.IsEnabled() {
+		return
+	}
 	// Sanity check - could someday get rid of this
 	for i, v := range self.Children {
 		mlog.Printf2("ibtree/ibtree", "[%d]: %x", i, v.Key)

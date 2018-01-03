@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 13:41:33 2017 mstenber
- * Last modified: Sat Dec 30 16:29:20 2017 mstenber
- * Edit time:     88 min
+ * Last modified: Wed Jan  3 10:45:52 2018 mstenber
+ * Edit time:     89 min
  *
  */
 
@@ -73,6 +73,13 @@ func reset() {
 	atomic.StoreInt32(&status, StateUninitialized)
 	minDepth = maxDepth
 	callers = make([]uintptr, maxDepth)
+}
+
+// IsEnabled can be used to check if mlog is in use at all before
+// doing something expensive.
+func IsEnabled() bool {
+	st := atomic.LoadInt32(&status)
+	return st != StateDisabled
 }
 
 // SetLogger allows overriding of the logger used as output when mlog

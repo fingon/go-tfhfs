@@ -6,8 +6,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Tue Jan  2 15:24:47 2018 mstenber
-# Last modified: Wed Jan  3 12:18:39 2018 mstenber
-# Edit time:     27 min
+# Last modified: Wed Jan  3 14:15:55 2018 mstenber
+# Edit time:     34 min
 #
 
 STORAGEDIR=/tmp/sanity-tfhfs-storage
@@ -31,6 +31,11 @@ mount2 () {
         if [ "$1" = "p" ]; then
             # profiling
             ./tfhfs -memprofile mem.prof -cpuprofile cpu.prof $MOUNTDIR $STORAGEDIR >& ,log2 &
+            return
+        fi
+        if [ "$1" = "r" ]; then
+            # race detector
+            go run -race ./tfhfs.go $MOUNTDIR $STORAGEDIR >& ,log2 &
             return
         fi
     fi

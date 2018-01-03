@@ -6,8 +6,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Tue Jan  2 15:24:47 2018 mstenber
-# Last modified: Tue Jan  2 22:28:34 2018 mstenber
-# Edit time:     16 min
+# Last modified: Wed Jan  3 11:45:13 2018 mstenber
+# Edit time:     17 min
 #
 
 STORAGEDIR=/tmp/sanity-tfhfs-storage
@@ -50,7 +50,8 @@ ls -l $MOUNTDIR/ls
 cd $ORIGDIR
 umount $MOUNTDIR
 
-MLOG=$MLOG ./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
+# MLOG=$MLOG ./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
+./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
 waitmount
 [ -f $MOUNTDIR/ls  ] || out "second mount: copied ls not present"
 ls -l $MOUNTDIR/ls

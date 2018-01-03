@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan  3 12:51:43 2018 mstenber
- * Edit time:     307 min
+ * Last modified: Wed Jan  3 13:48:43 2018 mstenber
+ * Edit time:     310 min
  *
  */
 
@@ -287,8 +287,8 @@ func (self *Storage) Flush() int {
 	for len(self.dirtyBid2Block) > 0 {
 		mlog.Printf2("storage/storage", " flush_dirty_stored_blocks; %d to go", len(self.dirtyBid2Block))
 		dirty := self.dirtyBid2Block
-		self.dirtyBid2Block = make(map[string]*Block)
-		nonzero_blocks := make([]*Block, 0)
+		self.dirtyBid2Block = make(map[string]*Block, len(dirty))
+		nonzero_blocks := make([]*Block, 0, len(dirty))
 		for _, b := range dirty {
 			if b.RefCount == 0 {
 				ops = ops + b.flush()

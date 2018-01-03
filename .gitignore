@@ -1,8 +1,11 @@
+,*
 coverage.out
 .done.*
 *.pb.go
 *_gen.go
 *_gen_test.go
+*.prof
+*.test
 /tfhfs
 /tfhfs-darwin
 /tfhfs-linux

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sat Dec 30 15:29:15 2017 mstenber
- * Edit time:     100 min
+ * Last modified: Wed Jan  3 12:52:11 2018 mstenber
+ * Edit time:     110 min
  *
  */
 
@@ -90,12 +90,29 @@ func ProdStorageOne(t *testing.T, s *Storage) {
 	assert.Equal(t, b, b2)
 	assert.Equal(t, b.RefCount, 2)
 	assert.Equal(t, len(s.dirtyBid2Block), 1)
+	assert.Equal(t, len(s.cacheBid2Block), 1)
 	s.Flush()
 	assert.Equal(t, len(s.dirtyBid2Block), 0)
+	assert.Equal(t, len(s.cacheBid2Block), 1)
+
+	b3 := s.ReferOrStoreBlock("k2", "v")
+	s.MaximumCacheSize = b3.getCacheSize() * 3 / 2
+	// ^ b.size must be <= 3/4 max
+
+	mlog.Printf("Set MaximumCacheSize to %v", s.MaximumCacheSize)
+	assert.Equal(t, len(s.dirtyBid2Block), 1)
+	assert.Equal(t, len(s.cacheBid2Block), 2)
+	s.Flush()
+	assert.Equal(t, len(s.dirtyBid2Block), 0)
+	assert.Equal(t, len(s.cacheBid2Block), 1)
+	// k2 should be in cache and k should be gone as it was earlier one
+	assert.True(t, s.cacheBid2Block["k2"] != nil)
+	s.ReleaseBlockId("k2")
 
 	s.ReleaseBlockId("k")
 	s.ReleaseBlockId("k")
 	s.Flush()
+	assert.Equal(t, len(s.cacheBid2Block), 0)
 
 }
 

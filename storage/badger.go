@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Wed Jan  3 00:35:45 2018 mstenber
- * Edit time:     106 min
+ * Last modified: Wed Jan  3 15:56:00 2018 mstenber
+ * Edit time:     111 min
  *
  */
 
@@ -13,9 +13,6 @@ package storage
 
 import (
 	"log"
-	"os"
-	"path/filepath"
-	"syscall"
 
 	"github.com/dgraph-io/badger"
 	"github.com/fingon/go-tfhfs/mlog"
@@ -27,7 +24,7 @@ import (
 // - key prefix 2 + block id -> data (essentially immutable)
 // - key prefix 3 + name -> block id
 type BadgerBlockBackend struct {
-	dir string
+	DirectoryBlockBackendBase
 	db  *badger.DB
 	txn *badger.Txn
 }
@@ -106,27 +103,6 @@ func (self *BadgerBlockBackend) GetBlockIdByName(name string) string {
 		log.Fatal("get error:", err)
 	}
 	return string(bv)
-}
-
-func (self *BadgerBlockBackend) GetBytesAvailable() uint64 {
-	var st syscall.Statfs_t
-	err := syscall.Statfs(self.dir, &st)
-	if err != nil {
-		return 0
-	}
-	r := uint64(st.Bsize) * st.Bfree
-	mlog.Printf2("storage/badger", "ba.GetBytesAvailable %v (%v * %v)", r, st.Bsize, st.Bfree)
-	return r
-}
-
-func (self *BadgerBlockBackend) GetBytesUsed() uint64 {
-	var sum uint64
-	filepath.Walk(self.dir, func(path string, info os.FileInfo, err error) error {
-		sum += uint64(info.Size())
-		return nil
-	})
-	mlog.Printf2("storage/badger", "ba.GetBytesUsed %v", sum)
-	return sum
 }
 
 func (self *BadgerBlockBackend) SetInFlush(value bool) {

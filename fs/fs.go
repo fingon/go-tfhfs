@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 15:07:26 2018 mstenber
- * Edit time:     169 min
+ * Last modified: Wed Jan  3 17:08:14 2018 mstenber
+ * Edit time:     175 min
  *
  */
 
@@ -151,16 +151,13 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	return fs
 }
 
-func NewBadgerCryptoFs(storedir, password, salt, rootName string) *Fs {
+func NewCryptoStorage(password, salt string, backend storage.BlockBackend) *storage.Storage {
 	c1 := codec.EncryptingCodec{}.Init([]byte(password), []byte(salt), iterations)
 	c2 := &codec.CompressingCodec{}
 	c := codec.CodecChain{}.Init(c1, c2)
-
-	backend := storage.BadgerBlockBackend{}.Init(storedir)
-
 	st := storage.Storage{MaximumCacheSize: 123456789,
 		Codec: c, Backend: backend}.Init()
-	return NewFs(st, rootName)
+	return st
 }
 
 // These are pre-flush references to blocks; I didn't come up with

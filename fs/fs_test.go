@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Fri Dec 29 14:28:06 2017 mstenber
- * Edit time:     16 min
+ * Last modified: Wed Jan  3 17:08:40 2018 mstenber
+ * Edit time:     17 min
  *
  */
 
@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/fingon/go-tfhfs/ibtree"
+	"github.com/fingon/go-tfhfs/storage"
 	"github.com/stvp/assert"
 )
 
@@ -39,7 +40,9 @@ func BenchmarkBadgerFs(b *testing.B) {
 
 	// Add some items we can access/delete/set
 	n := 100000
-	fs := NewBadgerCryptoFs(dir, "asdf", "foo", "root")
+	backend := storage.BadgerBlockBackend{}.Init(dir)
+	st := NewCryptoStorage("assword", "alt", backend)
+	fs := NewFs(st, "toor")
 
 	tr := ibtree.NewTransaction(fs.treeRoot)
 	for i := 0; i < n; i++ {

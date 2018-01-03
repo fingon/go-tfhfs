@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Wed Jan  3 12:52:11 2018 mstenber
- * Edit time:     110 min
+ * Last modified: Wed Jan  3 16:52:23 2018 mstenber
+ * Edit time:     116 min
  *
  */
 
@@ -83,10 +83,10 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 }
 
 func ProdStorageOne(t *testing.T, s *Storage) {
-	b := s.ReferOrStoreBlock("k", "v")
+	b := s.ReferOrStoreBlock("key", "v")
 	assert.True(t, b != nil)
 	assert.Equal(t, b.RefCount, 1)
-	b2 := s.ReferOrStoreBlock("k", "v")
+	b2 := s.ReferOrStoreBlock("key", "v")
 	assert.Equal(t, b, b2)
 	assert.Equal(t, b.RefCount, 2)
 	assert.Equal(t, len(s.dirtyBid2Block), 1)
@@ -95,7 +95,7 @@ func ProdStorageOne(t *testing.T, s *Storage) {
 	assert.Equal(t, len(s.dirtyBid2Block), 0)
 	assert.Equal(t, len(s.cacheBid2Block), 1)
 
-	b3 := s.ReferOrStoreBlock("k2", "v")
+	b3 := s.ReferOrStoreBlock("key2", "v")
 	s.MaximumCacheSize = b3.getCacheSize() * 3 / 2
 	// ^ b.size must be <= 3/4 max
 
@@ -106,11 +106,11 @@ func ProdStorageOne(t *testing.T, s *Storage) {
 	assert.Equal(t, len(s.dirtyBid2Block), 0)
 	assert.Equal(t, len(s.cacheBid2Block), 1)
 	// k2 should be in cache and k should be gone as it was earlier one
-	assert.True(t, s.cacheBid2Block["k2"] != nil)
-	s.ReleaseBlockId("k2")
+	assert.True(t, s.cacheBid2Block["key2"] != nil)
+	s.ReleaseBlockId("key2")
 
-	s.ReleaseBlockId("k")
-	s.ReleaseBlockId("k")
+	s.ReleaseBlockId("key")
+	s.ReleaseBlockId("key")
 	s.Flush()
 	assert.Equal(t, len(s.cacheBid2Block), 0)
 
@@ -144,6 +144,17 @@ func TestBadger(t *testing.T) {
 	defer os.RemoveAll(dir)
 	ProdBlockBackend(t, func() BlockBackend {
 		be := BadgerBlockBackend{}.Init(dir)
+		return be
+	})
+}
+
+func TestFile(t *testing.T) {
+	t.Parallel()
+	dir, _ := ioutil.TempDir("", "file")
+	defer os.RemoveAll(dir)
+	ProdBlockBackend(t, func() BlockBackend {
+		be := &FileBlockBackend{}
+		be.Init(dir)
 		return be
 	})
 }

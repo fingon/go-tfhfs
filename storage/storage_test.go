@@ -99,7 +99,7 @@ func ProdStorageOne(t *testing.T, s *Storage) {
 	s.MaximumCacheSize = b3.getCacheSize() * 3 / 2
 	// ^ b.size must be <= 3/4 max
 
-	mlog.Printf("Set MaximumCacheSize to %v", s.MaximumCacheSize)
+	mlog.Printf2("storage/storage_test", "Set MaximumCacheSize to %v", s.MaximumCacheSize)
 	assert.Equal(t, len(s.dirtyBid2Block), 1)
 	assert.Equal(t, len(s.cacheBid2Block), 2)
 	s.Flush()

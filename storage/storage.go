@@ -487,7 +487,7 @@ func (self *Storage) shrinkCache() {
 	for i = 0; i < n && self.cacheSize > goal; i++ {
 		self.deleteCachedBlock(arr[i])
 	}
-	mlog.Printf(" removed %d out of %d entries", i, cnt)
+	mlog.Printf2("storage/storage", " removed %d out of %d entries", i, cnt)
 
 }
 

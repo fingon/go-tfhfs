@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Tue Jan  2 17:44:04 2018 mstenber
- * Edit time:     81 min
+ * Last modified: Wed Jan  3 11:13:59 2018 mstenber
+ * Edit time:     82 min
  *
  */
 
@@ -76,7 +76,7 @@ func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 	ino := binary.BigEndian.Uint64([]byte(*inop))
 	name = string(kp.SubTypeData()[filenameHashSize:])
 	mlog.Printf2("fs/fh", " got %v %s", ino, name)
-	inode = self.inode.tracker.Getinode(ino)
+	inode = self.inode.tracker.GetInode(ino)
 	return
 }
 
@@ -118,7 +118,7 @@ func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool 
 		return false
 	}
 	*entry = fuse.EntryOut{}
-	self.Fs().Lookup(&input.InHeader, name, entry)
+	self.Ops().Lookup(&input.InHeader, name, entry)
 
 	// Move on with things
 	self.pos++
@@ -129,6 +129,10 @@ func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool 
 
 func (self *inodeFH) Fs() *Fs {
 	return self.inode.Fs()
+}
+
+func (self *inodeFH) Ops() *fsOps {
+	return self.inode.Ops()
 }
 
 func (self *inodeFH) Release() {

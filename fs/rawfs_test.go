@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  2 20:35:56 2018 mstenber
- * Edit time:     100 min
+ * Last modified: Wed Jan  3 11:21:59 2018 mstenber
+ * Edit time:     101 min
  *
  */
 
@@ -181,7 +181,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 	assert.Nil(t, err)
 
 	var sfo fuse.StatfsOut
-	code := fs.StatFs(&root.InHeader, &sfo)
+	code := fs.ops.StatFs(&root.InHeader, &sfo)
 	assert.True(t, code.Ok())
 
 	// Initially no xattr - list should be empty
@@ -229,7 +229,7 @@ type DummyGenerator struct {
 	incr  int64
 }
 
-func (self *DummyGenerator) CreateinodeNumber() uint64 {
+func (self *DummyGenerator) CreateInodeNumber() uint64 {
 	self.index = uint64(int64(self.index) + self.incr)
 	return self.index
 }
@@ -257,7 +257,7 @@ func TestFs(t *testing.T) {
 
 				}
 				ProdFs(t, fs)
-				fs.StorageFlush()
+				fs.Flush()
 
 				mlog.Printf2("fs/rawfs_test", "checking current state valid")
 				check(t, fs)

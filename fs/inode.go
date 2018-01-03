@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Wed Jan  3 00:07:27 2018 mstenber
- * Edit time:     212 min
+ * Last modified: Wed Jan  3 11:18:37 2018 mstenber
+ * Edit time:     214 min
  *
  */
 
@@ -52,6 +52,10 @@ func (self *inode) AddChild(name string, child *inode) {
 
 func (self *inode) Fs() *Fs {
 	return self.tracker.fs
+}
+
+func (self *inode) Ops() *fsOps {
+	return &self.tracker.fs.ops
 }
 
 func unixNanoToFuse(t uint64, seconds *uint64, parts *uint32) {
@@ -117,7 +121,7 @@ func (self *inode) GetChildByName(name string) *inode {
 	}
 	ino := binary.BigEndian.Uint64([]byte(*v))
 	mlog.Printf2("fs/inode", " inode %v", ino)
-	return self.tracker.Getinode(ino)
+	return self.tracker.GetInode(ino)
 }
 
 func (self *inode) GetFile(flags uint32) *inodeFH {
@@ -324,13 +328,13 @@ func (self *inode) SetSize(size uint64) {
 }
 
 type inodeNumberGenerator interface {
-	CreateinodeNumber() uint64
+	CreateInodeNumber() uint64
 }
 
 type randomInodeNumberGenerator struct {
 }
 
-func (self *randomInodeNumberGenerator) CreateinodeNumber() uint64 {
+func (self *randomInodeNumberGenerator) CreateInodeNumber() uint64 {
 	return rand.Uint64()
 }
 
@@ -369,8 +373,8 @@ func (self *inodeTracker) getinode(ino uint64) *inode {
 	return n
 }
 
-func (self *inodeTracker) Getinode(ino uint64) *inode {
-	mlog.Printf2("fs/inode", "Getinode %v", ino)
+func (self *inodeTracker) GetInode(ino uint64) *inode {
+	mlog.Printf2("fs/inode", "GetInode %v", ino)
 	inode := self.getinode(ino)
 	if inode.Meta() == nil {
 		mlog.Printf2("fs/inode", " no meta")
@@ -385,10 +389,10 @@ func (self *inodeTracker) GetFileByFh(fh uint64) *inodeFH {
 	return self.fh2ifile[fh]
 }
 
-func (self *inodeTracker) Createinode() *inode {
-	mlog.Printf2("fs/inode", "Createinode")
+func (self *inodeTracker) CreateInode() *inode {
+	mlog.Printf2("fs/inode", "CreateInode")
 	for {
-		ino := self.generator.CreateinodeNumber()
+		ino := self.generator.CreateInodeNumber()
 		mlog.Printf2("fs/inode", " %v", ino)
 		if ino == 0 || self.ino2inode[ino] != nil {
 			continue

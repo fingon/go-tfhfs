@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Tue Jan  2 13:13:54 2018 mstenber
- * Edit time:     144 min
+ * Last modified: Wed Jan  3 11:18:13 2018 mstenber
+ * Edit time:     145 min
  *
  */
 
@@ -43,7 +43,8 @@ func s2e(status fuse.Status) error {
 
 type FSUser struct {
 	fuse.InHeader
-	fs *Fs
+	fs  *Fs
+	ops fuse.RawFileSystem
 }
 
 type fileInfo struct {
@@ -94,7 +95,7 @@ func fileModeFromFuse(mode uint32) os.FileMode {
 }
 
 func NewFSUser(fs *Fs) *FSUser {
-	return &FSUser{fs: fs}
+	return &FSUser{fs: fs, ops: fs.LockedOps}
 }
 
 func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
@@ -107,7 +108,7 @@ func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
 		}
 		self.NodeId = inode
 		mlog.Printf2("fs/fsuser", " %v", name)
-		err = s2e(self.fs.Lookup(&self.InHeader, name, eo))
+		err = s2e(self.ops.Lookup(&self.InHeader, name, eo))
 		if err != nil {
 			return
 		}
@@ -115,7 +116,7 @@ func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
 	}
 	self.NodeId = inode
 	if inode == oinode {
-		err = s2e(self.fs.Lookup(&self.InHeader, ".", eo))
+		err = s2e(self.ops.Lookup(&self.InHeader, ".", eo))
 	}
 	return
 }
@@ -127,20 +128,20 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 		return
 	}
 	var oo fuse.OpenOut
-	err = s2e(self.fs.OpenDir(&fuse.OpenIn{InHeader: self.InHeader}, &oo))
+	err = s2e(self.ops.OpenDir(&fuse.OpenIn{InHeader: self.InHeader}, &oo))
 	if err != nil {
 		return
 	}
 	del := fuse.NewDirEntryList(make([]byte, 1000), 0)
 
-	err = s2e(self.fs.ReadDir(&fuse.ReadIn{Fh: oo.Fh,
+	err = s2e(self.ops.ReadDir(&fuse.ReadIn{Fh: oo.Fh,
 		InHeader: self.InHeader}, del))
 	if err != nil {
 		return
 	}
 	// We got _something_. No way to make sure it was fine. Oh well.
 	// Cheat using backdoor API.
-	err = s2e(self.fs.ReadDirPlus(&fuse.ReadIn{Fh: oo.Fh,
+	err = s2e(self.ops.ReadDirPlus(&fuse.ReadIn{Fh: oo.Fh,
 		InHeader: self.InHeader}, del))
 	if err != nil {
 		return
@@ -148,7 +149,7 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 	// We got _something_. No way to make sure it was fine. Oh well.
 	// Cheat using backdoor API.
 	ret = self.fs.ListDir(eo.Ino)
-	self.fs.ReleaseDir(&fuse.ReleaseIn{Fh: oo.Fh, InHeader: self.InHeader})
+	self.ops.ReleaseDir(&fuse.ReleaseIn{Fh: oo.Fh, InHeader: self.InHeader})
 	return
 }
 
@@ -179,7 +180,7 @@ func (self *FSUser) Mkdir(path string, perm os.FileMode) (err error) {
 	if err != nil {
 		return
 	}
-	err = s2e(self.fs.Mkdir(&fuse.MkdirIn{InHeader: self.InHeader,
+	err = s2e(self.ops.Mkdir(&fuse.MkdirIn{InHeader: self.InHeader,
 		Mode: uint32(perm)}, basename, &eo))
 	return
 }
@@ -213,9 +214,9 @@ func (self *FSUser) Remove(path string) (err error) {
 		return
 	}
 	if fi.IsDir() {
-		err = s2e(self.fs.Rmdir(&self.InHeader, basename))
+		err = s2e(self.ops.Rmdir(&self.InHeader, basename))
 	} else {
-		err = s2e(self.fs.Unlink(&self.InHeader, basename))
+		err = s2e(self.ops.Unlink(&self.InHeader, basename))
 	}
 	return
 }
@@ -226,12 +227,12 @@ func (self *FSUser) GetXAttr(path, attr string) (b []byte, err error) {
 	if err != nil {
 		return
 	}
-	b, code := self.fs.GetXAttrData(&self.InHeader, attr)
+	b, code := self.ops.GetXAttrData(&self.InHeader, attr)
 	err = s2e(code)
 	if err != nil {
 		return
 	}
-	l, code := self.fs.GetXAttrSize(&self.InHeader, attr)
+	l, code := self.ops.GetXAttrSize(&self.InHeader, attr)
 	err = s2e(code)
 	if err != nil {
 		return
@@ -248,7 +249,7 @@ func (self *FSUser) ListXAttr(path string) (s []string, err error) {
 	if err != nil {
 		return
 	}
-	b, code := self.fs.ListXAttr(&self.InHeader)
+	b, code := self.ops.ListXAttr(&self.InHeader)
 	err = s2e(code)
 	if err != nil {
 		return
@@ -267,7 +268,7 @@ func (self *FSUser) RemoveXAttr(path, attr string) (err error) {
 	if err != nil {
 		return
 	}
-	return s2e(self.fs.RemoveXAttr(&self.InHeader, attr))
+	return s2e(self.ops.RemoveXAttr(&self.InHeader, attr))
 }
 
 func (self *FSUser) SetXAttr(path, attr string, data []byte) (err error) {
@@ -276,7 +277,7 @@ func (self *FSUser) SetXAttr(path, attr string, data []byte) (err error) {
 	if err != nil {
 		return
 	}
-	return s2e(self.fs.SetXAttr(&fuse.SetXAttrIn{InHeader: self.InHeader,
+	return s2e(self.ops.SetXAttr(&fuse.SetXAttrIn{InHeader: self.InHeader,
 		Size: uint32(len(data))}, attr, data))
 }
 
@@ -299,7 +300,7 @@ func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *fsFile, 
 		}
 		ci := fuse.CreateIn{InHeader: self.InHeader, Flags: flag, Mode: perm}
 		var co fuse.CreateOut
-		err = s2e(self.fs.Create(&ci, basename, &co))
+		err = s2e(self.ops.Create(&ci, basename, &co))
 		oo = co.OpenOut
 	} else {
 		err = self.lookup(path, &eo)
@@ -307,7 +308,7 @@ func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *fsFile, 
 			return
 		}
 		oi := fuse.OpenIn{InHeader: self.InHeader, Flags: flag, Mode: perm}
-		err = s2e(self.fs.Open(&oi, &oo))
+		err = s2e(self.ops.Open(&oi, &oo))
 	}
 	if err != nil {
 		return
@@ -318,7 +319,7 @@ func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *fsFile, 
 
 func (self *fsFile) Close() {
 	ri := fuse.ReleaseIn{Fh: self.fh}
-	self.u.fs.Release(&ri)
+	self.u.ops.Release(&ri)
 }
 
 func (self *fsFile) Seek(ofs int64, whence int) (ret int64, err error) {
@@ -358,7 +359,7 @@ func (self *fsFile) Read(b []byte) (n int, err error) {
 		ri := fuse.ReadIn{Fh: self.fh,
 			Offset: uint64(self.pos),
 			Size:   uint32(len(b) - n)}
-		r, code := self.u.fs.Read(&ri, b[n:])
+		r, code := self.u.ops.Read(&ri, b[n:])
 		err = s2e(code)
 		if err != nil {
 			return
@@ -385,7 +386,7 @@ func (self *fsFile) Write(b []byte) (n int, err error) {
 		wi := fuse.WriteIn{Fh: self.fh,
 			Offset: uint64(self.pos),
 			Size:   uint32(len(b) - n)}
-		n32, code := self.u.fs.Write(&wi, b[n:])
+		n32, code := self.u.ops.Write(&wi, b[n:])
 		err = s2e(code)
 		if err != nil {
 			return

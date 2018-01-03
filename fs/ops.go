@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Wed Jan  3 00:45:20 2018 mstenber
- * Edit time:     227 min
+ * Last modified: Wed Jan  3 11:21:33 2018 mstenber
+ * Edit time:     233 min
  *
  */
 
@@ -21,32 +21,49 @@ import (
 	. "github.com/hanwen/go-fuse/fuse"
 )
 
-func (self *Fs) Init(server *Server) {
-	self.server = server
+type fsOps struct {
+	fs *Fs
 }
 
-func (self *Fs) String() string {
+var _ RawFileSystem = &fsOps{}
+
+func (self *fsOps) Init(server *Server) {
+	self.fs.server = server
+	flushLoop := func() {
+		for {
+			select {
+			case <-self.fs.closing:
+				return
+			case <-time.After(self.fs.flushInterval):
+				self.fs.LockedOps.Flush(nil)
+			}
+		}
+	}
+	go flushLoop()
+}
+
+func (self *fsOps) String() string {
 	return os.Args[0]
 }
 
-func (self *Fs) SetDebug(dbg bool) {
+func (self *fsOps) SetDebug(dbg bool) {
 	// TBD - do we need debug functionality someday?
 }
 
-func (self *Fs) StatFs(input *InHeader, out *StatfsOut) Status {
+func (self *fsOps) StatFs(input *InHeader, out *StatfsOut) Status {
 	bsize := uint64(blockSize)
 	out.Bsize = uint32(bsize)
 	out.Frsize = uint32(bsize)
-	avail := self.storage.Backend.GetBytesAvailable() / bsize
+	avail := self.fs.storage.Backend.GetBytesAvailable() / bsize
 	out.Bfree = avail
 	out.Bavail = avail
-	used := self.storage.Backend.GetBytesUsed() / bsize
+	used := self.fs.storage.Backend.GetBytesUsed() / bsize
 	total := used + avail
 	out.Blocks = total
 	return OK
 }
 
-func (self *Fs) access(inode *inode, mode uint32, orOwn bool, ctx *Context) Status {
+func (self *fsOps) access(inode *inode, mode uint32, orOwn bool, ctx *Context) Status {
 	if inode == nil {
 		return ENOENT
 	}
@@ -74,7 +91,7 @@ func (self *Fs) access(inode *inode, mode uint32, orOwn bool, ctx *Context) Stat
 }
 
 // lookup gets child of a parent.
-func (self *Fs) lookup(parent *inode, name string, ctx *Context) (child *inode, code Status) {
+func (self *fsOps) lookup(parent *inode, name string, ctx *Context) (child *inode, code Status) {
 	mlog.Printf2("fs/ops", "ops.lookup %v %s", parent.ino, name)
 	code = self.access(parent, X_OK, false, ctx)
 	if !code.Ok() {
@@ -96,8 +113,8 @@ func (self *Fs) lookup(parent *inode, name string, ctx *Context) (child *inode, 
 	return
 }
 
-func (self *Fs) Lookup(input *InHeader, name string, out *EntryOut) (code Status) {
-	parent := self.Getinode(input.NodeId)
+func (self *fsOps) Lookup(input *InHeader, name string, out *EntryOut) (code Status) {
+	parent := self.fs.GetInode(input.NodeId)
 	defer parent.Release()
 
 	child, code := self.lookup(parent, name, &input.Context)
@@ -109,12 +126,12 @@ func (self *Fs) Lookup(input *InHeader, name string, out *EntryOut) (code Status
 	return
 }
 
-func (self *Fs) Forget(nodeID, nlookup uint64) {
-	self.Getinode(nodeID).Forget(nlookup)
+func (self *fsOps) Forget(nodeID, nlookup uint64) {
+	self.fs.GetInode(nodeID).Forget(nlookup)
 }
 
-func (self *Fs) GetAttr(input *GetAttrIn, out *AttrOut) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) GetAttr(input *GetAttrIn, out *AttrOut) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	if inode == nil {
 		return ENOENT
 	}
@@ -128,8 +145,8 @@ func (self *Fs) GetAttr(input *GetAttrIn, out *AttrOut) (code Status) {
 	return
 }
 
-func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	if inode == nil {
 		return ENOENT
 	}
@@ -221,16 +238,16 @@ func (self *Fs) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 	return
 }
 
-func (self *Fs) Release(input *ReleaseIn) {
-	self.GetFileByFh(input.Fh).Release()
+func (self *fsOps) Release(input *ReleaseIn) {
+	self.fs.GetFileByFh(input.Fh).Release()
 }
 
-func (self *Fs) ReleaseDir(input *ReleaseIn) {
-	self.GetFileByFh(input.Fh).Release()
+func (self *fsOps) ReleaseDir(input *ReleaseIn) {
+	self.fs.GetFileByFh(input.Fh).Release()
 }
 
-func (self *Fs) OpenDir(input *OpenIn, out *OpenOut) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) OpenDir(input *OpenIn, out *OpenOut) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, R_OK|X_OK, false, &input.Context)
@@ -247,8 +264,8 @@ func (self *Fs) OpenDir(input *OpenIn, out *OpenOut) (code Status) {
 
 }
 
-func (self *Fs) Open(input *OpenIn, out *OpenOut) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) Open(input *OpenIn, out *OpenOut) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	mlog.Printf2("fs/ops", "ops.Open %v", input.NodeId)
 	defer inode.Release()
 
@@ -281,24 +298,24 @@ func (self *Fs) Open(input *OpenIn, out *OpenOut) (code Status) {
 	return OK
 }
 
-func (self *Fs) ReadDir(input *ReadIn, l *DirEntryList) Status {
-	dir := self.GetFileByFh(input.Fh)
+func (self *fsOps) ReadDir(input *ReadIn, l *DirEntryList) Status {
+	dir := self.fs.GetFileByFh(input.Fh)
 	dir.SetPos(input.Offset)
 	for dir.ReadDirEntry(l) {
 	}
 	return OK
 }
 
-func (self *Fs) ReadDirPlus(input *ReadIn, l *DirEntryList) Status {
-	dir := self.GetFileByFh(input.Fh)
+func (self *fsOps) ReadDirPlus(input *ReadIn, l *DirEntryList) Status {
+	dir := self.fs.GetFileByFh(input.Fh)
 	dir.SetPos(input.Offset)
 	for dir.ReadDirPlus(input, l) {
 	}
 	return OK
 }
 
-func (self *Fs) Readlink(input *InHeader) (out []byte, code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) Readlink(input *InHeader) (out []byte, code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, R_OK, false, &input.Context)
@@ -312,9 +329,9 @@ func (self *Fs) Readlink(input *InHeader) (out []byte, code Status) {
 	return
 }
 
-func (self *Fs) create(input *InHeader, name string, meta *InodeMeta, allowReplace bool) (child *inode, code Status) {
+func (self *fsOps) create(input *InHeader, name string, meta *InodeMeta, allowReplace bool) (child *inode, code Status) {
 	mlog.Printf2("fs/ops", " create %v", name)
-	inode := self.Getinode(input.NodeId)
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK|X_OK, false, &input.Context)
@@ -335,13 +352,13 @@ func (self *Fs) create(input *InHeader, name string, meta *InodeMeta, allowRepla
 		}
 	}
 
-	child = self.Createinode()
+	child = self.fs.CreateInode()
 	child.SetMeta(meta)
 	inode.AddChild(name, child)
 	return
 }
 
-func (self *Fs) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) {
+func (self *fsOps) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) {
 	var meta InodeMeta
 	meta.SetMkdirIn(input)
 	child, code := self.create(&input.InHeader, name, &meta, false)
@@ -353,8 +370,8 @@ func (self *Fs) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) 
 	return OK
 }
 
-func (self *Fs) unlink(input *InHeader, name string, isdir *bool) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) unlink(input *InHeader, name string, isdir *bool) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	child, code := self.lookup(inode, name, &input.Context)
@@ -375,19 +392,19 @@ func (self *Fs) unlink(input *InHeader, name string, isdir *bool) (code Status) 
 	return OK
 }
 
-func (self *Fs) Unlink(input *InHeader, name string) (code Status) {
+func (self *fsOps) Unlink(input *InHeader, name string) (code Status) {
 	mlog.Printf2("fs/ops", "ops.Unlink %s", name)
 	b := false
 	return self.unlink(input, name, &b)
 }
 
-func (self *Fs) Rmdir(input *InHeader, name string) (code Status) {
+func (self *fsOps) Rmdir(input *InHeader, name string) (code Status) {
 	mlog.Printf2("fs/ops", "ops.Rmdir %s", name)
 	b := true
 	return self.unlink(input, name, &b)
 }
 
-func (self *Fs) GetXAttrSize(input *InHeader, attr string) (size int, code Status) {
+func (self *fsOps) GetXAttrSize(input *InHeader, attr string) (size int, code Status) {
 	b, code := self.GetXAttrData(input, attr)
 	if !code.Ok() {
 		return
@@ -395,8 +412,8 @@ func (self *Fs) GetXAttrSize(input *InHeader, attr string) (size int, code Statu
 	return len(b), code
 }
 
-func (self *Fs) GetXAttrData(input *InHeader, attr string) (data []byte, code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) GetXAttrData(input *InHeader, attr string) (data []byte, code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, R_OK, false, &input.Context)
@@ -407,8 +424,8 @@ func (self *Fs) GetXAttrData(input *InHeader, attr string) (data []byte, code St
 	return inode.GetXAttr(attr)
 }
 
-func (self *Fs) SetXAttr(input *SetXAttrIn, attr string, data []byte) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) SetXAttr(input *SetXAttrIn, attr string, data []byte) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK, true, &input.Context)
@@ -419,8 +436,8 @@ func (self *Fs) SetXAttr(input *SetXAttrIn, attr string, data []byte) (code Stat
 	return inode.SetXAttr(attr, data)
 }
 
-func (self *Fs) ListXAttr(input *InHeader) (data []byte, code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) ListXAttr(input *InHeader) (data []byte, code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, R_OK, false, &input.Context)
@@ -439,8 +456,8 @@ func (self *Fs) ListXAttr(input *InHeader) (data []byte, code Status) {
 	return
 }
 
-func (self *Fs) RemoveXAttr(input *InHeader, attr string) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) RemoveXAttr(input *InHeader, attr string) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK, true, &input.Context)
@@ -450,8 +467,8 @@ func (self *Fs) RemoveXAttr(input *InHeader, attr string) (code Status) {
 	return inode.RemoveXAttr(attr)
 }
 
-func (self *Fs) Rename(input *RenameIn, oldName string, newName string) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK|X_OK, true, &input.Context)
@@ -465,7 +482,7 @@ func (self *Fs) Rename(input *RenameIn, oldName string, newName string) (code St
 		return
 	}
 
-	new_inode := self.Getinode(input.Newdir)
+	new_inode := self.fs.GetInode(input.Newdir)
 	defer new_inode.Release()
 	code = self.access(new_inode, W_OK|X_OK, true, &input.Context)
 	if !code.Ok() {
@@ -498,8 +515,8 @@ func (self *Fs) Rename(input *RenameIn, oldName string, newName string) (code St
 	return OK
 }
 
-func (self *Fs) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK|X_OK, true, &input.Context)
@@ -519,26 +536,26 @@ func (self *Fs) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
 
 }
 
-func (self *Fs) Access(input *AccessIn) (code Status) {
-	inode := self.Getinode(input.NodeId)
+func (self *fsOps) Access(input *AccessIn) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	return self.access(inode, input.Mask, true, &input.Context)
 }
 
-func (self *Fs) Read(input *ReadIn, buf []byte) (ReadResult, Status) {
+func (self *fsOps) Read(input *ReadIn, buf []byte) (ReadResult, Status) {
 	// Check perm?
-	file := self.GetFileByFh(input.Fh)
+	file := self.fs.GetFileByFh(input.Fh)
 	return file.Read(buf, input.Offset)
 }
 
-func (self *Fs) Write(input *WriteIn, data []byte) (written uint32, code Status) {
+func (self *fsOps) Write(input *WriteIn, data []byte) (written uint32, code Status) {
 	// Check perm?
-	file := self.GetFileByFh(input.Fh)
+	file := self.fs.GetFileByFh(input.Fh)
 	return file.Write(data, input.Offset)
 }
 
-func (self *Fs) Create(input *CreateIn, name string, out *CreateOut) (code Status) {
+func (self *fsOps) Create(input *CreateIn, name string, out *CreateOut) (code Status) {
 	mlog.Printf2("fs/ops", "ops.Create %s", name)
 	// first create file
 	var meta InodeMeta
@@ -562,7 +579,7 @@ func (self *Fs) Create(input *CreateIn, name string, out *CreateOut) (code Statu
 	return OK
 }
 
-func (self *Fs) Mknod(input *MknodIn, name string, out *EntryOut) (code Status) {
+func (self *fsOps) Mknod(input *MknodIn, name string, out *EntryOut) (code Status) {
 	var meta InodeMeta
 	meta.SetMknodIn(input)
 	child, code := self.create(&input.InHeader, name, &meta, false)
@@ -574,7 +591,7 @@ func (self *Fs) Mknod(input *MknodIn, name string, out *EntryOut) (code Status) 
 	return OK
 }
 
-func (self *Fs) Symlink(input *InHeader, pointedTo string, linkName string, out *EntryOut) (code Status) {
+func (self *fsOps) Symlink(input *InHeader, pointedTo string, linkName string, out *EntryOut) (code Status) {
 	meta := InodeMeta{InodeMetaData: InodeMetaData{StUid: input.Uid,
 		StGid:  input.Gid,
 		StMode: S_IFLNK | 0777,
@@ -590,27 +607,33 @@ func (self *Fs) Symlink(input *InHeader, pointedTo string, linkName string, out 
 	return OK
 }
 
-func (self *Fs) Flock(input *FlockIn, flags int) Status {
-	// TBD
-	return ENOSYS
-}
-
-func (self *Fs) Flush(input *FlushIn) Status {
+func (self *fsOps) Flush(input *FlushIn) Status {
+	// This is a hack I am not particularly proud of; control
+	// access to us by calling our own flush via lockedfilesystem.
+	if input == nil {
+		self.fs.Flush()
+		return OK
+	}
 	// TBD
 	return OK
 }
 
-func (self *Fs) Fsync(input *FsyncIn) (code Status) {
+func (self *fsOps) Flock(input *FlockIn, flags int) Status {
 	// TBD
 	return ENOSYS
 }
 
-func (self *Fs) FsyncDir(input *FsyncIn) (code Status) {
+func (self *fsOps) Fsync(input *FsyncIn) (code Status) {
 	// TBD
 	return ENOSYS
 }
 
-func (self *Fs) Fallocate(in *FallocateIn) (code Status) {
+func (self *fsOps) FsyncDir(input *FsyncIn) (code Status) {
+	// TBD
+	return ENOSYS
+}
+
+func (self *fsOps) Fallocate(in *FallocateIn) (code Status) {
 	// TBD
 	return ENOSYS
 }

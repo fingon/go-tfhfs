@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 10:34:10 2018 mstenber
- * Edit time:     148 min
+ * Last modified: Wed Jan  3 11:15:46 2018 mstenber
+ * Edit time:     159 min
  *
  */
 
@@ -20,6 +20,7 @@ package fs
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/ibtree"
@@ -35,6 +36,10 @@ const blockSubTypeOffset = inodeDataLength
 
 type Fs struct {
 	inodeTracker
+	ops             fsOps
+	closing         chan bool
+	flushInterval   time.Duration
+	LockedOps       fuse.RawFileSystem
 	server          *fuse.Server
 	tree            *ibtree.IBTree
 	storage         *storage.Storage
@@ -44,11 +49,10 @@ type Fs struct {
 	bidMap          map[string]bool
 }
 
-var _ fuse.RawFileSystem = &Fs{}
-
 func (self *Fs) Close() {
-	self.StorageFlush()
+	self.Flush()
 	self.storage.Backend.Close()
+	self.closing <- true
 }
 
 // ibtree.IBTreeBackend API
@@ -61,7 +65,7 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 	return self.loadNodeFromString(b.GetData())
 }
 
-func (self *Fs) StorageFlush() int {
+func (self *Fs) Flush() int {
 	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 	// ^ done in each commit, so pointless here?
 	rv := self.storage.Flush()
@@ -95,7 +99,7 @@ func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
 // is binary garbage and I am too lazy to write a decoder for it.
 func (self *Fs) ListDir(ino uint64) (ret []string) {
 	mlog.Printf2("fs/fs", "Fs.ListDir #%d", ino)
-	inode := self.Getinode(ino)
+	inode := self.GetInode(ino)
 	defer inode.Release()
 
 	file := inode.GetFile(uint32(os.O_RDONLY))
@@ -115,6 +119,10 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 
 func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
+	fs.ops.fs = fs
+	fs.closing = make(chan bool)
+	fs.flushInterval = 1 * time.Second
+	fs.LockedOps = fuse.NewLockingRawFileSystem(&fs.ops)
 	fs.inodeTracker.Init(fs)
 	fs.tree = ibtree.IBTree{}.Init(fs)
 	fs.bidMap = make(map[string]bool)

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Tue Jan  2 23:39:07 2018 mstenber
- * Edit time:     21 min
+ * Last modified: Wed Jan  3 11:22:12 2018 mstenber
+ * Edit time:     22 min
  *
  */
 
@@ -37,8 +37,8 @@ func main() {
 	}
 	badgerfs := fs.NewBadgerCryptoFs(storedir, *password, *salt, "xxx")
 	defer badgerfs.Close()
-	opts := &fuse.MountOptions{Debug: true, SingleThreaded: true}
-	server, err := fuse.NewServer(badgerfs, mountpoint, opts)
+	opts := &fuse.MountOptions{Debug: true}
+	server, err := fuse.NewServer(badgerfs.LockedOps, mountpoint, opts)
 	if err != nil {
 		log.Panic(err)
 	}

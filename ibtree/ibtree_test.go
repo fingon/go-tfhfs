@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Wed Jan  3 10:33:58 2018 mstenber
+ * Last modified: Wed Jan  3 15:07:37 2018 mstenber
  * Edit time:     252 min
  *
  */
@@ -59,7 +59,7 @@ func (self *DummyBackend) LoadNode(id BlockId) *IBNodeData {
 	return nd
 }
 
-func (self *DummyBackend) SaveNode(nd IBNodeData) BlockId {
+func (self *DummyBackend) SaveNode(nd *IBNodeData) BlockId {
 	b, _ := nd.MarshalMsg(nil)
 	h := sha256.Sum256(b)
 	bid := BlockId(h[:])

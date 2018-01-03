@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 14:14:34 2018 mstenber
- * Edit time:     164 min
+ * Last modified: Wed Jan  3 15:07:26 2018 mstenber
+ * Edit time:     169 min
  *
  */
 
@@ -66,17 +66,17 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 }
 
 func (self *Fs) Flush() int {
-	mlog.Printf("fs.Flush started")
+	mlog.Printf2("fs/fs", "fs.Flush started")
 	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 	// ^ done in each commit, so pointless here?
 	rv := self.storage.Flush()
 	self.bidMap = make(map[string]bool)
-	mlog.Printf(" .. done with fs.Flush")
+	mlog.Printf2("fs/fs", " .. done with fs.Flush")
 	return rv
 }
 
 // ibtree.IBTreeBackend API
-func (self *Fs) SaveNode(nd ibtree.IBNodeData) ibtree.BlockId {
+func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 	b, err := nd.MarshalMsg(nil)
 	if err != nil {
 		log.Panic(err)

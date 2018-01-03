@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Wed Jan  3 10:46:24 2018 mstenber
- * Edit time:     694 min
+ * Last modified: Wed Jan  3 15:07:00 2018 mstenber
+ * Edit time:     695 min
  *
  */
 
@@ -37,7 +37,7 @@ type IBTreeBackend interface {
 	LoadNode(id BlockId) *IBNodeData
 
 	// SaveNode persists the node, and returns the backend id for it.
-	SaveNode(nd IBNodeData) BlockId
+	SaveNode(nd *IBNodeData) BlockId
 }
 
 // IBTree represents static configuration that can be used over
@@ -136,7 +136,7 @@ func (self *IBNode) Commit() (*IBNode, BlockId) {
 	n := self.copy()
 	n.Children = cl
 
-	bid := self.tree.backend.SaveNode(n.IBNodeData)
+	bid := self.tree.backend.SaveNode(&n.IBNodeData)
 	n.blockId = &bid
 	mlog.Printf2("ibtree/ibtree", "in.Commit, new bid %x..", bid[:10])
 	return n, bid

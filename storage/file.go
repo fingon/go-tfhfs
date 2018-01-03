@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:44:41 2018 mstenber
- * Last modified: Wed Jan  3 17:02:12 2018 mstenber
- * Edit time:     60 min
+ * Last modified: Wed Jan  3 17:31:36 2018 mstenber
+ * Edit time:     68 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -41,6 +42,7 @@ const directoryBytes = 2 // 65536 subdirs should be plenty
 
 type FileBlockBackend struct {
 	DirectoryBlockBackendBase
+	created map[string]bool
 }
 
 var _ BlockBackend = &FileBlockBackend{}
@@ -51,6 +53,27 @@ func (self *FileBlockBackend) DeleteBlock(bl *Block) {
 	if err != nil {
 		log.Panic(err)
 	}
+}
+
+func (self *FileBlockBackend) mkdirAll(path string) {
+	if self.created == nil {
+		self.created = make(map[string]bool)
+	}
+	if path == "" {
+		return
+	}
+	if self.created[path] {
+		return
+	}
+	if path != self.dir {
+		dir, _ := filepath.Split(path)
+		if len(dir) < len(path) {
+			self.mkdirAll(dir)
+		}
+	}
+	os.Mkdir(path, 0700)
+	self.created[path] = true
+
 }
 
 func (self *FileBlockBackend) GetBlockData(bl *Block) string {
@@ -114,7 +137,7 @@ func (self *FileBlockBackend) SetNameToBlockId(name, block_id string) {
 	mlog.Printf2("storage/file", "fbb.SetNameToBlockId %v %x", name, block_id)
 	dir := fmt.Sprintf("%s/names", self.dir)
 	path := fmt.Sprintf("%s/%x", dir, name)
-	os.MkdirAll(dir, 0700)
+	self.mkdirAll(dir)
 	if block_id == "" {
 		err := os.Remove(path)
 		if err != nil {
@@ -131,7 +154,7 @@ func (self *FileBlockBackend) SetNameToBlockId(name, block_id string) {
 
 func (self *FileBlockBackend) StoreBlock(bl *Block) {
 	dir, path := self.blockPath(bl, nil)
-	os.MkdirAll(dir, 0700)
+	self.mkdirAll(dir)
 	data := bl.GetCodecData()
 	err := ioutil.WriteFile(path, []byte(data), 0600)
 	if err != nil {

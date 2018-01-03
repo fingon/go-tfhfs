@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan  3 23:24:15 2018 mstenber
- * Edit time:     322 min
+ * Last modified: Thu Jan  4 01:08:41 2018 mstenber
+ * Edit time:     329 min
  *
  */
 
@@ -56,7 +56,7 @@ type BlockBackend interface {
 }
 
 type BlockReferenceCallback func(string)
-type BlockIterateReferencesCallback func([]byte, BlockReferenceCallback)
+type BlockIterateReferencesCallback func(string, []byte, BlockReferenceCallback)
 type BlockHasExternalReferencesCallback func(string) bool
 
 // Storage is essentially DelayedStorage of Python prototype; it has
@@ -220,13 +220,13 @@ func (self *Storage) StoreBlock(id string, data []byte, status BlockStatus) *Blo
 	b.setStatus(status)
 	b.Data = data
 	self.cacheSize += b.getCacheSize()
-	self.updateBlockDataDependencies(data, true, status)
+	self.updateBlockDataDependencies(b, true, status)
 	return b
 
 }
 
 /// Private
-func (self *Storage) updateBlockDataDependencies(data []byte, add bool, st BlockStatus) {
+func (self *Storage) updateBlockDataDependencies(b *Block, add bool, st BlockStatus) {
 	// No sub-references
 	if st >= BlockStatus_WANT_NORMAL {
 		return
@@ -234,7 +234,7 @@ func (self *Storage) updateBlockDataDependencies(data []byte, add bool, st Block
 	if self.IterateReferencesCallback == nil {
 		return
 	}
-	self.IterateReferencesCallback(data, func(id string) {
+	self.IterateReferencesCallback(b.Id, b.GetData(), func(id string) {
 		if add {
 			self.ReferBlockId(id)
 		} else {
@@ -263,7 +263,7 @@ func (self *Storage) getBlockById(id string) *Block {
 }
 
 func (self *Storage) deleteBlockWithDeps(b *Block) bool {
-	self.updateBlockDataDependencies(b.GetData(), false, b.Status)
+	self.updateBlockDataDependencies(b, false, b.Status)
 	self.Backend.DeleteBlock(b)
 	self.deleteCachedBlock(b)
 	return true
@@ -324,7 +324,7 @@ func (self *Storage) deleteCachedBlock(b *Block) {
 	self.cacheSize -= b.getCacheSize()
 	if b.stored != nil && b.stored.RefCount == 0 {
 		// Locally stored, never hit disk, but references did
-		self.updateBlockDataDependencies(b.Data, false, b.Status)
+		self.updateBlockDataDependencies(b, false, b.Status)
 	}
 }
 

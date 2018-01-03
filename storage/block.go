@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Wed Jan  3 23:26:22 2018 mstenber
- * Edit time:     6 min
+ * Last modified: Thu Jan  4 01:08:03 2018 mstenber
+ * Edit time:     4 min
  *
  */
 
@@ -130,9 +130,8 @@ func (self *Block) flushStatus() {
 		// old type = WEAK
 		return
 	}
-	data := self.GetData()
-	self.storage.updateBlockDataDependencies(data, true, self.Status)
-	self.storage.updateBlockDataDependencies(data, false, self.stored.Status)
+	self.storage.updateBlockDataDependencies(self, true, self.Status)
+	self.storage.updateBlockDataDependencies(self, false, self.stored.Status)
 
 }
 

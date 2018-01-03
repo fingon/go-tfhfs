@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Wed Jan  3 21:27:06 2018 mstenber
- * Edit time:     173 min
+ * Last modified: Thu Jan  4 01:32:10 2018 mstenber
+ * Edit time:     178 min
  *
  */
 
@@ -289,7 +289,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		}
 		k := NewblockKeyOffset(self.inode.ino, offset)
 		tr := self.Fs().GetTransaction()
-		bid := self.Fs().getBlockDataId(bbuf)
+		bid := self.Fs().getBlockDataId(bbuf, nil)
 		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
 		// mlog.Printf2("fs/fh", " %x", buf)
 		tr.Set(ibtree.IBKey(k), string(bid))

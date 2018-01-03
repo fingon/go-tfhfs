@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 21:29:55 2018 mstenber
- * Edit time:     210 min
+ * Last modified: Thu Jan  4 01:38:03 2018 mstenber
+ * Edit time:     238 min
  *
  */
 
@@ -22,6 +22,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/bluele/gcache"
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
@@ -47,6 +48,7 @@ type Fs struct {
 	treeRoot        *ibtree.IBNode
 	treeRootBlockId ibtree.BlockId
 	bidMap          map[string]bool
+	nodeDataCache   gcache.Cache
 }
 
 func (self *Fs) Close() {
@@ -57,12 +59,15 @@ func (self *Fs) Close() {
 
 // ibtree.IBTreeBackend API
 func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
-	mlog.Printf2("fs/fs", "fs.LoadNode %x", id)
-	b := self.storage.GetBlockById(string(id))
-	if b == nil {
-		return nil
+	v, _ := self.nodeDataCache.Get(id)
+	if v == nil {
+		nd := self.loadNode(id)
+		if nd != nil {
+			self.nodeDataCache.Set(id, nd)
+		}
+		return nd
 	}
-	return self.loadNodeFromBytes(b.GetData())
+	return v.(*ibtree.IBNodeData)
 }
 
 func (self *Fs) Flush() int {
@@ -85,7 +90,7 @@ func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 	}
 	b = bb[0 : 1+len(b)]
 	mlog.Printf2("fs/fs", "SaveNode %d bytes", len(b))
-	return self.getBlockDataId(b)
+	return self.getBlockDataId(b, nd)
 }
 
 func (self *Fs) GetTransaction() *ibtree.IBTransaction {
@@ -124,6 +129,12 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 
 func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
+	fs.nodeDataCache = gcache.New(10000).
+		ARC().
+		//	LoaderFunc(func(k interface{}) (interface{}, error) {
+		//		return fs.loadNode(k.(ibtree.BlockId)), nil
+		//}).
+		Build()
 	fs.ops.fs = fs
 	fs.closing = make(chan bool)
 	fs.flushInterval = 1 * time.Second
@@ -134,8 +145,8 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	st.HasExternalReferencesCallback = func(id string) bool {
 		return fs.hasExternalReferences(id)
 	}
-	st.IterateReferencesCallback = func(data []byte, cb storage.BlockReferenceCallback) {
-		fs.iterateReferencesCallback(data, cb)
+	st.IterateReferencesCallback = func(id string, data []byte, cb storage.BlockReferenceCallback) {
+		fs.iterateReferencesCallback(id, data, cb)
 	}
 	rootbid := st.GetBlockIdByName(rootName)
 	if rootbid != "" {
@@ -171,11 +182,18 @@ func (self *Fs) hasExternalReferences(id string) bool {
 	return self.bidMap[id]
 }
 
-func (self *Fs) iterateReferencesCallback(data []byte, cb storage.BlockReferenceCallback) {
-	nd := self.loadNodeFromBytes(data)
-	if nd == nil {
-		return
+func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.BlockReferenceCallback) {
+	v, _ := self.nodeDataCache.GetIFPresent(ibtree.BlockId(id))
+	var nd *ibtree.IBNodeData
+	if v != nil {
+		nd = v.(*ibtree.IBNodeData)
+	} else {
+		nd = self.loadNodeFromBytes(data)
+		if nd == nil {
+			return
+		}
 	}
+
 	if !nd.Leafy {
 		for _, c := range nd.Children {
 			cb(c.Value)
@@ -191,10 +209,14 @@ func (self *Fs) iterateReferencesCallback(data []byte, cb storage.BlockReference
 	}
 }
 
-func (self *Fs) getBlockDataId(b []byte) ibtree.BlockId {
+func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
 	h := sha256.Sum256(b)
 	bid := h[:]
-	block := self.storage.ReferOrStoreBlock(string(bid), b)
+	id := string(bid)
+	if nd != nil {
+		self.nodeDataCache.Set(ibtree.BlockId(id), nd)
+	}
+	block := self.storage.ReferOrStoreBlock(id, b)
 	self.storage.ReleaseBlockId(block.Id)
 	// By default this won't increase references; however, stuff
 	// that happens 'elsewhere' (e.g. taking root reference) does,
@@ -220,4 +242,13 @@ func (self *Fs) loadNodeFromBytes(bd []byte) *ibtree.IBNodeData {
 		log.Panicf("loadNodeFromString - wrong dt:%v", dt)
 	}
 	return nil
+}
+
+func (self *Fs) loadNode(id ibtree.BlockId) *ibtree.IBNodeData {
+	mlog.Printf2("fs/fs", "fs.LoadNode %x", id)
+	b := self.storage.GetBlockById(string(id))
+	if b == nil {
+		return nil
+	}
+	return self.loadNodeFromBytes(b.GetData())
 }

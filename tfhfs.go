@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Wed Jan  3 17:11:10 2018 mstenber
- * Edit time:     32 min
+ * Last modified: Wed Jan  3 18:24:04 2018 mstenber
+ * Edit time:     35 min
  *
  */
 
@@ -31,7 +31,7 @@ func main() {
 	}
 	password := flag.String("password", "siikret", "Password")
 	salt := flag.String("salt", "salt", "Salt")
-	badger := flag.Bool("badger", false, "Use Badger instead of raw files")
+	backendp := flag.String("backend", "file", "Backend to use (possible: file, badger, inmemory)")
 	cpuprofile := flag.String("cpuprofile", "", "CPU profile file")
 	memprofile := flag.String("memprofile", "", "Memory profile file")
 
@@ -52,13 +52,17 @@ func main() {
 		os.Exit(1)
 	}
 	var backend storage.BlockBackend
-	if *badger {
-		be := storage.BadgerBlockBackend{}.Init(storedir)
-		backend = be
-	} else {
+	switch *backendp {
+	case "badger":
+		backend = storage.BadgerBlockBackend{}.Init(storedir)
+	case "file":
 		be := &storage.FileBlockBackend{}
 		be.Init(storedir)
 		backend = be
+	case "inmemory":
+		backend = storage.InMemoryBlockBackend{}.Init()
+	default:
+		log.Panicf("Invalid backend: %s", *backendp)
 	}
 
 	st := fs.NewCryptoStorage(*password, *salt, backend)

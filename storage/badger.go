@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Wed Jan  3 18:36:02 2018 mstenber
- * Edit time:     114 min
+ * Last modified: Wed Jan  3 22:02:29 2018 mstenber
+ * Edit time:     115 min
  *
  */
 
@@ -33,6 +33,7 @@ var _ BlockBackend = &BadgerBlockBackend{}
 
 // Init makes the instance actually useful
 func (self BadgerBlockBackend) Init(dir string) *BadgerBlockBackend {
+	(&self.DirectoryBlockBackendBase).Init(dir)
 	opts := badger.DefaultOptions
 	opts.Dir = dir
 	opts.ValueDir = dir
@@ -40,7 +41,6 @@ func (self BadgerBlockBackend) Init(dir string) *BadgerBlockBackend {
 	if err != nil {
 		log.Fatal("badger.Open", err)
 	}
-	self.dir = dir
 	self.db = db
 	self.txn = db.NewTransaction(false)
 	return &self

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 18:44:17 2018 mstenber
- * Edit time:     179 min
+ * Last modified: Wed Jan  3 18:57:14 2018 mstenber
+ * Edit time:     180 min
  *
  */
 
@@ -81,7 +81,7 @@ func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 	if err != nil {
 		log.Panic(err)
 	}
-	return self.getBlockDataId(BDT_NODE, string(b))
+	return self.getBlockDataId(BDT_NODE, b)
 }
 
 func (self *Fs) GetTransaction() *ibtree.IBTransaction {
@@ -187,7 +187,7 @@ func (self *Fs) iterateReferencesCallback(data []byte, cb storage.BlockReference
 	}
 }
 
-func (self *Fs) getBlockDataId(blockType BlockDataType, data string) ibtree.BlockId {
+func (self *Fs) getBlockDataId(blockType BlockDataType, data []byte) ibtree.BlockId {
 	b := []byte(data)
 	h := sha256.Sum256(b)
 	bid := h[:]

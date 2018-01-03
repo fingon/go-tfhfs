@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Wed Jan  3 11:13:59 2018 mstenber
- * Edit time:     82 min
+ * Last modified: Wed Jan  3 19:42:55 2018 mstenber
+ * Edit time:     114 min
  *
  */
 
@@ -217,7 +217,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 	// Grab start of block, if any
 	bofs := offset % dataExtentSize
 	if bofs > 0 {
-		tbuf := make([]byte, bofs)
+		tbuf := make([]byte, bofs, bofs+uint64(len(buf)))
 		r, code = self.Read(tbuf, offset-bofs)
 		if !code.Ok() {
 			return
@@ -266,12 +266,12 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		mlog.Printf2("fs/fh", " meta %d bytes", len(buf))
 	} else {
 		if len(meta.Data) > 0 {
-			meta.Data = []byte{}
+			meta.Data = nil
 			self.inode.SetMeta(meta)
 		}
 		k := NewblockKeyOffset(self.inode.ino, offset)
 		tr := self.Fs().GetTransaction()
-		bid := self.Fs().getBlockDataId(BDT_EXTENT, string(buf))
+		bid := self.Fs().getBlockDataId(BDT_EXTENT, buf)
 		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(buf), bid)
 		// mlog.Printf2("fs/fh", " %x", buf)
 		tr.Set(ibtree.IBKey(k), string(bid))

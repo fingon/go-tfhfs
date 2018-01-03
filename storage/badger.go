@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Wed Jan  3 15:56:00 2018 mstenber
- * Edit time:     111 min
+ * Last modified: Wed Jan  3 18:36:02 2018 mstenber
+ * Edit time:     114 min
  *
  */
 
@@ -72,9 +72,9 @@ func (self *BadgerBlockBackend) getKKValue(prefix, suffix []byte) ([]byte, error
 
 }
 
-func (self *BadgerBlockBackend) GetBlockData(b *Block) string {
+func (self *BadgerBlockBackend) GetBlockData(b *Block) []byte {
 	bv, _ := self.getKKValue([]byte("2"), []byte(b.Id))
-	return string(bv)
+	return bv
 }
 
 func (self *BadgerBlockBackend) GetBlockById(id string) *Block {

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Wed Jan  3 14:55:46 2018 mstenber
- * Edit time:     1 min
+ * Last modified: Wed Jan  3 18:41:28 2018 mstenber
+ * Edit time:     4 min
  *
  */
 
@@ -34,7 +34,7 @@ type Block struct {
 	// used to get it always). Backends should use
 	// GetCodecData() when writing things to disk and
 	// SetCodecData() when loading from disk.
-	Data string
+	Data []byte
 
 	// Node is the actual btree node encoded within this
 	// block. Used to derive Data as needed.
@@ -54,8 +54,8 @@ type Block struct {
 	t uint64
 }
 
-func (self *Block) GetData() string {
-	if self.Data == "" {
+func (self *Block) GetData() []byte {
+	if self.Data == nil {
 		if self.storage == nil {
 			mlog.Printf2("storage/block", "b.GetData - calling be.GetBlockData")
 			self.Data = self.backend.GetBlockData(self)
@@ -71,29 +71,28 @@ func (self *Block) GetData() string {
 	return self.Data
 }
 
-func (self *Block) GetCodecData() string {
-	data := self.GetData()
+func (self *Block) GetCodecData() []byte {
+	b := self.GetData()
 	if self.storage == nil {
-		return data
+		return b
 	}
-	b, err := self.storage.Codec.EncodeBytes([]byte(data), []byte(self.Id))
+	b, err := self.storage.Codec.EncodeBytes(b, []byte(self.Id))
 	if err != nil {
 		log.Panic("Encoding failed", err)
 	}
-	return string(b)
+	return b
 }
 
-func (self *Block) SetCodecData(s string) {
+func (self *Block) SetCodecData(b []byte) {
 	if self.storage == nil {
-		mlog.Printf2("storage/block", "SetCodecData skipped, storage not set")
-		self.Data = s
+		self.Data = b
 		return
 	}
-	b, err := self.storage.Codec.DecodeBytes([]byte(s), []byte(self.Id))
+	b, err := self.storage.Codec.DecodeBytes(b, []byte(self.Id))
 	if err != nil {
 		log.Panic("Decoding failed", err)
 	}
-	self.Data = string(b)
+	self.Data = b
 }
 
 func (self *Block) flush() int {

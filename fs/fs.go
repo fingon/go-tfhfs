@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 17:08:14 2018 mstenber
- * Edit time:     175 min
+ * Last modified: Wed Jan  3 18:44:17 2018 mstenber
+ * Edit time:     179 min
  *
  */
 
@@ -62,7 +62,7 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 	if b == nil {
 		return nil
 	}
-	return self.loadNodeFromString(b.GetData())
+	return self.loadNodeFromBytes(b.GetData())
 }
 
 func (self *Fs) Flush() int {
@@ -130,7 +130,7 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	st.HasExternalReferencesCallback = func(id string) bool {
 		return fs.hasExternalReferences(id)
 	}
-	st.IterateReferencesCallback = func(data string, cb storage.BlockReferenceCallback) {
+	st.IterateReferencesCallback = func(data []byte, cb storage.BlockReferenceCallback) {
 		fs.iterateReferencesCallback(data, cb)
 	}
 	rootbid := st.GetBlockIdByName(rootName)
@@ -167,8 +167,8 @@ func (self *Fs) hasExternalReferences(id string) bool {
 	return self.bidMap[id]
 }
 
-func (self *Fs) iterateReferencesCallback(data string, cb storage.BlockReferenceCallback) {
-	nd := self.loadNodeFromString(data)
+func (self *Fs) iterateReferencesCallback(data []byte, cb storage.BlockReferenceCallback) {
+	nd := self.loadNodeFromBytes(data)
 	if nd == nil {
 		return
 	}
@@ -194,7 +194,7 @@ func (self *Fs) getBlockDataId(blockType BlockDataType, data string) ibtree.Bloc
 	nb := make([]byte, len(b)+1)
 	nb[0] = byte(blockType)
 	copy(nb[1:], b)
-	block := self.storage.ReferOrStoreBlock(string(bid), string(nb))
+	block := self.storage.ReferOrStoreBlock(string(bid), nb)
 	self.storage.ReleaseBlockId(block.Id)
 	// By default this won't increase references; however, stuff
 	// that happens 'elsewhere' (e.g. taking root reference) does,
@@ -203,7 +203,7 @@ func (self *Fs) getBlockDataId(blockType BlockDataType, data string) ibtree.Bloc
 	return ibtree.BlockId(block.Id)
 }
 
-func (self *Fs) loadNodeFromString(data string) *ibtree.IBNodeData {
+func (self *Fs) loadNodeFromBytes(data []byte) *ibtree.IBNodeData {
 	bd := []byte(data)
 	dt := BlockDataType(bd[0])
 	switch dt {

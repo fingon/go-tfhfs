@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:44:41 2018 mstenber
- * Last modified: Wed Jan  3 17:31:36 2018 mstenber
- * Edit time:     68 min
+ * Last modified: Wed Jan  3 18:40:16 2018 mstenber
+ * Edit time:     70 min
  *
  */
 
@@ -76,13 +76,13 @@ func (self *FileBlockBackend) mkdirAll(path string) {
 
 }
 
-func (self *FileBlockBackend) GetBlockData(bl *Block) string {
+func (self *FileBlockBackend) GetBlockData(bl *Block) []byte {
 	_, path := self.blockPath(bl, bl.stored)
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Panic(err)
 	}
-	return string(b)
+	return b
 }
 
 func (self *FileBlockBackend) GetBlockById(id string) *Block {

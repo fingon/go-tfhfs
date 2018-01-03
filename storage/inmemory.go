@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Wed Jan  3 00:31:15 2018 mstenber
+ * Last modified: Wed Jan  3 18:39:55 2018 mstenber
  * Edit time:     59 min
  *
  */
@@ -37,7 +37,7 @@ func (self *InMemoryBlockBackend) DeleteBlock(b *Block) {
 	delete(self.id2Block, b.Id)
 }
 
-func (self *InMemoryBlockBackend) GetBlockData(b *Block) string {
+func (self *InMemoryBlockBackend) GetBlockData(b *Block) []byte {
 	return b.Data
 }
 

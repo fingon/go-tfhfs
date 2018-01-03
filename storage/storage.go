@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan  3 14:55:31 2018 mstenber
- * Edit time:     314 min
+ * Last modified: Wed Jan  3 18:35:36 2018 mstenber
+ * Edit time:     319 min
  *
  */
 
@@ -28,7 +28,7 @@ type BlockBackend interface {
 	DeleteBlock(b *Block)
 
 	// GetBlockData retrieves lazily (if need be) block data
-	GetBlockData(b *Block) string
+	GetBlockData(b *Block) []byte
 
 	// GetBlockById returns block by id or nil.
 	GetBlockById(id string) *Block
@@ -56,7 +56,7 @@ type BlockBackend interface {
 }
 
 type BlockReferenceCallback func(string)
-type BlockIterateReferencesCallback func(string, BlockReferenceCallback)
+type BlockIterateReferencesCallback func([]byte, BlockReferenceCallback)
 type BlockHasExternalReferencesCallback func(string) bool
 
 // Storage is essentially DelayedStorage of Python prototype; it has
@@ -183,7 +183,7 @@ func (self *Storage) ReferBlockId(id string) {
 	b.setRefCount(b.RefCount + 1)
 }
 
-func (self *Storage) ReferOrStoreBlock(id, data string) *Block {
+func (self *Storage) ReferOrStoreBlock(id string, data []byte) *Block {
 	b := self.GetBlockById(id)
 	if b != nil {
 		self.ReferBlockId(id)
@@ -206,7 +206,7 @@ func (self *Storage) SetNameToBlockId(name, block_id string) {
 	self.getName(name).new_value = block_id
 }
 
-func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Block {
+func (self *Storage) StoreBlock(id string, data []byte, status BlockStatus) *Block {
 	b := self.gocBlockById(id)
 	b.setRefCount(1)
 	b.setStatus(status)
@@ -218,7 +218,7 @@ func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Blo
 }
 
 /// Private
-func (self *Storage) updateBlockDataDependencies(data string, add bool, st BlockStatus) {
+func (self *Storage) updateBlockDataDependencies(data []byte, add bool, st BlockStatus) {
 	// No sub-references
 	if st >= BlockStatus_WANT_NORMAL {
 		return

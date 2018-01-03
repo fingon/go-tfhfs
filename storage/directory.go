@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:55:15 2018 mstenber
- * Last modified: Wed Jan  3 18:12:43 2018 mstenber
- * Edit time:     28 min
+ * Last modified: Wed Jan  3 18:49:56 2018 mstenber
+ * Edit time:     34 min
  *
  */
 
@@ -28,13 +28,23 @@ type delayedUInt64Value struct {
 	value      uint64
 	valueTime  time.Time
 	valueMutex sync.Mutex
-	going      bool
+	status     int
 	callback   delayedUInt64ValueCallback
 }
 
 func (self *delayedUInt64Value) Value() uint64 {
 	self.valueMutex.Lock()
 	defer self.valueMutex.Unlock()
+	if self.status == 0 {
+		// Unset values are bit bogus, so let's not do those
+		v := self.callback()
+		self.update(v)
+		return self.value
+	}
+	if self.status == 1 || self.valueTime.Add(self.interval).After(time.Now()) {
+		return self.value
+	}
+	self.status = 1
 	fun := func() {
 		// Calculate value without mutex
 		value := self.callback()
@@ -42,17 +52,18 @@ func (self *delayedUInt64Value) Value() uint64 {
 		self.valueMutex.Lock()
 		defer self.valueMutex.Unlock()
 
-		self.value = value
-		self.valueTime = time.Now()
-		self.going = false
+		self.update(value)
 	}
-	if self.going || self.valueTime.Add(self.interval).After(time.Now()) {
-		return self.value
-	}
-	self.going = true
 	go fun()
+	// Return old value for now; next call will get updated one
 	return self.value
 
+}
+
+func (self *delayedUInt64Value) update(value uint64) {
+	self.status = 2
+	self.value = value
+	self.valueTime = time.Now()
 }
 
 type DirectoryBlockBackendBase struct {

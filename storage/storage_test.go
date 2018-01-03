@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Wed Jan  3 16:52:23 2018 mstenber
- * Edit time:     116 min
+ * Last modified: Wed Jan  3 18:43:04 2018 mstenber
+ * Edit time:     117 min
  *
  */
 
@@ -28,7 +28,7 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 		mlog.Printf2("storage/storage_test", "ProdBlockBackend %v", bs)
 		defer bs.Close()
 
-		b1 := &Block{Id: "foo", Data: "data",
+		b1 := &Block{Id: "foo", Data: []byte("data"),
 			BlockMetadata: BlockMetadata{RefCount: 123,
 				Status: BlockStatus_NORMAL}}
 		bs.SetInFlush(true) // enable r-w mode
@@ -39,7 +39,7 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 		log.Print(" initial set")
 		b2 := bs.GetBlockById("foo")
 		log.Print(" got")
-		assert.Equal(t, b2.GetData(), "data")
+		assert.Equal(t, string(b2.GetData()), "data")
 		log.Print(" data ok")
 		// ^ has to be called before the next one, as .Data isn't
 		// populated by default.
@@ -83,10 +83,11 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 }
 
 func ProdStorageOne(t *testing.T, s *Storage) {
-	b := s.ReferOrStoreBlock("key", "v")
+	v := []byte("v")
+	b := s.ReferOrStoreBlock("key", v)
 	assert.True(t, b != nil)
 	assert.Equal(t, b.RefCount, 1)
-	b2 := s.ReferOrStoreBlock("key", "v")
+	b2 := s.ReferOrStoreBlock("key", v)
 	assert.Equal(t, b, b2)
 	assert.Equal(t, b.RefCount, 2)
 	assert.Equal(t, len(s.dirtyBid2Block), 1)
@@ -95,7 +96,7 @@ func ProdStorageOne(t *testing.T, s *Storage) {
 	assert.Equal(t, len(s.dirtyBid2Block), 0)
 	assert.Equal(t, len(s.cacheBid2Block), 1)
 
-	b3 := s.ReferOrStoreBlock("key2", "v")
+	b3 := s.ReferOrStoreBlock("key2", v)
 	s.MaximumCacheSize = b3.getCacheSize() * 3 / 2
 	// ^ b.size must be <= 3/4 max
 
@@ -165,7 +166,7 @@ func BenchmarkBadgerSet(b *testing.B) {
 	be := BadgerBlockBackend{}.Init(dir)
 	defer be.Close()
 
-	bl := &Block{Id: "foo", Data: "data"}
+	bl := &Block{Id: "foo", Data: []byte("data")}
 
 	b.ResetTimer()
 
@@ -182,7 +183,7 @@ func BenchmarkBadgerGet(b *testing.B) {
 	be := BadgerBlockBackend{}.Init(dir)
 	defer be.Close()
 
-	bl := &Block{Id: "foo", Data: "data"}
+	bl := &Block{Id: "foo", Data: []byte("data")}
 	be.SetInFlush(true)
 	be.StoreBlock(bl)
 	be.SetInFlush(false)
@@ -201,7 +202,7 @@ func BenchmarkBadgerGetData(b *testing.B) {
 	be := BadgerBlockBackend{}.Init(dir)
 	defer be.Close()
 
-	bl := &Block{Id: "foo", Data: "data"}
+	bl := &Block{Id: "foo", Data: []byte("data")}
 	be.SetInFlush(true)
 	be.StoreBlock(bl)
 	be.SetInFlush(false)
@@ -211,7 +212,7 @@ func BenchmarkBadgerGetData(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		bl2.Data = ""
+		bl2.Data = nil
 		bl2.GetData()
 	}
 }

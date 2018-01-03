@@ -27,7 +27,7 @@ func BenchmarkStringToByteSlice20K(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		by = []byte(s)
 	}
-	mlog.Printf("hopefully mlog not on", by)
+	mlog.Printf2("storage/string_test", "hopefully mlog not on", by)
 }
 
 func BenchmarkByteSliceToString20K(b *testing.B) {
@@ -39,5 +39,5 @@ func BenchmarkByteSliceToString20K(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		s = string(by)
 	}
-	mlog.Printf("hopefully mlog not on", s)
+	mlog.Printf2("storage/string_test", "hopefully mlog not on", s)
 }

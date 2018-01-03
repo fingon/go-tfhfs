@@ -4,162 +4,19 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan  3 13:48:43 2018 mstenber
- * Edit time:     310 min
+ * Last modified: Wed Jan  3 14:55:31 2018 mstenber
+ * Edit time:     314 min
  *
  */
 
 package storage
 
 import (
-	"log"
 	"sort"
-	"sync/atomic"
-	"unsafe"
 
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/mlog"
 )
-
-// Block is externally usable read-only structure that is handled
-// using BlockStorer interface. Notably changes to 'Id' and 'Data' are
-// not allowed, and Status should be mutated only via
-// UpdateBlockStatus call of BlockStorer.
-type Block struct {
-	BlockMetadata // contains RefCount, Status
-
-	// Id contains identity of the block, derived from Data if not
-	// set.
-	Id string
-
-	// Actually plaintext data (if available; GetData() should be
-	// used to get it always). Backends should use
-	// GetCodecData() when writing things to disk and
-	// SetCodecData() when loading from disk.
-	Data string
-
-	// Node is the actual btree node encoded within this
-	// block. Used to derive Data as needed.
-	//Node *TreeNode
-
-	// Backend this is fetched from, if any
-	backend BlockBackend
-
-	// Storage this is stored on, if any
-	storage *Storage
-
-	// Stored version of the block metadata, if any. Set only if
-	// something has changed locally.
-	stored *BlockMetadata
-
-	// Last usage time (in Storage.t units)
-	t uint64
-}
-
-func (self *Block) GetData() string {
-	if self.Data == "" {
-		if self.storage == nil {
-			mlog.Printf2("storage/storage", "b.GetData - calling be.GetBlockData")
-			self.Data = self.backend.GetBlockData(self)
-		} else {
-			oldSize := self.getCacheSize()
-			mlog.Printf2("storage/storage", "b.GetData - calling s.be.GetBlockData")
-			data := self.storage.Backend.GetBlockData(self)
-			self.SetCodecData(data)
-			newSize := self.getCacheSize()
-			self.storage.cacheSize += newSize - oldSize
-		}
-	}
-	return self.Data
-}
-
-func (self *Block) GetCodecData() string {
-	data := self.GetData()
-	if self.storage == nil {
-		return data
-	}
-	b, err := self.storage.Codec.EncodeBytes([]byte(data), []byte(self.Id))
-	if err != nil {
-		log.Panic("Encoding failed", err)
-	}
-	return string(b)
-}
-
-func (self *Block) SetCodecData(s string) {
-	if self.storage == nil {
-		mlog.Printf2("storage/storage", "SetCodecData skipped, storage not set")
-		self.Data = s
-		return
-	}
-	b, err := self.storage.Codec.DecodeBytes([]byte(s), []byte(self.Id))
-	if err != nil {
-		log.Panic("Decoding failed", err)
-	}
-	self.Data = string(b)
-}
-
-func (self *Block) flush() int {
-	// self.stored MUST be set, otherwise we wouldn't be dirty!
-	ops := 0
-	if self.stored.RefCount == 0 {
-		if self.RefCount > 0 {
-			self.storage.Backend.StoreBlock(self)
-			ops = ops + 1
-		} else {
-			ops = ops + self.storage.updateBlock(self)
-		}
-	} else {
-		if self.stored.Status != self.Status {
-			self.flushStatus()
-			ops = ops + 1
-		}
-		ops = ops + self.storage.updateBlock(self)
-	}
-	self.stored = nil
-	return ops
-}
-
-func (self *Block) flushStatus() {
-	// self.stored.status != self.status
-	if self.Status == BlockStatus_MISSING {
-		// old type = NORMAL
-		return
-	}
-	if self.Status == BlockStatus_WANT_WEAK {
-		// old type = WEAK
-		return
-	}
-	data := self.GetData()
-	self.storage.updateBlockDataDependencies(data, true, self.Status)
-	self.storage.updateBlockDataDependencies(data, false, self.stored.Status)
-
-}
-
-func (self *Block) getCacheSize() int {
-	s := int(unsafe.Sizeof(*self))
-	return s + len(self.Id) + len(self.Data)
-}
-
-func (self *Block) setRefCount(count int) {
-	self.markDirty()
-	self.RefCount = count
-}
-
-func (self *Block) setStatus(st BlockStatus) {
-	self.markDirty()
-	self.Status = st
-
-}
-
-func (self *Block) markDirty() {
-	if self.stored != nil {
-		return
-	}
-	self.stored = &BlockMetadata{Status: self.Status,
-		RefCount: self.RefCount}
-	// Add to dirty block list
-	self.storage.dirtyBid2Block[self.Id] = self
-}
 
 // BlockBackend is the shadow behind the throne; it actually
 // handles the low-level operations of blocks.
@@ -314,15 +171,6 @@ func (self *Storage) Flush() int {
 	return ops
 }
 
-func (self *Storage) GetBlockById(id string) *Block {
-	mlog.Printf2("storage/storage", "st.GetBlockById %x", id)
-	b := self.gocBlockById(id)
-	if self.blockValid(b) {
-		return b
-	}
-	return nil
-}
-
 func (self *Storage) GetBlockIdByName(name string) string {
 	return self.getName(name).new_value
 }
@@ -370,21 +218,6 @@ func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Blo
 }
 
 /// Private
-func (self *Storage) gocBlockById(id string) *Block {
-	mlog.Printf2("storage/storage", "st.gocBlockById %x", id)
-	b, ok := self.cacheBid2Block[id]
-	if !ok {
-		b = self.getBlockById(id)
-		if b == nil {
-			b = &Block{Id: id, storage: self}
-		}
-		self.cacheSize += b.getCacheSize()
-		self.cacheBid2Block[id] = b
-	}
-	b.t = atomic.AddUint64(&self.t, uint64(1))
-	return b
-}
-
 func (self *Storage) updateBlockDataDependencies(data string, add bool, st BlockStatus) {
 	// No sub-references
 	if st >= BlockStatus_WANT_NORMAL {
@@ -400,23 +233,6 @@ func (self *Storage) updateBlockDataDependencies(data string, add bool, st Block
 			self.ReleaseBlockId(id)
 		}
 	})
-}
-
-func (self *Storage) blockValid(b *Block) bool {
-	if b == nil {
-		mlog.Printf2("storage/storage", "blockValid - not, nil")
-		return false
-	}
-	if b.RefCount == 0 {
-		if self.HasExternalReferencesCallback != nil && self.HasExternalReferencesCallback(b.Id) {
-			mlog.Printf2("storage/storage", "blockValid - yes, transient refs")
-			return true
-		}
-		mlog.Printf2("storage/storage", "blockValid - no")
-		return false
-	}
-	mlog.Printf2("storage/storage", "blockValid - yes, stored refs")
-	return true
 }
 
 // getBlockById is the old Storage version; GetBlockIdBy is the external one

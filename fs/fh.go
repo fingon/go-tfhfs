@@ -4,21 +4,19 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Wed Jan  3 19:42:55 2018 mstenber
- * Edit time:     114 min
+ * Last modified: Wed Jan  3 21:27:06 2018 mstenber
+ * Edit time:     173 min
  *
  */
 
 package fs
 
 import (
-	"bytes"
 	"encoding/binary"
 	"log"
 
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
-	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -181,31 +179,35 @@ func (self *inodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 			if bl == nil {
 				log.Panicf("Block %x not found at all", *bidp)
 			}
-			b = []byte(bl.GetData())
+			b = bl.GetData()
 			if b[0] != byte(BDT_EXTENT) {
-				log.Panicf("Wrong extent type in read")
+				log.Panicf("Wrong extent type in read - block content: %x", b)
 			}
 			b = b[1:]
 		}
 	}
 
+	copy(buf, b[offset:])
+	read := len(b[offset:])
+
 	// offset / end are now relative to current extent, which is
 	// in b.
 
-	zeros := int(end) - len(b)
+	zeros := int(end) - read - int(offset)
 	if zeros > 0 {
 		// implicitly pad it with zeros
 		mlog.Printf2("fs/fh", " padding result with %d zeros", zeros)
-		b = util.ConcatBytes(b, bytes.Repeat([]byte{0}, zeros))
+		for i := 0; i < zeros; i++ {
+			buf[read+i] = 0
+		}
 	}
 
 	if end <= offset {
 		mlog.Printf2("fs/fh", " nothing to read")
-		rr = fuse.ReadResultData([]byte{})
+		rr = fuse.ReadResultData(buf[0:0])
 	} else {
-		read := end - offset
-		mlog.Printf2("fs/fh", " read %v ([%v:%v])", read, offset, end)
-		rr = fuse.ReadResultData(b[offset:end])
+		mlog.Printf2("fs/fh", " read %v ([%v:%v])", read+zeros, offset, end)
+		rr = fuse.ReadResultData(buf[0 : read+zeros])
 	}
 	return
 }
@@ -214,56 +216,72 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 	mlog.Printf2("fs/fh", "fh.Write %v @%v", len(buf), offset)
 	var r fuse.ReadResult
 
-	// Grab start of block, if any
-	bofs := offset % dataExtentSize
-	if bofs > 0 {
-		tbuf := make([]byte, bofs, bofs+uint64(len(buf)))
-		r, code = self.Read(tbuf, offset-bofs)
-		if !code.Ok() {
-			return
-		}
-		tbuf, code = r.Bytes(nil)
-		if !code.Ok() {
-			return
-		}
-		buf = util.ConcatBytes(tbuf, buf)
-		offset -= bofs
-	}
-
-	if len(buf) > dataExtentSize {
-		buf = buf[:dataExtentSize]
-	}
-
 	end := offset + uint64(len(buf))
+	need := dataExtentSize + dataHeaderMaximumSize
+	meta := self.inode.Meta()
+	if end <= embeddedSize && meta.StSize <= embeddedSize {
+		need = embeddedSize + 1
+	}
+
+	// obuf is the master slice to which we gather data, using
+	// wbuf slice which moves gradually onward
+	obuf := make([]byte, need)
+	obuf[0] = byte(BDT_EXTENT)
+
+	wbuf := obuf[1:]
+
+	// Grab start of block, if any
+	bofs := int(offset % dataExtentSize)
+	offset -= uint64(bofs)
+	if bofs > 0 {
+		r, code = self.Read(wbuf[:bofs], offset)
+		if !code.Ok() {
+			return
+		}
+		tbuf, _ := r.Bytes(nil)
+		wbuf = wbuf[len(tbuf):]
+		mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
+	}
+
+	// Bytes to write
+	w := len(buf)
+	if w > (dataExtentSize - bofs) {
+		w = dataExtentSize - bofs
+	}
+	if len(buf) > w {
+		buf = buf[:w]
+	}
+
+	copy(wbuf, buf)
+	wbuf = wbuf[len(buf):]
+
+	// Now obuf contains header(< bofs) + buf
 
 	// Read leftovers, if any, from the block
-	blockend := offset - bofs + dataExtentSize
-	extraend := uint64(0)
-
-	if blockend > end {
+	blockend := offset + dataExtentSize
+	if blockend > end && end < meta.StSize {
 		extra := blockend - end
-		tbuf := make([]byte, extra)
-		r, code = self.Read(tbuf, end)
+		r, code = self.Read(wbuf, extra)
 		if !code.Ok() {
 			return
 		}
-		tbuf, code = r.Bytes(nil)
-		if !code.Ok() {
-			return
-		}
-		mlog.Printf2("fs/fh", " got leftovers %v", len(tbuf))
-		extraend = uint64(len(tbuf))
-		buf = util.ConcatBytes(buf, tbuf)
+		tbuf, _ := r.Bytes(nil)
+		wbuf = wbuf[len(tbuf):]
 	}
 
-	// Special case: If file is small AND we're writing only at
-	// most to first small bytes, do it there
-	meta := self.inode.Meta()
+	// bbuf is actually what we want to store
+	mlog.Printf2("fs/fh", " obuf %v wbuf %v", len(obuf), len(wbuf))
+	bbuf := obuf[:len(obuf)-len(wbuf)]
+	mlog.Printf2("fs/fh", " bbuf %v", len(bbuf))
+
 	if meta.StSize <= embeddedSize && end <= embeddedSize {
-		meta.Data = buf
-		meta.StSize = uint64(len(buf))
+		// in .Data this will live long -> make new copy of
+		// the (small) slice
+		nbuf := bbuf[1:]
+		meta.Data = nbuf
+		meta.StSize = uint64(len(nbuf))
 		self.inode.SetMeta(meta)
-		mlog.Printf2("fs/fh", " meta %d bytes", len(buf))
+		mlog.Printf2("fs/fh", " meta %d bytes", len(nbuf))
 	} else {
 		if len(meta.Data) > 0 {
 			meta.Data = nil
@@ -271,16 +289,15 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		}
 		k := NewblockKeyOffset(self.inode.ino, offset)
 		tr := self.Fs().GetTransaction()
-		bid := self.Fs().getBlockDataId(BDT_EXTENT, buf)
-		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(buf), bid)
+		bid := self.Fs().getBlockDataId(bbuf)
+		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
 		// mlog.Printf2("fs/fh", " %x", buf)
 		tr.Set(ibtree.IBKey(k), string(bid))
 		self.Fs().CommitTransaction(tr)
 		self.inode.SetSize(end)
 	}
 
-	blen := uint64(len(buf))
-	written = uint32(blen - bofs - extraend)
+	written = uint32(w)
 	mlog.Printf2("fs/fh", " wrote %v", written)
 	return
 }

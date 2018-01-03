@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 18:57:14 2018 mstenber
- * Edit time:     180 min
+ * Last modified: Wed Jan  3 21:29:55 2018 mstenber
+ * Edit time:     210 min
  *
  */
 
@@ -77,11 +77,15 @@ func (self *Fs) Flush() int {
 
 // ibtree.IBTreeBackend API
 func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
-	b, err := nd.MarshalMsg(nil)
+	bb := make([]byte, nd.Msgsize()+1)
+	bb[0] = byte(BDT_NODE)
+	b, err := nd.MarshalMsg(bb[1:1])
 	if err != nil {
 		log.Panic(err)
 	}
-	return self.getBlockDataId(BDT_NODE, b)
+	b = bb[0 : 1+len(b)]
+	mlog.Printf2("fs/fs", "SaveNode %d bytes", len(b))
+	return self.getBlockDataId(b)
 }
 
 func (self *Fs) GetTransaction() *ibtree.IBTransaction {
@@ -187,14 +191,10 @@ func (self *Fs) iterateReferencesCallback(data []byte, cb storage.BlockReference
 	}
 }
 
-func (self *Fs) getBlockDataId(blockType BlockDataType, data []byte) ibtree.BlockId {
-	b := []byte(data)
+func (self *Fs) getBlockDataId(b []byte) ibtree.BlockId {
 	h := sha256.Sum256(b)
 	bid := h[:]
-	nb := make([]byte, len(b)+1)
-	nb[0] = byte(blockType)
-	copy(nb[1:], b)
-	block := self.storage.ReferOrStoreBlock(string(bid), nb)
+	block := self.storage.ReferOrStoreBlock(string(bid), b)
 	self.storage.ReleaseBlockId(block.Id)
 	// By default this won't increase references; however, stuff
 	// that happens 'elsewhere' (e.g. taking root reference) does,
@@ -203,8 +203,8 @@ func (self *Fs) getBlockDataId(blockType BlockDataType, data []byte) ibtree.Bloc
 	return ibtree.BlockId(block.Id)
 }
 
-func (self *Fs) loadNodeFromBytes(data []byte) *ibtree.IBNodeData {
-	bd := []byte(data)
+func (self *Fs) loadNodeFromBytes(bd []byte) *ibtree.IBNodeData {
+	mlog.Printf2("fs/fs", "loadNodeFromBytes - %d bytes", len(bd))
 	dt := BlockDataType(bd[0])
 	switch dt {
 	case BDT_EXTENT:

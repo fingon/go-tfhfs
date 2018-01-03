@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Wed Jan  3 11:18:13 2018 mstenber
- * Edit time:     145 min
+ * Last modified: Wed Jan  3 20:20:24 2018 mstenber
+ * Edit time:     147 min
  *
  */
 
@@ -387,6 +387,9 @@ func (self *fsFile) Write(b []byte) (n int, err error) {
 			Offset: uint64(self.pos),
 			Size:   uint32(len(b) - n)}
 		n32, code := self.u.ops.Write(&wi, b[n:])
+		if n32 == 0 {
+			log.Panic("Write failed?!?")
+		}
 		err = s2e(code)
 		if err != nil {
 			return

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 09:19:42 2017 mstenber
- * Last modified: Tue Jan  2 10:16:26 2018 mstenber
- * Edit time:     2 min
+ * Last modified: Wed Jan  3 20:12:19 2018 mstenber
+ * Edit time:     3 min
  *
  */
 
@@ -19,3 +19,4 @@ const entryValidity = 5
 
 const embeddedSize = 1024
 const dataExtentSize = 65536
+const dataHeaderMaximumSize = 100

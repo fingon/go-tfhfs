@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan  3 18:35:36 2018 mstenber
- * Edit time:     319 min
+ * Last modified: Wed Jan  3 23:24:15 2018 mstenber
+ * Edit time:     322 min
  *
  */
 
@@ -82,6 +82,8 @@ type Storage struct {
 	cacheBid2Block map[string]*Block
 	cacheSize      int
 	t              uint64
+
+	reads, writes, readbytes, writebytes int
 }
 
 // Init sets up the default values to be usable
@@ -111,6 +113,12 @@ func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
 
 func (self *Storage) Flush() int {
 	mlog.Printf2("storage/storage", "st.Flush")
+	mlog.Printf2("storage/storage", " reads since last flush: %d - %d k", self.reads, self.reads/1024)
+	mlog.Printf2("storage/storage", " writes since last flush: %d - %d k", self.writes, self.writebytes/1024)
+	self.reads = 0
+	self.readbytes = 0
+	self.writes = 0
+	self.writebytes = 0
 	mlog.Printf2("storage/storage", " cache size:%v", self.cacheSize)
 	self.Backend.SetInFlush(true)
 	defer self.Backend.SetInFlush(false)

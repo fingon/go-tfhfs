@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Wed Jan  3 18:41:28 2018 mstenber
- * Edit time:     4 min
+ * Last modified: Wed Jan  3 23:26:22 2018 mstenber
+ * Edit time:     6 min
  *
  */
 
@@ -66,6 +66,8 @@ func (self *Block) GetData() []byte {
 			self.SetCodecData(data)
 			newSize := self.getCacheSize()
 			self.storage.cacheSize += newSize - oldSize
+			self.storage.reads++
+			self.storage.readbytes += len(data)
 		}
 	}
 	return self.Data
@@ -100,6 +102,8 @@ func (self *Block) flush() int {
 	ops := 0
 	if self.stored.RefCount == 0 {
 		if self.RefCount > 0 {
+			self.storage.writes++
+			self.storage.writebytes += len(self.GetData())
 			self.storage.Backend.StoreBlock(self)
 			ops = ops + 1
 		} else {

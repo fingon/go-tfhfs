@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Wed Jan  3 18:24:04 2018 mstenber
- * Edit time:     35 min
+ * Last modified: Wed Jan  3 23:07:58 2018 mstenber
+ * Edit time:     36 min
  *
  */
 
@@ -31,7 +31,7 @@ func main() {
 	}
 	password := flag.String("password", "siikret", "Password")
 	salt := flag.String("salt", "salt", "Salt")
-	backendp := flag.String("backend", "file", "Backend to use (possible: file, badger, inmemory)")
+	backendp := flag.String("backend", "bolt", "Backend to use (possible: file, badger, bolt, inmemory)")
 	cpuprofile := flag.String("cpuprofile", "", "CPU profile file")
 	memprofile := flag.String("memprofile", "", "Memory profile file")
 
@@ -53,6 +53,8 @@ func main() {
 	}
 	var backend storage.BlockBackend
 	switch *backendp {
+	case "bolt":
+		backend = storage.BoltBlockBackend{}.Init(storedir)
 	case "badger":
 		backend = storage.BadgerBlockBackend{}.Init(storedir)
 	case "file":

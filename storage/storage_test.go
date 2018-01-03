@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Wed Jan  3 18:43:04 2018 mstenber
- * Edit time:     117 min
+ * Last modified: Wed Jan  3 23:06:43 2018 mstenber
+ * Edit time:     118 min
  *
  */
 
@@ -145,6 +145,16 @@ func TestBadger(t *testing.T) {
 	defer os.RemoveAll(dir)
 	ProdBlockBackend(t, func() BlockBackend {
 		be := BadgerBlockBackend{}.Init(dir)
+		return be
+	})
+}
+
+func TestBolt(t *testing.T) {
+	t.Parallel()
+	dir, _ := ioutil.TempDir("", "badger")
+	defer os.RemoveAll(dir)
+	ProdBlockBackend(t, func() BlockBackend {
+		be := BoltBlockBackend{}.Init(dir)
 		return be
 	})
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 11:44:16 2018 mstenber
- * Edit time:     162 min
+ * Last modified: Wed Jan  3 14:14:34 2018 mstenber
+ * Edit time:     164 min
  *
  */
 
@@ -50,7 +50,7 @@ type Fs struct {
 }
 
 func (self *Fs) Close() {
-	self.Flush()
+	self.LockedOps.Flush(nil)
 	self.storage.Backend.Close()
 	self.closing <- true
 }
@@ -66,11 +66,12 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 }
 
 func (self *Fs) Flush() int {
+	mlog.Printf("fs.Flush started")
 	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 	// ^ done in each commit, so pointless here?
 	rv := self.storage.Flush()
 	self.bidMap = make(map[string]bool)
-
+	mlog.Printf(" .. done with fs.Flush")
 	return rv
 }
 

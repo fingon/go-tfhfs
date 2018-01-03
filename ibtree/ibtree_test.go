@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Tue Jan  2 20:35:35 2018 mstenber
+ * Last modified: Wed Jan  3 10:33:58 2018 mstenber
  * Edit time:     252 min
  *
  */
@@ -12,10 +12,11 @@
 package ibtree
 
 import (
-	"crypto/sha256"
 	"fmt"
 	"log"
 	"testing"
+
+	"github.com/minio/sha256-simd"
 
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/stvp/assert"

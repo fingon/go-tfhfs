@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  2 23:38:49 2018 mstenber
- * Edit time:     147 min
+ * Last modified: Wed Jan  3 10:34:10 2018 mstenber
+ * Edit time:     148 min
  *
  */
 
@@ -18,7 +18,6 @@
 package fs
 
 import (
-	"crypto/sha256"
 	"log"
 	"os"
 
@@ -27,6 +26,7 @@ import (
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/hanwen/go-fuse/fuse"
+	"github.com/minio/sha256-simd"
 )
 
 const iterations = 1234

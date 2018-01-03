@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan  3 11:15:46 2018 mstenber
- * Edit time:     159 min
+ * Last modified: Wed Jan  3 11:44:16 2018 mstenber
+ * Edit time:     162 min
  *
  */
 
@@ -157,7 +157,8 @@ func NewBadgerCryptoFs(storedir, password, salt, rootName string) *Fs {
 
 	backend := storage.BadgerBlockBackend{}.Init(storedir)
 
-	st := storage.Storage{Codec: c, Backend: backend}.Init()
+	st := storage.Storage{MaximumCacheSize: 123456789,
+		Codec: c, Backend: backend}.Init()
 	return NewFs(st, rootName)
 }
 

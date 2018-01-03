@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan  3 00:31:36 2018 mstenber
- * Edit time:     278 min
+ * Last modified: Wed Jan  3 11:40:36 2018 mstenber
+ * Edit time:     286 min
  *
  */
 
@@ -155,7 +155,7 @@ func (self *Block) markDirty() {
 	self.stored = &BlockMetadata{Status: self.Status,
 		RefCount: self.RefCount}
 	// Add to dirty block list
-	self.storage.dirty_bid2block[self.Id] = self
+	self.storage.dirtyBid2Block[self.Id] = self
 }
 
 // BlockBackend is the shadow behind the throne; it actually
@@ -208,25 +208,26 @@ type Storage struct {
 	IterateReferencesCallback     BlockIterateReferencesCallback
 	HasExternalReferencesCallback BlockHasExternalReferencesCallback
 	Codec                         codec.Codec
+	MaximumCacheSize              int
 
 	// Map of block id => block for dirty blocks.
-	dirty_bid2block map[string]*Block
+	dirtyBid2Block map[string]*Block
 
 	// Blocks that have refcnt0 but BlockHasExternalReferencesCallback has
 	// claimed they should still be around
-	referenced_refcnt0_blocks map[string]*Block
+	referencedRefcnt0Blocks map[string]*Block
 
 	// Stuff below here is ~DelayedStorage
-	names                          map[string]*oldNewStruct
-	cache_bid2block                map[string]*Block
-	cache_size, maximum_cache_size int
-	t                              uint64
+	names          map[string]*oldNewStruct
+	cacheBid2Block map[string]*Block
+	cacheSize      int
+	t              uint64
 }
 
 // Init sets up the default values to be usable
 func (self Storage) Init() *Storage {
-	self.dirty_bid2block = make(map[string]*Block)
-	self.cache_bid2block = make(map[string]*Block)
+	self.dirtyBid2Block = make(map[string]*Block)
+	self.cacheBid2Block = make(map[string]*Block)
 	self.names = make(map[string]*oldNewStruct)
 	// No need to special case Codec = nil elsewhere with this
 	if self.Codec == nil {
@@ -250,7 +251,7 @@ func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
 
 func (self *Storage) Flush() int {
 	mlog.Printf2("storage/storage", "st.Flush")
-	mlog.Printf2("storage/storage", " cache size:%v", self.cache_size)
+	mlog.Printf2("storage/storage", " cache size:%v", self.cacheSize)
 	self.Backend.SetInFlush(true)
 	defer self.Backend.SetInFlush(false)
 	oops := -1
@@ -266,11 +267,11 @@ func (self *Storage) Flush() int {
 	for ops != oops {
 		mlog.Printf2("storage/storage", " flush (delete)")
 		oops = ops
-		s := self.referenced_refcnt0_blocks
+		s := self.referencedRefcnt0Blocks
 		if s == nil {
 			break
 		}
-		self.referenced_refcnt0_blocks = nil
+		self.referencedRefcnt0Blocks = nil
 		for _, v := range s {
 			if v.RefCount == 0 && self.deleteBlockIfNoExtRef(v) {
 				ops = ops + 1
@@ -279,10 +280,10 @@ func (self *Storage) Flush() int {
 	}
 
 	// flush_dirty_stored_blocks in Python
-	for len(self.dirty_bid2block) > 0 {
+	for len(self.dirtyBid2Block) > 0 {
 		mlog.Printf2("storage/storage", " flush_dirty_stored_blocks")
-		dirty := self.dirty_bid2block
-		self.dirty_bid2block = make(map[string]*Block)
+		dirty := self.dirtyBid2Block
+		self.dirtyBid2Block = make(map[string]*Block)
 		nonzero_blocks := make([]*Block, 0)
 		for _, b := range dirty {
 			if b.RefCount == 0 {
@@ -296,16 +297,16 @@ func (self *Storage) Flush() int {
 				ops = ops + b.flush()
 			} else {
 				// populate for subsequent round
-				self.dirty_bid2block[b.Id] = b
+				self.dirtyBid2Block[b.Id] = b
 			}
 		}
 	}
 
 	// end of flush in DelayedStorage in Python prototype
-	if self.maximum_cache_size > 0 && self.cache_size > self.maximum_cache_size {
+	if self.MaximumCacheSize > 0 && self.cacheSize > self.MaximumCacheSize {
 		self.shrinkCache()
 	}
-	mlog.Printf2("storage/storage", " ops:%v, cache size:%v", ops, self.cache_size)
+	mlog.Printf2("storage/storage", " ops:%v, cache size:%v", ops, self.cacheSize)
 	return ops
 }
 
@@ -358,7 +359,7 @@ func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Blo
 	b.setRefCount(1)
 	b.setStatus(status)
 	b.Data = data
-	self.cache_size = self.cache_size + b.getCacheSize()
+	self.cacheSize = self.cacheSize + b.getCacheSize()
 	self.updateBlockDataDependencies(data, true, status)
 	return b
 
@@ -367,14 +368,14 @@ func (self *Storage) StoreBlock(id string, data string, status BlockStatus) *Blo
 /// Private
 func (self *Storage) gocBlockById(id string) *Block {
 	mlog.Printf2("storage/storage", "st.gocBlockById %x", id)
-	b, ok := self.cache_bid2block[id]
+	b, ok := self.cacheBid2Block[id]
 	if !ok {
 		b = self.getBlockById(id)
 		if b == nil {
 			b = &Block{Id: id, storage: self}
 		}
-		self.cache_size += b.getCacheSize()
-		self.cache_bid2block[id] = b
+		self.cacheSize += b.getCacheSize()
+		self.cacheBid2Block[id] = b
 	}
 	b.t = atomic.AddUint64(&self.t, uint64(1))
 	return b
@@ -416,12 +417,12 @@ func (self *Storage) blockValid(b *Block) bool {
 
 // getBlockById is the old Storage version; GetBlockIdBy is the external one
 func (self *Storage) getBlockById(id string) *Block {
-	b := self.dirty_bid2block[id]
+	b := self.dirtyBid2Block[id]
 	if self.blockValid(b) {
 		return b
 	}
-	if self.referenced_refcnt0_blocks != nil {
-		b := self.referenced_refcnt0_blocks[id]
+	if self.referencedRefcnt0Blocks != nil {
+		b := self.referencedRefcnt0Blocks[id]
 		if self.blockValid(b) {
 			return b
 		}
@@ -442,24 +443,24 @@ func (self *Storage) deleteBlockWithDeps(b *Block) bool {
 
 func (self *Storage) deleteBlockIfNoExtRef(b *Block) bool {
 	if self.HasExternalReferencesCallback != nil && self.HasExternalReferencesCallback(b.Id) {
-		if self.referenced_refcnt0_blocks == nil {
-			self.referenced_refcnt0_blocks = make(map[string]*Block)
+		if self.referencedRefcnt0Blocks == nil {
+			self.referencedRefcnt0Blocks = make(map[string]*Block)
 		}
-		self.referenced_refcnt0_blocks[b.Id] = b
+		self.referencedRefcnt0Blocks[b.Id] = b
 		return false
 	}
-	if self.referenced_refcnt0_blocks != nil {
-		delete(self.referenced_refcnt0_blocks, b.Id)
+	if self.referencedRefcnt0Blocks != nil {
+		delete(self.referencedRefcnt0Blocks, b.Id)
 	}
 	return self.deleteBlockWithDeps(b)
 }
 
 func (self *Storage) shrinkCache() {
 	mlog.Printf2("storage/storage", "shrinkCache")
-	n := len(self.cache_bid2block)
+	n := len(self.cacheBid2Block)
 	arr := make([]*Block, n)
 	i := 0
-	for _, v := range self.cache_bid2block {
+	for _, v := range self.cacheBid2Block {
 		arr[i] = v
 		i = i + 1
 	}
@@ -467,17 +468,17 @@ func (self *Storage) shrinkCache() {
 		return arr[i].t > arr[j].t
 	})
 	i = 0
-	goal := self.maximum_cache_size * 3 / 4
-	for i < n && self.cache_size > goal {
+	goal := self.MaximumCacheSize * 3 / 4
+	for i < n && self.cacheSize > goal {
 		self.deleteCachedBlock(arr[i])
 	}
 
 }
 
 func (self *Storage) deleteCachedBlock(b *Block) {
-	delete(self.cache_bid2block, b.Id)
-	self.cache_size = self.cache_size - b.getCacheSize()
-	if b.stored.RefCount == 0 {
+	delete(self.cacheBid2Block, b.Id)
+	self.cacheSize = self.cacheSize - b.getCacheSize()
+	if b.stored != nil && b.stored.RefCount == 0 {
 		// Locally stored, never hit disk, but references did
 		self.updateBlockDataDependencies(b.Data, false, b.Status)
 	}

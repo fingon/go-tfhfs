@@ -89,9 +89,9 @@ func ProdStorageOne(t *testing.T, s *Storage) {
 	b2 := s.ReferOrStoreBlock("k", "v")
 	assert.Equal(t, b, b2)
 	assert.Equal(t, b.RefCount, 2)
-	assert.Equal(t, len(s.dirty_bid2block), 1)
+	assert.Equal(t, len(s.dirtyBid2Block), 1)
 	s.Flush()
-	assert.Equal(t, len(s.dirty_bid2block), 0)
+	assert.Equal(t, len(s.dirtyBid2Block), 0)
 
 	s.ReleaseBlockId("k")
 	s.ReleaseBlockId("k")

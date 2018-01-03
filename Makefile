@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Tue Jan  2 21:23:56 2018 mstenber
-# Edit time:     48 min
+# Last modified: Wed Jan  3 12:03:42 2018 mstenber
+# Edit time:     49 min
 #
 #
 
@@ -32,7 +32,7 @@ prof-%: .done.cpuprof.%
 
 test: .done.test
 
-tfhfs: .done.test tfhfs.go $(wildcard */*.go)
+tfhfs: tfhfs.go $(wildcard */*.go)
 	go build -o tfhfs tfhfs.go
 
 tfhfs-darwin: .done.test tfhfs.go $(wildcard */*.go)

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:55:15 2018 mstenber
- * Last modified: Wed Jan  3 18:10:04 2018 mstenber
- * Edit time:     27 min
+ * Last modified: Wed Jan  3 18:12:43 2018 mstenber
+ * Edit time:     28 min
  *
  */
 
@@ -91,7 +91,9 @@ func calculateAvailable(dir string) uint64 {
 
 func calculateUsed(dir string) (sum uint64) {
 	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		sum += uint64(info.Size())
+		if err == nil {
+			sum += uint64(info.Size())
+		}
 		return nil
 	})
 	return sum

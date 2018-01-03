@@ -6,8 +6,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Tue Jan  2 15:24:47 2018 mstenber
-# Last modified: Wed Jan  3 11:45:13 2018 mstenber
-# Edit time:     17 min
+# Last modified: Wed Jan  3 12:18:39 2018 mstenber
+# Edit time:     27 min
 #
 
 STORAGEDIR=/tmp/sanity-tfhfs-storage
@@ -18,6 +18,24 @@ out () {
     echo $*
     umount $MOUNTDIR
     exit 1
+}
+
+mount2 () {
+    if [ $# == 1 ]; then
+        if [ "$1" = "d" ]; then
+            # debug
+            MLOG=$MLOG ./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
+            # profile
+            return
+        fi
+        if [ "$1" = "p" ]; then
+            # profiling
+            ./tfhfs -memprofile mem.prof -cpuprofile cpu.prof $MOUNTDIR $STORAGEDIR >& ,log2 &
+            return
+        fi
+    fi
+    # fast
+    ./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
 }
 
 waitmount () {
@@ -50,8 +68,7 @@ ls -l $MOUNTDIR/ls
 cd $ORIGDIR
 umount $MOUNTDIR
 
-# MLOG=$MLOG ./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
-./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
+mount2 $*
 waitmount
 [ -f $MOUNTDIR/ls  ] || out "second mount: copied ls not present"
 ls -l $MOUNTDIR/ls

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Wed Jan  3 11:22:12 2018 mstenber
- * Edit time:     22 min
+ * Last modified: Wed Jan  3 12:10:09 2018 mstenber
+ * Edit time:     28 min
  *
  */
 
@@ -16,8 +16,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime/pprof"
 
 	"github.com/fingon/go-tfhfs/fs"
+	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -28,7 +30,20 @@ func main() {
 	}
 	password := flag.String("password", "siikret", "Password")
 	salt := flag.String("salt", "salt", "Salt")
+
+	cpuprofile := flag.String("cpuprofile", "", "CPU profile file")
+	memprofile := flag.String("memprofile", "", "Memory profile file")
+
 	flag.Parse()
+
+	if *cpuprofile != "" {
+		f, err := os.Create(*cpuprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 	mountpoint := flag.Arg(0)
 	storedir := flag.Arg(1)
 	if flag.NArg() < 2 {
@@ -37,10 +52,23 @@ func main() {
 	}
 	badgerfs := fs.NewBadgerCryptoFs(storedir, *password, *salt, "xxx")
 	defer badgerfs.Close()
-	opts := &fuse.MountOptions{Debug: true}
+	opts := &fuse.MountOptions{}
+	if mlog.IsEnabled() {
+		opts.Debug = true
+	}
 	server, err := fuse.NewServer(badgerfs.LockedOps, mountpoint, opts)
 	if err != nil {
 		log.Panic(err)
 	}
 	server.Serve()
+
+	if *memprofile != "" {
+		f, err := os.Create(*memprofile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.WriteHeapProfile(f)
+		f.Close()
+		return
+	}
 }

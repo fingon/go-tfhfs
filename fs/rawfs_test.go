@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Wed Jan  3 11:21:59 2018 mstenber
- * Edit time:     101 min
+ * Last modified: Thu Jan  4 14:19:37 2018 mstenber
+ * Edit time:     115 min
  *
  */
 
@@ -15,6 +15,7 @@ import (
 	"bytes"
 	"log"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -106,14 +107,29 @@ func ProdFs(t *testing.T, fs *Fs) {
 	assert.Nil(t, err)
 	assert.Equal(t, len(arr), 0)
 
-	err = root.Mkdir("/public", 0777)
-	assert.Nil(t, err)
+	var wg sync.WaitGroup
 
-	err = root.Mkdir("/private", 0007)
-	assert.Nil(t, err)
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		err = root.Mkdir("/public", 0777)
+		assert.Nil(t, err)
+	}()
 
-	err = root.Mkdir("/nobody", 0)
-	assert.Nil(t, err)
+	go func() {
+		defer wg.Done()
+		err = root.Mkdir("/private", 0007)
+		assert.Nil(t, err)
+	}()
+
+	go func() {
+		defer wg.Done()
+		err = root.Mkdir("/nobody", 0)
+		assert.Nil(t, err)
+
+	}()
+	mlog.Printf("ProdFs wait 1")
+	wg.Wait()
 
 	arr, err = root.ReadDir("/")
 	assert.Nil(t, err)
@@ -157,69 +173,133 @@ func ProdFs(t *testing.T, fs *Fs) {
 	u3.Uid = 123
 	u3.Gid = 123
 
-	err = u1.Mkdir("/u1", 0777)
-	err = u1.Mkdir("/u1/u", 0700)
-	err = u1.Mkdir("/u1/g", 0070)
-	err = u1.Mkdir("/u1/o", 0007)
+	u1.Mkdir("/u1", 0777)
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		u1.Mkdir("/u1/u", 0700)
+	}()
+	go func() {
+		defer wg.Done()
+		u1.Mkdir("/u1/g", 0070)
+	}()
+	go func() {
+		defer wg.Done()
+		u1.Mkdir("/u1/o", 0007)
+	}()
+	mlog.Printf("ProdFs wait 2")
+	wg.Wait()
 
-	fi, err = u2.Stat("/u1/u/.")
-	assert.True(t, err != nil)
+	wg.Add(9)
+	go func() {
+		defer wg.Done()
+		_, err := u2.Stat("/u1/u/.")
+		assert.True(t, err != nil)
+	}()
 
-	fi, err = u1.Stat("/u1/u/.")
-	assert.Nil(t, err)
+	go func() {
+		defer wg.Done()
+		_, err := u1.Stat("/u1/u/.")
+		assert.Nil(t, err)
+	}()
 
-	fi, err = u3.Stat("/u1/g/.")
-	assert.True(t, err != nil)
+	go func() {
+		defer wg.Done()
+		_, err := u3.Stat("/u1/g/.")
+		assert.True(t, err != nil)
+	}()
 
-	fi, err = u2.Stat("/u1/g/.")
-	assert.Nil(t, err)
+	go func() {
+		defer wg.Done()
+		_, err := u2.Stat("/u1/g/.")
+		assert.Nil(t, err)
+	}()
 
-	fi, err = u2.Stat("/u1/o/.")
-	assert.Nil(t, err)
+	go func() {
+		defer wg.Done()
+		_, err := u2.Stat("/u1/o/.")
+		assert.Nil(t, err)
+	}()
 
-	fi, err = u3.Stat("/u1/o/.")
-	assert.Nil(t, err)
+	go func() {
+		defer wg.Done()
+		_, err = u3.Stat("/u1/o/.")
+		assert.Nil(t, err)
 
-	var sfo fuse.StatfsOut
-	code := fs.ops.StatFs(&root.InHeader, &sfo)
-	assert.True(t, code.Ok())
+	}()
 
-	// Initially no xattr - list should be empty
+	go func() {
+		defer wg.Done()
+		var sfo fuse.StatfsOut
+		code := fs.Ops.StatFs(&root.InHeader, &sfo)
+		assert.True(t, code.Ok())
+	}()
 
-	l, err := root.ListXAttr("/public")
-	assert.Nil(t, err)
-	assert.Equal(t, len(l), 0)
+	go func() {
+		defer wg.Done()
+		// Initially no xattr - list should be empty
 
-	_, err = root.GetXAttr("/public", "foo")
-	assert.True(t, err != nil)
+		l, err := root.ListXAttr("/public")
+		assert.Nil(t, err)
+		assert.Equal(t, len(l), 0)
+	}()
+
+	go func() {
+		defer wg.Done()
+		_, err = root.GetXAttr("/public", "foo")
+		assert.True(t, err != nil)
+	}()
+
+	mlog.Printf("ProdFs wait 3")
+	wg.Wait()
 
 	// Set xattr
 
 	err = root.SetXAttr("/public", "foo", []byte("bar"))
 	assert.Nil(t, err)
 
+	wg.Add(2)
 	// Xattr should be accessible
+	go func() {
+		defer wg.Done()
+		b, err := root.GetXAttr("/public", "foo")
+		assert.Nil(t, err)
+		assert.Equal(t, string(b), "bar")
 
-	b, err := root.GetXAttr("/public", "foo")
-	assert.Nil(t, err)
-	assert.Equal(t, string(b), "bar")
+	}()
 
-	l, err = root.ListXAttr("/public")
-	assert.Nil(t, err)
-	assert.Equal(t, len(l), 1)
-	assert.Equal(t, string(l[0]), "foo")
+	go func() {
+		defer wg.Done()
+		l, err := root.ListXAttr("/public")
+		assert.Nil(t, err)
+		assert.Equal(t, len(l), 1)
+		assert.Equal(t, string(l[0]), "foo")
+	}()
+
+	mlog.Printf("ProdFs wait 4")
+	wg.Wait()
 
 	// Remove xattr - it should be gone
 
 	err = root.RemoveXAttr("/public", "foo")
 	assert.Nil(t, err)
 
-	l, err = root.ListXAttr("/public")
-	assert.Nil(t, err)
-	assert.Equal(t, len(l), 0)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		l, err := root.ListXAttr("/public")
+		assert.Nil(t, err)
+		assert.Equal(t, len(l), 0)
+	}()
 
-	_, err = root.GetXAttr("/public", "foo")
-	assert.True(t, err != nil)
+	go func() {
+		defer wg.Done()
+		_, err := root.GetXAttr("/public", "foo")
+		assert.True(t, err != nil)
+	}()
+
+	mlog.Printf("ProdFs wait 5")
+	wg.Wait()
 
 	ProdFsFile(t, root)
 }
@@ -237,7 +317,7 @@ func (self *DummyGenerator) CreateInodeNumber() uint64 {
 func TestFs(t *testing.T) {
 	check := func(t *testing.T, fs *Fs) {
 		mlog.Printf2("fs/rawfs_test", "Root: %s = %x", fs.rootName, fs.treeRootBlockId)
-		fs.treeRoot.PrintToMLogAll()
+		fs.treeRoot.Get().PrintToMLogAll()
 		root := NewFSUser(fs)
 		_, err := root.Stat("/public")
 		assert.Nil(t, err)

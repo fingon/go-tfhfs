@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Jan  3 12:03:42 2018 mstenber
-# Edit time:     49 min
+# Last modified: Thu Jan  4 13:19:58 2018 mstenber
+# Edit time:     59 min
 #
 #
 
@@ -22,7 +22,16 @@ bench: .done.buildable
 
 get: .done.getprebuild
 
-generate: .done.buildable
+generate: .done.buildable fs/ibnodepointer_gen.go
+
+fs/ibnodepointer_gen.go: Makefile xxx/pointer.go
+	( echo "package fs" ; \
+		echo 'import "github.com/fingon/go-tfhfs/ibtree"' ; \
+		egrep -A 9999 '^import' xxx/pointer.go | \
+		egrep -v '^(type XXX|// XXX)Type' | \
+		sed 's/XXXType/(*ibtree.IBNode)/g;s/XXX/IBNode/g' | \
+		cat ) > $@.new
+	mv $@.new $@
 
 html-cover-%: .done.cover.%
 	go tool cover -html=$<

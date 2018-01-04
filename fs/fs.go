@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Jan  4 01:38:03 2018 mstenber
- * Edit time:     238 min
+ * Last modified: Thu Jan  4 14:03:31 2018 mstenber
+ * Edit time:     248 min
  *
  */
 
@@ -27,6 +27,7 @@ import (
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
+	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
 	"github.com/minio/sha256-simd"
 )
@@ -36,23 +37,28 @@ const inodeDataLength = 8
 const blockSubTypeOffset = inodeDataLength
 
 type Fs struct {
+	// These have their own locking or are used in single-threaded way
 	inodeTracker
-	ops             fsOps
-	closing         chan bool
-	flushInterval   time.Duration
-	LockedOps       fuse.RawFileSystem
-	server          *fuse.Server
-	tree            *ibtree.IBTree
-	storage         *storage.Storage
-	rootName        string
-	treeRoot        *ibtree.IBNode
+	Ops           fsOps
+	closing       chan bool
+	flushInterval time.Duration
+	server        *fuse.Server
+	tree          *ibtree.IBTree
+	storage       *storage.Storage
+	rootName      string
+	treeRoot      IBNodeAtomicPointer
+
+	// data covers the things below here that involve writing
+	// e.g. any write operation should grab the lock early on to
+	// make sure writes are consistent.
+	lock            util.MutexLocked
 	treeRootBlockId ibtree.BlockId
 	bidMap          map[string]bool
 	nodeDataCache   gcache.Cache
 }
 
 func (self *Fs) Close() {
-	self.LockedOps.Flush(nil)
+	self.Flush()
 	self.storage.Backend.Close()
 	self.closing <- true
 }
@@ -71,6 +77,7 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 }
 
 func (self *Fs) Flush() int {
+	defer self.lock.Locked()()
 	mlog.Printf2("fs/fs", "fs.Flush started")
 	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 	// ^ done in each commit, so pointless here?
@@ -95,13 +102,18 @@ func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 
 func (self *Fs) GetTransaction() *ibtree.IBTransaction {
 	// mlog.Printf2("fs/fs", "GetTransaction of %p", self.treeRoot)
-	return ibtree.NewTransaction(self.treeRoot)
+	return ibtree.NewTransaction(self.treeRoot.Get())
 }
 
 func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
-	self.treeRoot, self.treeRootBlockId = t.Commit()
+	self.lock.AssertLocked()
+	root, bid := t.Commit()
+	// TBD: Make real merging scheme ro merge newRoot with what
+	// the transaction started with and current root
+	self.treeRoot.Set(root)
+	self.treeRootBlockId = bid
 	mlog.Printf2("fs/fs", "CommitTransaction %p", self.treeRoot)
-	self.treeRoot.PrintToMLogDirty()
+	root.PrintToMLogDirty()
 	self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 }
 
@@ -129,16 +141,16 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 
 func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
+	defer fs.lock.Locked()()
 	fs.nodeDataCache = gcache.New(10000).
 		ARC().
 		//	LoaderFunc(func(k interface{}) (interface{}, error) {
 		//		return fs.loadNode(k.(ibtree.BlockId)), nil
 		//}).
 		Build()
-	fs.ops.fs = fs
+	fs.Ops.fs = fs
 	fs.closing = make(chan bool)
 	fs.flushInterval = 1 * time.Second
-	fs.LockedOps = fuse.NewLockingRawFileSystem(&fs.ops)
 	fs.inodeTracker.Init(fs)
 	fs.tree = ibtree.IBTree{}.Init(fs)
 	fs.bidMap = make(map[string]bool)
@@ -151,11 +163,11 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	rootbid := st.GetBlockIdByName(rootName)
 	if rootbid != "" {
 		bid := ibtree.BlockId(rootbid)
-		fs.treeRoot = fs.tree.LoadRoot(bid)
+		fs.treeRoot.Set(fs.tree.LoadRoot(bid))
 		fs.treeRootBlockId = bid
 	}
-	if fs.treeRoot == nil {
-		fs.treeRoot = fs.tree.NewRoot()
+	if fs.treeRoot.Get() == nil {
+		fs.treeRoot.Set(fs.tree.NewRoot())
 		// getinode succeeds always; Get does not
 		root := fs.getinode(fuse.FUSE_ROOT_ID)
 		var meta InodeMeta

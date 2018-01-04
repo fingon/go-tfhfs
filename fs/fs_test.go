@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Wed Jan  3 17:08:40 2018 mstenber
- * Edit time:     17 min
+ * Last modified: Thu Jan  4 13:28:23 2018 mstenber
+ * Edit time:     20 min
  *
  */
 
@@ -44,17 +44,17 @@ func BenchmarkBadgerFs(b *testing.B) {
 	st := NewCryptoStorage("assword", "alt", backend)
 	fs := NewFs(st, "toor")
 
-	tr := ibtree.NewTransaction(fs.treeRoot)
+	tr := fs.GetTransaction()
 	for i := 0; i < n; i++ {
 		k := ibtree.IBKey(NewblockKey(uint64(i), BST_META, ""))
 		tr.Set(k, fmt.Sprintf("v%d", i))
 	}
-	fs.treeRoot, _ = tr.Commit()
+	fs.CommitTransaction(tr)
 
 	b.Run("Get1", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			tr := ibtree.NewTransaction(fs.treeRoot)
+			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.Get(k)
@@ -62,7 +62,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 	})
 
 	b.Run("GetN", func(b *testing.B) {
-		tr := ibtree.NewTransaction(fs.treeRoot)
+		tr := fs.GetTransaction()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			j := rand.Int() % n
@@ -74,7 +74,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 	b.Run("Set", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			tr := ibtree.NewTransaction(fs.treeRoot)
+			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.Set(k, fmt.Sprintf("V%d%d", j, i))
@@ -85,7 +85,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 	b.Run("Delete", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			tr := ibtree.NewTransaction(fs.treeRoot)
+			tr := ibtree.NewTransaction(fs.treeRoot.Get())
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.Delete(k)

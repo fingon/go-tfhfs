@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Wed Jan  3 11:18:37 2018 mstenber
- * Edit time:     214 min
+ * Last modified: Thu Jan  4 14:09:50 2018 mstenber
+ * Edit time:     239 min
  *
  */
 
@@ -15,6 +15,8 @@ import (
 	"encoding/binary"
 	"log"
 	"math/rand"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/fingon/go-tfhfs/ibtree"
@@ -26,7 +28,7 @@ import (
 type inode struct {
 	ino     uint64
 	tracker *inodeTracker
-	refcnt  uint64
+	refcnt  int64
 	meta    *InodeMeta
 }
 
@@ -55,12 +57,25 @@ func (self *inode) Fs() *Fs {
 }
 
 func (self *inode) Ops() *fsOps {
-	return &self.tracker.fs.ops
+	return &self.tracker.fs.Ops
 }
 
 func unixNanoToFuse(t uint64, seconds *uint64, parts *uint32) {
 	*seconds = t / uint64(time.Second)
 	*parts = uint32(t % uint64(time.Second))
+}
+
+func (self *inode) addRefCount(refcnt int64) {
+	refcnt = atomic.AddInt64(&self.refcnt, refcnt)
+	if refcnt == 0 {
+		defer self.tracker.Locked()()
+		// was taken by someone
+		if self.refcnt > 0 {
+			return
+		}
+		// TBD if there's something else that should be done?
+		delete(self.tracker.ino2inode, self.ino)
+	}
 }
 
 func (self *inode) FillAttr(out *fuse.Attr) fuse.Status {
@@ -204,22 +219,21 @@ func (self *inode) IsLink() bool {
 }
 
 func (self *inode) Refer() {
-	self.refcnt++
-}
-
-func (self *inode) Forget(refcnt uint64) {
-	self.refcnt -= refcnt
-	if self.refcnt == 0 {
-		// TBD if there's something else that should be done?
-		delete(self.tracker.ino2inode, self.ino)
-	}
+	self.addRefCount(1)
 }
 
 func (self *inode) Release() {
 	if self == nil {
 		return
 	}
-	self.Forget(1)
+	self.addRefCount(-1)
+}
+
+func (self *inode) Forget(nlookup uint64) {
+	if self == nil {
+		return
+	}
+	self.addRefCount(-int64(nlookup))
 }
 
 func (self *inode) RemoveChildByName(name string) {
@@ -277,6 +291,7 @@ func (self *inode) Meta() *InodeMeta {
 }
 
 func (self *inode) SetMeta(meta *InodeMeta) {
+
 	times := 0
 
 	if meta.StAtimeNs == 0 {
@@ -339,11 +354,13 @@ func (self *randomInodeNumberGenerator) CreateInodeNumber() uint64 {
 }
 
 type inodeTracker struct {
+	util.RMutexLocked
 	generator inodeNumberGenerator
 	ino2inode map[uint64]*inode
 	fh2ifile  map[uint64]*inodeFH
 	fs        *Fs
 	nextFh    uint64
+	mu        sync.Mutex
 }
 
 func (self *inodeTracker) Init(fs *Fs) {
@@ -357,6 +374,7 @@ func (self *inodeTracker) Init(fs *Fs) {
 }
 
 func (self *inodeTracker) AddFile(file *inodeFH) {
+	defer self.Locked()()
 	self.nextFh++
 	fh := self.nextFh
 	file.fh = fh
@@ -364,12 +382,13 @@ func (self *inodeTracker) AddFile(file *inodeFH) {
 }
 
 func (self *inodeTracker) getinode(ino uint64) *inode {
+	defer self.Locked()()
 	n := self.ino2inode[ino]
 	if n == nil {
 		n = &inode{ino: ino, tracker: self}
 		self.ino2inode[ino] = n
 	}
-	n.refcnt++
+	atomic.AddInt64(&n.refcnt, 1)
 	return n
 }
 
@@ -386,10 +405,12 @@ func (self *inodeTracker) GetInode(ino uint64) *inode {
 }
 
 func (self *inodeTracker) GetFileByFh(fh uint64) *inodeFH {
+	defer self.Locked()()
 	return self.fh2ifile[fh]
 }
 
 func (self *inodeTracker) CreateInode() *inode {
+	defer self.Locked()()
 	mlog.Printf2("fs/inode", "CreateInode")
 	for {
 		ino := self.generator.CreateInodeNumber()

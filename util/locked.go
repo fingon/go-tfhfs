@@ -4,15 +4,20 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan  4 12:21:40 2018 mstenber
- * Last modified: Thu Jan  4 13:05:52 2018 mstenber
- * Edit time:     17 min
+ * Last modified: Thu Jan  4 14:15:09 2018 mstenber
+ * Edit time:     26 min
  *
  */
 
 package util
 
-import "sync"
-import "sync/atomic"
+import (
+	"log"
+	"sync"
+	"sync/atomic"
+
+	"github.com/fingon/go-tfhfs/mlog"
+)
 
 // RMutexLocked is recursive mutex with convenience features
 // (just defer x.Locked()()). It is also insanely slow because golang
@@ -65,12 +70,48 @@ func (self *RMutexLocked) Locked() (unlock func()) {
 	}
 }
 
-type MutexLocked sync.Mutex
+type MutexLocked struct {
+	mu sync.Mutex
+
+	// just when debugging is enabled, ensure we actually own the
+	// mutex as well
+	owner uint64
+}
+
+func (self *MutexLocked) AssertLocked() {
+	if mlog.IsEnabled() {
+		gid := GetGoroutineID()
+		ogid := atomic.LoadUint64(&self.owner)
+		if ogid != gid {
+			log.Panicf("Not locked by us - %v != our %v", ogid, gid)
+		}
+	}
+}
+
+func (self *MutexLocked) Lock() {
+	debugging := mlog.IsEnabled()
+	if debugging {
+		gid := GetGoroutineID()
+		if atomic.LoadUint64(&self.owner) == gid {
+			log.Panic("Double lock by us")
+		}
+	}
+	self.mu.Lock()
+	if debugging {
+		atomic.StoreUint64(&self.owner, GetGoroutineID())
+	}
+}
+
+func (self *MutexLocked) Unlock() {
+	if mlog.IsEnabled() {
+		atomic.StoreUint64(&self.owner, 0)
+	}
+	self.mu.Unlock()
+}
 
 func (self *MutexLocked) Locked() (unlock func()) {
-	mut := (*sync.Mutex)(self)
-	mut.Lock()
+	self.Lock()
 	return func() {
-		mut.Unlock()
+		self.Unlock()
 	}
 }

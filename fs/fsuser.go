@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Wed Jan  3 20:20:24 2018 mstenber
- * Edit time:     147 min
+ * Last modified: Thu Jan  4 12:06:57 2018 mstenber
+ * Edit time:     149 min
  *
  */
 
@@ -95,7 +95,7 @@ func fileModeFromFuse(mode uint32) os.FileMode {
 }
 
 func NewFSUser(fs *Fs) *FSUser {
-	return &FSUser{fs: fs, ops: fs.LockedOps}
+	return &FSUser{fs: fs, ops: &fs.Ops}
 }
 
 func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {

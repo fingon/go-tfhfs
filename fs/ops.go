@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Wed Jan  3 11:21:33 2018 mstenber
- * Edit time:     233 min
+ * Last modified: Thu Jan  4 14:11:27 2018 mstenber
+ * Edit time:     247 min
  *
  */
 
@@ -14,6 +14,7 @@ package fs
 import (
 	"bytes"
 	"os"
+	"sync"
 	"syscall"
 	"time"
 
@@ -22,6 +23,7 @@ import (
 )
 
 type fsOps struct {
+	mu sync.Mutex
 	fs *Fs
 }
 
@@ -35,7 +37,7 @@ func (self *fsOps) Init(server *Server) {
 			case <-self.fs.closing:
 				return
 			case <-time.After(self.fs.flushInterval):
-				self.fs.LockedOps.Flush(nil)
+				self.fs.Flush()
 			}
 		}
 	}
@@ -151,6 +153,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		return ENOENT
 	}
 	defer inode.Release()
+	defer self.fs.lock.Locked()()
 
 	meta := inode.Meta()
 	newmeta := meta.InodeMetaData
@@ -269,6 +272,8 @@ func (self *fsOps) Open(input *OpenIn, out *OpenOut) (code Status) {
 	mlog.Printf2("fs/ops", "ops.Open %v", input.NodeId)
 	defer inode.Release()
 
+	defer self.fs.lock.Locked()()
+
 	flags := uint32(0)
 	if input.Flags&uint32(os.O_RDONLY|os.O_RDWR) != 0 {
 		flags |= R_OK
@@ -346,7 +351,8 @@ func (self *fsOps) create(input *InHeader, name string, meta *InodeMeta, allowRe
 			code = Status(syscall.EEXIST)
 			return
 		}
-		code = self.Unlink(input, name)
+		b := false
+		code = self.unlink(input, name, &b)
 		if !code.Ok() {
 			return
 		}
@@ -359,6 +365,7 @@ func (self *fsOps) create(input *InHeader, name string, meta *InodeMeta, allowRe
 }
 
 func (self *fsOps) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Status) {
+	defer self.fs.lock.Locked()()
 	var meta InodeMeta
 	meta.SetMkdirIn(input)
 	child, code := self.create(&input.InHeader, name, &meta, false)
@@ -393,12 +400,14 @@ func (self *fsOps) unlink(input *InHeader, name string, isdir *bool) (code Statu
 }
 
 func (self *fsOps) Unlink(input *InHeader, name string) (code Status) {
+	defer self.fs.lock.Locked()()
 	mlog.Printf2("fs/ops", "ops.Unlink %s", name)
 	b := false
 	return self.unlink(input, name, &b)
 }
 
 func (self *fsOps) Rmdir(input *InHeader, name string) (code Status) {
+	defer self.fs.lock.Locked()()
 	mlog.Printf2("fs/ops", "ops.Rmdir %s", name)
 	b := true
 	return self.unlink(input, name, &b)
@@ -425,6 +434,7 @@ func (self *fsOps) GetXAttrData(input *InHeader, attr string) (data []byte, code
 }
 
 func (self *fsOps) SetXAttr(input *SetXAttrIn, attr string, data []byte) (code Status) {
+	defer self.fs.lock.Locked()()
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
@@ -457,6 +467,7 @@ func (self *fsOps) ListXAttr(input *InHeader) (data []byte, code Status) {
 }
 
 func (self *fsOps) RemoveXAttr(input *InHeader, attr string) (code Status) {
+	defer self.fs.lock.Locked()()
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
@@ -468,6 +479,7 @@ func (self *fsOps) RemoveXAttr(input *InHeader, attr string) (code Status) {
 }
 
 func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code Status) {
+	defer self.fs.lock.Locked()()
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
@@ -516,6 +528,8 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 }
 
 func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
+	defer self.fs.lock.Locked()()
+
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
@@ -550,17 +564,20 @@ func (self *fsOps) Read(input *ReadIn, buf []byte) (ReadResult, Status) {
 }
 
 func (self *fsOps) Write(input *WriteIn, data []byte) (written uint32, code Status) {
+	defer self.fs.lock.Locked()()
 	// Check perm?
 	file := self.fs.GetFileByFh(input.Fh)
 	return file.Write(data, input.Offset)
 }
 
 func (self *fsOps) Create(input *CreateIn, name string, out *CreateOut) (code Status) {
+	self.fs.lock.Lock()
 	mlog.Printf2("fs/ops", "ops.Create %s", name)
 	// first create file
 	var meta InodeMeta
 	meta.SetCreateIn(input)
 	child, code := self.create(&input.InHeader, name, &meta, input.Flags&uint32(os.O_EXCL) == 0)
+	self.fs.lock.Unlock()
 	if !code.Ok() {
 		return
 	}
@@ -580,6 +597,7 @@ func (self *fsOps) Create(input *CreateIn, name string, out *CreateOut) (code St
 }
 
 func (self *fsOps) Mknod(input *MknodIn, name string, out *EntryOut) (code Status) {
+	defer self.fs.lock.Locked()()
 	var meta InodeMeta
 	meta.SetMknodIn(input)
 	child, code := self.create(&input.InHeader, name, &meta, false)
@@ -592,6 +610,7 @@ func (self *fsOps) Mknod(input *MknodIn, name string, out *EntryOut) (code Statu
 }
 
 func (self *fsOps) Symlink(input *InHeader, pointedTo string, linkName string, out *EntryOut) (code Status) {
+	defer self.fs.lock.Locked()()
 	meta := InodeMeta{InodeMetaData: InodeMetaData{StUid: input.Uid,
 		StGid:  input.Gid,
 		StMode: S_IFLNK | 0777,
@@ -608,12 +627,6 @@ func (self *fsOps) Symlink(input *InHeader, pointedTo string, linkName string, o
 }
 
 func (self *fsOps) Flush(input *FlushIn) Status {
-	// This is a hack I am not particularly proud of; control
-	// access to us by calling our own flush via lockedfilesystem.
-	if input == nil {
-		self.fs.Flush()
-		return OK
-	}
 	// TBD
 	return OK
 }

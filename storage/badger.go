@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Wed Jan  3 22:02:29 2018 mstenber
- * Edit time:     115 min
+ * Last modified: Thu Jan  4 02:41:46 2018 mstenber
+ * Edit time:     123 min
  *
  */
 
@@ -39,7 +39,7 @@ func (self BadgerBlockBackend) Init(dir string) *BadgerBlockBackend {
 	opts.ValueDir = dir
 	db, err := badger.Open(opts)
 	if err != nil {
-		log.Fatal("badger.Open", err)
+		log.Panic("badger.Open", err)
 	}
 	self.db = db
 	self.txn = db.NewTransaction(false)
@@ -49,11 +49,11 @@ func (self BadgerBlockBackend) Init(dir string) *BadgerBlockBackend {
 func (self *BadgerBlockBackend) DeleteBlock(b *Block) {
 	k := append([]byte("1"), []byte(b.Id)...)
 	if err := self.delete(k); err != nil {
-		log.Fatal("txn.Delete", err)
+		log.Panic("txn.Delete", err)
 	}
 	k = append([]byte("2"), []byte(b.Id)...)
 	if err := self.delete(k); err != nil {
-		log.Fatal("txn.Delete 2", err)
+		log.Panic("txn.Delete 2", err)
 	}
 }
 
@@ -83,12 +83,12 @@ func (self *BadgerBlockBackend) GetBlockById(id string) *Block {
 		return nil
 	}
 	if err != nil {
-		log.Fatal("get error:", err)
+		log.Panic("get error:", err)
 	}
 	b := &Block{Id: id, backend: self}
 	_, err = b.BlockMetadata.UnmarshalMsg(bv)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	mlog.Printf2("storage/badger", "b.GetBlockById %x", id)
 	return b
@@ -100,40 +100,36 @@ func (self *BadgerBlockBackend) GetBlockIdByName(name string) string {
 		return ""
 	}
 	if err != nil {
-		log.Fatal("get error:", err)
+		log.Panic("get error:", err)
 	}
 	return string(bv)
 }
 
 func (self *BadgerBlockBackend) SetInFlush(value bool) {
-	if value {
-		// Old transaction was read-only
-		self.txn.Discard()
-
-	} else {
-		self.commit()
-	}
-	self.txn = self.db.NewTransaction(value)
+	self.newTxn(!value, value)
 }
 
-func (self *BadgerBlockBackend) commit() {
-	if err := self.txn.Commit(nil); err != nil {
-		log.Fatal("commit:", err)
+func (self *BadgerBlockBackend) newTxn(commit, write bool) {
+	if commit {
+		if err := self.txn.Commit(nil); err != nil {
+			log.Panic("commit:", err)
+		}
 	}
+	self.txn.Discard()
+	self.txn = self.db.NewTransaction(write)
 }
 
 func (self *BadgerBlockBackend) setKKValue(prefix, suffix, value []byte) {
 	k := append(prefix, suffix...)
 	if err := self.set(k, value); err != nil {
-		log.Fatal("set", err)
+		log.Panic("set", err)
 	}
 }
 
 func (self *BadgerBlockBackend) delete(k []byte) error {
 	err := self.txn.Delete(k)
 	if err == badger.ErrTxnTooBig {
-		self.commit()
-		self.txn = self.db.NewTransaction(true)
+		self.newTxn(true, true)
 		return self.delete(k)
 	}
 	return err
@@ -142,8 +138,7 @@ func (self *BadgerBlockBackend) delete(k []byte) error {
 func (self *BadgerBlockBackend) set(k, v []byte) error {
 	err := self.txn.Set(k, v)
 	if err == badger.ErrTxnTooBig {
-		self.commit()
-		self.txn = self.db.NewTransaction(true)
+		self.newTxn(true, true)
 		return self.set(k, v)
 	}
 	return err
@@ -163,7 +158,7 @@ func (self *BadgerBlockBackend) StoreBlock(b *Block) {
 func (self *BadgerBlockBackend) updateBlock(b *Block) {
 	buf, err := b.BlockMetadata.MarshalMsg(nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	self.setKKValue([]byte("1"), []byte(b.Id), buf)
 }

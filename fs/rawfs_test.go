@@ -128,7 +128,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 		assert.Nil(t, err)
 
 	}()
-	mlog.Printf("ProdFs wait 1")
+	mlog.Printf2("fs/rawfs_test", "ProdFs wait 1")
 	wg.Wait()
 
 	arr, err = root.ReadDir("/")
@@ -187,7 +187,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 		defer wg.Done()
 		u1.Mkdir("/u1/o", 0007)
 	}()
-	mlog.Printf("ProdFs wait 2")
+	mlog.Printf2("fs/rawfs_test", "ProdFs wait 2")
 	wg.Wait()
 
 	wg.Add(9)
@@ -250,7 +250,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 		assert.True(t, err != nil)
 	}()
 
-	mlog.Printf("ProdFs wait 3")
+	mlog.Printf2("fs/rawfs_test", "ProdFs wait 3")
 	wg.Wait()
 
 	// Set xattr
@@ -276,7 +276,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 		assert.Equal(t, string(l[0]), "foo")
 	}()
 
-	mlog.Printf("ProdFs wait 4")
+	mlog.Printf2("fs/rawfs_test", "ProdFs wait 4")
 	wg.Wait()
 
 	// Remove xattr - it should be gone
@@ -298,7 +298,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 		assert.True(t, err != nil)
 	}()
 
-	mlog.Printf("ProdFs wait 5")
+	mlog.Printf2("fs/rawfs_test", "ProdFs wait 5")
 	wg.Wait()
 
 	ProdFsFile(t, root)

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Jan  4 14:03:31 2018 mstenber
- * Edit time:     248 min
+ * Last modified: Thu Jan  4 14:33:53 2018 mstenber
+ * Edit time:     253 min
  *
  */
 
@@ -168,8 +168,9 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	}
 	if fs.treeRoot.Get() == nil {
 		fs.treeRoot.Set(fs.tree.NewRoot())
-		// getinode succeeds always; Get does not
-		root := fs.getinode(fuse.FUSE_ROOT_ID)
+		// getInode succeeds always; Get does not
+		defer fs.inodeLock.Locked()()
+		root := fs.getInode(fuse.FUSE_ROOT_ID)
 		var meta InodeMeta
 		meta.StMode = 0777 | fuse.S_IFDIR
 		meta.StNlink++ // root has always built-in link
@@ -191,6 +192,7 @@ func NewCryptoStorage(password, salt string, backend storage.BlockBackend) *stor
 // better scheme than this, so we keep that and clear it at flush
 // time.
 func (self *Fs) hasExternalReferences(id string) bool {
+	self.lock.AssertLocked()
 	return self.bidMap[id]
 }
 
@@ -222,6 +224,7 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 }
 
 func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
+	self.lock.AssertLocked()
 	h := sha256.Sum256(b)
 	bid := h[:]
 	id := string(bid)

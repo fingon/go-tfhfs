@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Thu Jan  4 14:09:50 2018 mstenber
- * Edit time:     239 min
+ * Last modified: Thu Jan  4 14:31:01 2018 mstenber
+ * Edit time:     243 min
  *
  */
 
@@ -68,7 +68,7 @@ func unixNanoToFuse(t uint64, seconds *uint64, parts *uint32) {
 func (self *inode) addRefCount(refcnt int64) {
 	refcnt = atomic.AddInt64(&self.refcnt, refcnt)
 	if refcnt == 0 {
-		defer self.tracker.Locked()()
+		defer self.tracker.inodeLock.Locked()()
 		// was taken by someone
 		if self.refcnt > 0 {
 			return
@@ -354,7 +354,7 @@ func (self *randomInodeNumberGenerator) CreateInodeNumber() uint64 {
 }
 
 type inodeTracker struct {
-	util.RMutexLocked
+	inodeLock util.MutexLocked
 	generator inodeNumberGenerator
 	ino2inode map[uint64]*inode
 	fh2ifile  map[uint64]*inodeFH
@@ -374,15 +374,15 @@ func (self *inodeTracker) Init(fs *Fs) {
 }
 
 func (self *inodeTracker) AddFile(file *inodeFH) {
-	defer self.Locked()()
+	defer self.inodeLock.Locked()()
 	self.nextFh++
 	fh := self.nextFh
 	file.fh = fh
 	self.fh2ifile[fh] = file
 }
 
-func (self *inodeTracker) getinode(ino uint64) *inode {
-	defer self.Locked()()
+func (self *inodeTracker) getInode(ino uint64) *inode {
+	self.inodeLock.AssertLocked()
 	n := self.ino2inode[ino]
 	if n == nil {
 		n = &inode{ino: ino, tracker: self}
@@ -393,8 +393,9 @@ func (self *inodeTracker) getinode(ino uint64) *inode {
 }
 
 func (self *inodeTracker) GetInode(ino uint64) *inode {
+	defer self.inodeLock.Locked()()
 	mlog.Printf2("fs/inode", "GetInode %v", ino)
-	inode := self.getinode(ino)
+	inode := self.getInode(ino)
 	if inode.Meta() == nil {
 		mlog.Printf2("fs/inode", " no meta")
 		inode.Release()
@@ -405,13 +406,13 @@ func (self *inodeTracker) GetInode(ino uint64) *inode {
 }
 
 func (self *inodeTracker) GetFileByFh(fh uint64) *inodeFH {
-	defer self.Locked()()
+	defer self.inodeLock.Locked()()
 	return self.fh2ifile[fh]
 }
 
-func (self *inodeTracker) CreateInode() *inode {
-	defer self.Locked()()
-	mlog.Printf2("fs/inode", "CreateInode")
+func (self *inodeTracker) createInode() *inode {
+	self.inodeLock.AssertLocked()
+	mlog.Printf2("fs/inode", "createInode")
 	for {
 		ino := self.generator.CreateInodeNumber()
 		mlog.Printf2("fs/inode", " %v", ino)
@@ -420,7 +421,7 @@ func (self *inodeTracker) CreateInode() *inode {
 		}
 
 		// Potentially interesting. See if it is on disk.
-		inode := self.getinode(ino)
+		inode := self.getInode(ino)
 		if inode.Meta() != nil {
 			inode.Release()
 			continue
@@ -429,6 +430,11 @@ func (self *inodeTracker) CreateInode() *inode {
 		// We have fresh inode for ourselves!
 		return inode
 	}
+}
+
+func (self *inodeTracker) CreateInode() *inode {
+	defer self.inodeLock.Locked()()
+	return self.createInode()
 }
 
 // Misc utility stuff

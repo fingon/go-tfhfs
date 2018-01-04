@@ -4,18 +4,19 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Jan  4 01:08:41 2018 mstenber
- * Edit time:     329 min
+ * Last modified: Fri Jan  5 00:52:35 2018 mstenber
+ * Edit time:     434 min
  *
  */
 
 package storage
 
 import (
-	"sort"
+	"log"
 
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util"
 )
 
 // BlockBackend is the shadow behind the throne; it actually
@@ -57,39 +58,35 @@ type BlockBackend interface {
 
 type BlockReferenceCallback func(string)
 type BlockIterateReferencesCallback func(string, []byte, BlockReferenceCallback)
-type BlockHasExternalReferencesCallback func(string) bool
 
 // Storage is essentially DelayedStorage of Python prototype; it has
 // dirty tracking of blocks, delayed flush to BlockBackend, and
 // caching of data.
 type oldNewStruct struct{ old_value, new_value string }
 type Storage struct {
-	Backend                       BlockBackend
-	IterateReferencesCallback     BlockIterateReferencesCallback
-	HasExternalReferencesCallback BlockHasExternalReferencesCallback
-	Codec                         codec.Codec
-	MaximumCacheSize              int
+	Backend                   BlockBackend
+	IterateReferencesCallback BlockIterateReferencesCallback
+	Codec                     codec.Codec
 
-	// Map of block id => block for dirty blocks.
-	dirtyBid2Block map[string]*Block
+	// blocks is Block object herd; they are reference counted, so
+	// as long as someone keeps a reference to one, it stays
+	// here. Being in dirtyBlocks means it also has extra
+	// reference.
+	blocks BlockMapAtomicPointer
 
-	// Blocks that have refcnt0 but BlockHasExternalReferencesCallback has
-	// claimed they should still be around
-	referencedRefcnt0Blocks map[string]*Block
+	// Blocks that are dirty
+	dirtyBlocks BlockMapAtomicPointer
+	dirtyLock   util.MutexLocked
 
 	// Stuff below here is ~DelayedStorage
-	names          map[string]*oldNewStruct
-	cacheBid2Block map[string]*Block
-	cacheSize      int
-	t              uint64
+	names    map[string]*oldNewStruct
+	nameLock util.MutexLocked
 
 	reads, writes, readbytes, writebytes int
 }
 
 // Init sets up the default values to be usable
 func (self Storage) Init() *Storage {
-	self.dirtyBid2Block = make(map[string]*Block)
-	self.cacheBid2Block = make(map[string]*Block)
 	self.names = make(map[string]*oldNewStruct)
 	// No need to special case Codec = nil elsewhere with this
 	if self.Codec == nil {
@@ -100,101 +97,83 @@ func (self Storage) Init() *Storage {
 
 func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
 	mlog.Printf2("storage/storage", "flushBlockName %s=%x", k, v.new_value)
-	if v.old_value != "" {
-		self.ReleaseBlockId(v.old_value)
-	}
 	self.Backend.SetNameToBlockId(k, v.new_value)
 	if v.new_value != "" {
-		self.ReferBlockId(v.new_value)
+		bl := self.GetBlockById(v.new_value)
+		bl.addRefCount(1)
+		bl.Close()
+	}
+	if v.old_value != "" {
+		self.releaseBlockId(v.old_value)
 	}
 	v.old_value = v.new_value
+}
 
+func (self *Storage) flushBlockNames() int {
+	defer self.nameLock.Locked()()
+	defer self.dirtyLock.Locked()()
+	ops := 0
+	for k, v := range self.names {
+		if v.old_value != v.new_value {
+			self.flushBlockName(k, v)
+			ops++
+		}
+	}
+	return ops
 }
 
 func (self *Storage) Flush() int {
 	mlog.Printf2("storage/storage", "st.Flush")
 	mlog.Printf2("storage/storage", " reads since last flush: %d - %d k", self.reads, self.reads/1024)
 	mlog.Printf2("storage/storage", " writes since last flush: %d - %d k", self.writes, self.writebytes/1024)
+	mlog.Printf2("storage/storage", " blocks:%d (%d dirty)",
+		self.blocks.Get().Len(),
+		self.dirtyBlocks.Get().Len())
 	self.reads = 0
 	self.readbytes = 0
 	self.writes = 0
 	self.writebytes = 0
-	mlog.Printf2("storage/storage", " cache size:%v", self.cacheSize)
 	self.Backend.SetInFlush(true)
 	defer self.Backend.SetInFlush(false)
-	ops := 0
+
 	// _flush_names in Python prototype
-	for k, v := range self.names {
-		if v.old_value != v.new_value {
-			self.flushBlockName(k, v)
-			ops = ops + 1
-		}
-	}
-	// Main flush in Python prototype; handles deletion
-	for self.referencedRefcnt0Blocks != nil {
-		s := self.referencedRefcnt0Blocks
-		mlog.Printf2("storage/storage", " flush (delete); %d candidates", len(s))
-		self.referencedRefcnt0Blocks = nil
+	ops := self.flushBlockNames()
+
+	// flush_dirty_stored_blocks in Python
+	for {
+		s := self.dirtyBlocks.Get()
 		oops := ops
-		for _, v := range s {
-			if v.RefCount == 0 && self.deleteBlockIfNoExtRef(v) {
-				ops = ops + 1
-			}
+		mlog.Printf2("storage/storage", " flush_dirty_stored_blocks; %d to go", s.Len())
+		// first nonzero refcounts as they may add references;
+		// then zero refcounts as they reduce references
+		for i := 0; i < 2; i++ {
+			s.Range(func(_ string, b *Block) bool {
+				if (b.RefCount == 0) == (i == 1) {
+					ops += b.flush()
+				}
+				return true
+			})
 		}
-		// If we didn't manage to kill any blocks, rest have
-		// external references that are current.
-		if oops == ops {
+		if ops == oops {
 			break
 		}
 	}
 
-	// flush_dirty_stored_blocks in Python
-	for len(self.dirtyBid2Block) > 0 {
-		mlog.Printf2("storage/storage", " flush_dirty_stored_blocks; %d to go", len(self.dirtyBid2Block))
-		dirty := self.dirtyBid2Block
-		self.dirtyBid2Block = make(map[string]*Block, len(dirty))
-		nonzero_blocks := make([]*Block, 0, len(dirty))
-		for _, b := range dirty {
-			if b.RefCount == 0 {
-				ops = ops + b.flush()
-			} else {
-				nonzero_blocks = append(nonzero_blocks, b)
-			}
-		}
-		for _, b := range nonzero_blocks {
-			if b.RefCount > 0 {
-				ops = ops + b.flush()
-			} else {
-				// populate for subsequent round
-				self.dirtyBid2Block[b.Id] = b
-			}
-		}
-	}
-
-	// end of flush in DelayedStorage in Python prototype
-	if self.MaximumCacheSize > 0 && self.cacheSize > self.MaximumCacheSize {
-		self.shrinkCache()
-	}
-	mlog.Printf2("storage/storage", " ops:%v, cache size:%v", ops, self.cacheSize)
+	mlog.Printf2("storage/storage", " ops:%v", ops)
 	return ops
 }
 
 func (self *Storage) GetBlockIdByName(name string) string {
+	defer self.nameLock.Locked()()
 	return self.getName(name).new_value
-}
-
-func (self *Storage) ReferBlockId(id string) {
-	b := self.GetBlockById(id)
-	if b == nil {
-		panic("block id disappeared")
-	}
-	b.setRefCount(b.RefCount + 1)
 }
 
 func (self *Storage) ReferOrStoreBlock(id string, data []byte) *Block {
 	b := self.GetBlockById(id)
 	if b != nil {
-		self.ReferBlockId(id)
+		defer self.dirtyLock.Locked()()
+		// storageRefCount was added already
+		b.addRefCount(1)
 		return b
 	}
 	return self.StoreBlock(id, data, BlockStatus_NORMAL)
@@ -203,30 +182,39 @@ func (self *Storage) ReferOrStoreBlock(id string, data []byte) *Block {
 // ReleaseBlockId will eventually release block (in Flush), if its
 // refcnt is zero.
 func (self *Storage) ReleaseBlockId(id string) {
+	defer self.dirtyLock.Locked()()
+	self.releaseBlockId(id)
+}
+
+func (self *Storage) releaseBlockId(id string) {
 	b := self.GetBlockById(id)
 	if b == nil {
-		panic("block id disappeared")
+		log.Panicf("block id %x disappeared", id)
 	}
-	b.setRefCount(b.RefCount - 1)
+	b.addRefCount(-1)
+	b.Close()
 }
 
 func (self *Storage) SetNameToBlockId(name, block_id string) {
+	defer self.nameLock.Locked()()
 	self.getName(name).new_value = block_id
 }
 
 func (self *Storage) StoreBlock(id string, data []byte, status BlockStatus) *Block {
+	mlog.Printf2("storage/storage", "st.StoreBlock %x", id)
 	b := self.gocBlockById(id)
-	b.setRefCount(1)
+	defer self.dirtyLock.Locked()()
+	b.addRefCount(1)
 	b.setStatus(status)
 	b.Data = data
-	self.cacheSize += b.getCacheSize()
-	self.updateBlockDataDependencies(b, true, status)
 	return b
 
 }
 
 /// Private
 func (self *Storage) updateBlockDataDependencies(b *Block, add bool, st BlockStatus) {
+	mlog.Printf2("storage/storage", "st.updateBlockDataDependencies %p %v %v", b, add, st)
+	defer mlog.Printf2("storage/storage", " st.updateBlockDataDependencies done")
 	// No sub-references
 	if st >= BlockStatus_WANT_NORMAL {
 		return
@@ -236,109 +224,16 @@ func (self *Storage) updateBlockDataDependencies(b *Block, add bool, st BlockSta
 	}
 	self.IterateReferencesCallback(b.Id, b.GetData(), func(id string) {
 		if add {
-			self.ReferBlockId(id)
+			b := self.GetBlockById(id)
+			if b == nil {
+				log.Panicf("nonexistent block requested: %x", id)
+			}
+			b.addRefCount(1)
+			b.Close()
 		} else {
-			self.ReleaseBlockId(id)
+			self.releaseBlockId(id)
 		}
 	})
-}
-
-// getBlockById is the old Storage version; GetBlockIdBy is the external one
-func (self *Storage) getBlockById(id string) *Block {
-	b := self.dirtyBid2Block[id]
-	if self.blockValid(b) {
-		return b
-	}
-	if self.referencedRefcnt0Blocks != nil {
-		b := self.referencedRefcnt0Blocks[id]
-		if self.blockValid(b) {
-			return b
-		}
-	}
-	b = self.Backend.GetBlockById(id)
-	if b != nil {
-		b.storage = self
-	}
-	return b
-}
-
-func (self *Storage) deleteBlockWithDeps(b *Block) bool {
-	self.updateBlockDataDependencies(b, false, b.Status)
-	self.Backend.DeleteBlock(b)
-	self.deleteCachedBlock(b)
-	return true
-}
-
-func (self *Storage) deleteBlockIfNoExtRef(b *Block) bool {
-	if self.HasExternalReferencesCallback != nil && self.HasExternalReferencesCallback(b.Id) {
-		if self.referencedRefcnt0Blocks == nil {
-			self.referencedRefcnt0Blocks = make(map[string]*Block)
-		}
-		self.referencedRefcnt0Blocks[b.Id] = b
-		return false
-	}
-	if self.referencedRefcnt0Blocks != nil {
-		delete(self.referencedRefcnt0Blocks, b.Id)
-	}
-	return self.deleteBlockWithDeps(b)
-}
-
-func (self *Storage) shrinkCache() {
-	mlog.Printf2("storage/storage", "shrinkCache")
-	n := len(self.cacheBid2Block)
-	arr := make([]*Block, n)
-	i := 0
-	for _, v := range self.cacheBid2Block {
-		arr[i] = v
-		i = i + 1
-	}
-	sort.Slice(arr, func(i, j int) bool {
-		return arr[i].t < arr[j].t
-	})
-	cnt := i
-	i = 0
-	goal := self.MaximumCacheSize * 3 / 4
-
-	// recalculate cache size so we're actually doing correct
-	// cleanup (TBD is this too expensive? probably not compared
-	// to e.g. building and sorting the array above anyway)
-	cs := 0
-	for i = 0; i < n; i++ {
-		cs += arr[i].getCacheSize()
-	}
-	self.cacheSize = cs
-
-	for i = 0; i < n && self.cacheSize > goal; i++ {
-		self.deleteCachedBlock(arr[i])
-	}
-	mlog.Printf2("storage/storage", " removed %d out of %d entries", i, cnt)
-
-}
-
-func (self *Storage) recalculateCacheSize() {
-
-}
-
-func (self *Storage) deleteCachedBlock(b *Block) {
-	delete(self.cacheBid2Block, b.Id)
-	self.cacheSize -= b.getCacheSize()
-	if b.stored != nil && b.stored.RefCount == 0 {
-		// Locally stored, never hit disk, but references did
-		self.updateBlockDataDependencies(b, false, b.Status)
-	}
-}
-
-func (self *Storage) updateBlock(b *Block) int {
-	if b.RefCount == 0 {
-		if b.stored.RefCount == 0 {
-			self.deleteCachedBlock(b)
-			return 0
-		}
-		if self.deleteBlockIfNoExtRef(b) {
-			return 1
-		}
-	}
-	return self.Backend.UpdateBlock(b)
 }
 
 func (self *Storage) getName(name string) *oldNewStruct {

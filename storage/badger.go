@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Thu Jan  4 02:41:46 2018 mstenber
- * Edit time:     123 min
+ * Last modified: Thu Jan  4 20:08:25 2018 mstenber
+ * Edit time:     125 min
  *
  */
 
@@ -47,6 +47,7 @@ func (self BadgerBlockBackend) Init(dir string) *BadgerBlockBackend {
 }
 
 func (self *BadgerBlockBackend) DeleteBlock(b *Block) {
+	mlog.Printf2("storage/badger", "bad.DeleteBlock %x", b.Id)
 	k := append([]byte("1"), []byte(b.Id)...)
 	if err := self.delete(k); err != nil {
 		log.Panic("txn.Delete", err)
@@ -150,7 +151,7 @@ func (self *BadgerBlockBackend) SetNameToBlockId(name, block_id string) {
 
 func (self *BadgerBlockBackend) StoreBlock(b *Block) {
 	data := b.GetCodecData()
-	mlog.Printf2("storage/badger", "StoreBlock %x (%d b)", b.Id, len(data))
+	mlog.Printf2("storage/badger", "bad.StoreBlock %x (%d b)", b.Id, len(data))
 	self.updateBlock(b)
 	self.setKKValue([]byte("2"), []byte(b.Id), []byte(data))
 }
@@ -164,6 +165,7 @@ func (self *BadgerBlockBackend) updateBlock(b *Block) {
 }
 
 func (self *BadgerBlockBackend) UpdateBlock(b *Block) int {
+	mlog.Printf2("storage/badger", "bad.UpdateBlock %x", b.Id)
 	self.updateBlock(b)
 	return 1
 }

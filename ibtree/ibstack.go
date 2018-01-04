@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Tue Jan  2 20:34:06 2018 mstenber
- * Edit time:     130 min
+ * Last modified: Fri Jan  5 00:29:18 2018 mstenber
+ * Edit time:     140 min
  *
  */
 package ibtree
@@ -122,6 +122,7 @@ func (self *IBStack) child() *IBNodeDataChild {
 func (self *IBStack) childNode(idx int) *IBNode {
 	n := self.node()
 	if idx < 0 || idx >= len(n.Children) {
+		mlog.Printf2("ibtree/ibstack", "childNode out of bounds (%d out of %d)", idx, len(n.Children))
 		return nil
 	}
 	if self.indexes[self.top] == idx && self.nodes[self.top+1] != nil {
@@ -573,6 +574,9 @@ func (self *IBStack) search(key IBKey) {
 			break
 		}
 		n = self.childNode(idx)
+		if n == nil {
+			log.Panicf("nil child node at depth %d idx %d", self.top, idx)
+		}
 		self.push(idx, n)
 	}
 }

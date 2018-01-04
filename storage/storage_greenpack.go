@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 08:37:14 2017 mstenber
- * Last modified: Sun Dec 24 16:42:50 2017 mstenber
+ * Last modified: Thu Jan  4 16:58:21 2018 mstenber
  * Edit time:     18 min
  *
  */
@@ -57,7 +57,7 @@ const (
 type BlockMetadata struct {
 	// RefCount is the non-negative number of references to a
 	// block _on disk_ (or what should be on disk).
-	RefCount int `zid:"0"`
+	RefCount int32 `zid:"0"`
 
 	// Status describes the desired behavior of sub-references and
 	// availability of data of a block.

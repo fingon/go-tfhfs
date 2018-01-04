@@ -4,14 +4,19 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Jan  4 13:19:58 2018 mstenber
-# Edit time:     59 min
+# Last modified: Thu Jan  4 15:31:25 2018 mstenber
+# Edit time:     61 min
 #
 #
 
 GREENPACKS=$(wildcard */*_greenpack.go)
 GREENPACK_OPTS=-alltuple
 # ^ remove -alltuple someday if we want to pretend to be compatible over versions
+
+GENERATED=\
+	fs/ibnodepointer_gen.go \
+	storage/block_map_gen.go \
+	storage/block_map_pointer_gen.go
 
 SUBDIRS=codec fs ibtree storage
 
@@ -22,7 +27,18 @@ bench: .done.buildable
 
 get: .done.getprebuild
 
-generate: .done.buildable fs/ibnodepointer_gen.go
+generate: .done.buildable $(GENERATED)
+
+storage/block_map_gen.go: Makefile
+	peds -maps 'BlockMap<string,*Block>' -pkg storage -file storage/block_map_gen.go
+
+storage/block_map_pointer_gen.go: Makefile xxx/pointer.go
+	( echo "package storage" ; \
+		egrep -A 9999 '^import' xxx/pointer.go | \
+		egrep -v '^(type XXX|// XXX)Type' | \
+		sed 's/XXXType/(*BlockMap)/g;s/XXX/BlockMap/g' | \
+		cat ) > $@.new
+	mv $@.new $@
 
 fs/ibnodepointer_gen.go: Makefile xxx/pointer.go
 	( echo "package fs" ; \

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Wed Jan  3 15:07:00 2018 mstenber
- * Edit time:     695 min
+ * Last modified: Fri Jan  5 00:31:48 2018 mstenber
+ * Edit time:     700 min
  *
  */
 
@@ -263,11 +263,13 @@ func (self *IBNode) childNode(idx int) *IBNode {
 	// Uh oh. Not dirty. Have to load from somewhere.
 	// TBD: We could cache this, maybe, but probably not worth it.
 	if self.tree.backend == nil {
+		mlog.Printf2("ibtree/ibtree", "childNode - backend not set")
 		return nil
 	}
 	bid := BlockId(c.Value)
 	nd := self.tree.backend.LoadNode(bid)
 	if nd == nil {
+		mlog.Printf2("ibtree/ibtree", "childNode - backend LoadNode for %x failed", bid)
 		return nil
 	}
 	return &IBNode{tree: self.tree, blockId: &bid, IBNodeData: *nd}

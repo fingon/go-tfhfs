@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 22:49:15 2018 mstenber
- * Last modified: Wed Jan  3 23:05:45 2018 mstenber
- * Edit time:     17 min
+ * Last modified: Thu Jan  4 20:09:16 2018 mstenber
+ * Edit time:     18 min
  *
  */
 
@@ -72,6 +72,7 @@ func (self BoltBlockBackend) Init(dir string) *BoltBlockBackend {
 }
 
 func (self *BoltBlockBackend) DeleteBlock(b *Block) {
+	mlog.Printf2("storage/bolt", "bolt.DeleteBlock %x", b.Id)
 	bid := []byte(b.Id)
 	self.tx.Bucket(metadataKey).Delete(bid)
 	self.tx.Bucket(dataKey).Delete(bid)
@@ -93,7 +94,7 @@ func (self *BoltBlockBackend) GetBlockById(id string) *Block {
 	if err != nil {
 		log.Fatal(err)
 	}
-	mlog.Printf2("storage/bolt", "b.GetBlockById %x", id)
+	mlog.Printf2("storage/bolt", "bolt.GetBlockById %x", id)
 	return b
 }
 
@@ -102,6 +103,7 @@ func (self *BoltBlockBackend) GetBlockIdByName(name string) string {
 }
 
 func (self *BoltBlockBackend) SetInFlush(value bool) {
+	mlog.Printf2("storage/bolt", "bolt.SetInFlush %v", value)
 	if !value {
 		self.tx.Commit()
 	}
@@ -120,7 +122,7 @@ func (self *BoltBlockBackend) SetNameToBlockId(name, block_id string) {
 func (self *BoltBlockBackend) StoreBlock(b *Block) {
 	data := b.GetCodecData()
 	bid := []byte(b.Id)
-	mlog.Printf2("storage/bolt", "StoreBlock %x (%d b)", bid, len(data))
+	mlog.Printf2("storage/bolt", "bolt.StoreBlock %x (%d b)", bid, len(data))
 	self.updateBlock(b)
 	self.tx.Bucket(dataKey).Put(bid, data)
 }
@@ -135,6 +137,7 @@ func (self *BoltBlockBackend) updateBlock(b *Block) {
 }
 
 func (self *BoltBlockBackend) UpdateBlock(b *Block) int {
+	mlog.Printf2("storage/bolt", "bolt.UpdateBlock %x", b.Id)
 	self.updateBlock(b)
 	return 1
 }

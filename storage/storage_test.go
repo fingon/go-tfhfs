@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Wed Jan  3 23:06:43 2018 mstenber
- * Edit time:     118 min
+ * Last modified: Thu Jan  4 20:22:26 2018 mstenber
+ * Edit time:     138 min
  *
  */
 
@@ -44,7 +44,7 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 		// ^ has to be called before the next one, as .Data isn't
 		// populated by default.
 		//assert.Equal(t, b1, b2)
-		assert.Equal(t, b2.RefCount, 123)
+		assert.Equal(t, int(b2.RefCount), 123)
 		assert.Equal(t, b2.Status, BlockStatus_NORMAL)
 
 		//bs.UpdateBlockStatus(b1, BlockStatus_MISSING)
@@ -83,38 +83,53 @@ func ProdBlockBackend(t *testing.T, factory func() BlockBackend) {
 }
 
 func ProdStorageOne(t *testing.T, s *Storage) {
+	mlog.Printf2("storage/storage_test", "ProdStorageOne")
 	v := []byte("v")
 	b := s.ReferOrStoreBlock("key", v)
+	assert.Equal(t, int(b.storageRefCount), 2)
 	assert.True(t, b != nil)
-	assert.Equal(t, b.RefCount, 1)
+	assert.Equal(t, int(b.RefCount), 1)
 	b2 := s.ReferOrStoreBlock("key", v)
 	assert.Equal(t, b, b2)
-	assert.Equal(t, b.RefCount, 2)
-	assert.Equal(t, len(s.dirtyBid2Block), 1)
-	assert.Equal(t, len(s.cacheBid2Block), 1)
+	assert.Equal(t, int(b.storageRefCount), 3)
+	assert.Equal(t, int(b.RefCount), 2)
+	assert.Equal(t, s.dirtyBlocks.Get().Len(), 1)
 	s.Flush()
-	assert.Equal(t, len(s.dirtyBid2Block), 0)
-	assert.Equal(t, len(s.cacheBid2Block), 1)
+	assert.Equal(t, s.blocks.Get().Len(), 1)
+	assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
+	assert.Equal(t, int(b.storageRefCount), 2) // two references kept below
 
 	b3 := s.ReferOrStoreBlock("key2", v)
-	s.MaximumCacheSize = b3.getCacheSize() * 3 / 2
+	assert.Equal(t, s.blocks.Get().Len(), 2)
+	assert.Equal(t, s.dirtyBlocks.Get().Len(), 1)
+	assert.Equal(t, int(b3.storageRefCount), 2)
+	assert.Equal(t, int(b3.RefCount), 1)
 	// ^ b.size must be <= 3/4 max
 
-	mlog.Printf2("storage/storage_test", "Set MaximumCacheSize to %v", s.MaximumCacheSize)
-	assert.Equal(t, len(s.dirtyBid2Block), 1)
-	assert.Equal(t, len(s.cacheBid2Block), 2)
+	assert.Equal(t, s.dirtyBlocks.Get().Len(), 1)
 	s.Flush()
-	assert.Equal(t, len(s.dirtyBid2Block), 0)
-	assert.Equal(t, len(s.cacheBid2Block), 1)
-	// k2 should be in cache and k should be gone as it was earlier one
-	assert.True(t, s.cacheBid2Block["key2"] != nil)
+	assert.Equal(t, s.blocks.Get().Len(), 2)
+	assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
+	assert.Equal(t, int(b3.storageRefCount), 1)
+	assert.Equal(t, int(b3.RefCount), 1)
 	s.ReleaseBlockId("key2")
 
 	s.ReleaseBlockId("key")
 	s.ReleaseBlockId("key")
 	s.Flush()
-	assert.Equal(t, len(s.cacheBid2Block), 0)
+	assert.Equal(t, s.blocks.Get().Len(), 2)
 
+	assert.Equal(t, int(b.storageRefCount), 2)
+	assert.Equal(t, int(b3.storageRefCount), 1)
+	assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
+	assert.Equal(t, s.blocks.Get().Len(), 2)
+	b.Close()
+	b.Close()
+	b3.Close()
+	assert.Equal(t, int(b.storageRefCount), 0)
+	assert.Equal(t, int(b3.storageRefCount), 0)
+	assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
+	assert.Equal(t, s.blocks.Get().Len(), 0)
 }
 
 func ProdStorage(t *testing.T, factory func() BlockBackend) {

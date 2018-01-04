@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:44:41 2018 mstenber
- * Last modified: Wed Jan  3 18:40:16 2018 mstenber
+ * Last modified: Thu Jan  4 16:59:02 2018 mstenber
  * Edit time:     70 min
  *
  */
@@ -113,7 +113,7 @@ func (self *FileBlockBackend) GetBlockById(id string) *Block {
 		}
 		mlog.Printf2("storage/file", " found")
 		return &Block{Id: id, backend: self,
-			BlockMetadata: BlockMetadata{RefCount: refcount,
+			BlockMetadata: BlockMetadata{RefCount: int32(refcount),
 				Status: BlockStatus(status)}}
 	}
 	return nil

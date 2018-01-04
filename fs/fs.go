@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Jan  4 14:33:53 2018 mstenber
- * Edit time:     253 min
+ * Last modified: Fri Jan  5 00:18:48 2018 mstenber
+ * Edit time:     267 min
  *
  */
 
@@ -53,7 +53,6 @@ type Fs struct {
 	// make sure writes are consistent.
 	lock            util.MutexLocked
 	treeRootBlockId ibtree.BlockId
-	bidMap          map[string]bool
 	nodeDataCache   gcache.Cache
 }
 
@@ -73,6 +72,7 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 		}
 		return nd
 	}
+	mlog.Printf2("fs/fs", "fs.LoadNode found %x in cache: %p", id, v)
 	return v.(*ibtree.IBNodeData)
 }
 
@@ -82,7 +82,6 @@ func (self *Fs) Flush() int {
 	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 	// ^ done in each commit, so pointless here?
 	rv := self.storage.Flush()
-	self.bidMap = make(map[string]bool)
 	mlog.Printf2("fs/fs", " .. done with fs.Flush")
 	return rv
 }
@@ -153,10 +152,6 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs.flushInterval = 1 * time.Second
 	fs.inodeTracker.Init(fs)
 	fs.tree = ibtree.IBTree{}.Init(fs)
-	fs.bidMap = make(map[string]bool)
-	st.HasExternalReferencesCallback = func(id string) bool {
-		return fs.hasExternalReferences(id)
-	}
 	st.IterateReferencesCallback = func(id string, data []byte, cb storage.BlockReferenceCallback) {
 		fs.iterateReferencesCallback(id, data, cb)
 	}
@@ -183,17 +178,12 @@ func NewCryptoStorage(password, salt string, backend storage.BlockBackend) *stor
 	c1 := codec.EncryptingCodec{}.Init([]byte(password), []byte(salt), iterations)
 	c2 := &codec.CompressingCodec{}
 	c := codec.CodecChain{}.Init(c1, c2)
-	st := storage.Storage{MaximumCacheSize: 123456789,
-		Codec: c, Backend: backend}.Init()
+	st := storage.Storage{Codec: c, Backend: backend}.Init()
 	return st
 }
 
-// These are pre-flush references to blocks; I didn't come up with
-// better scheme than this, so we keep that and clear it at flush
-// time.
 func (self *Fs) hasExternalReferences(id string) bool {
-	self.lock.AssertLocked()
-	return self.bidMap[id]
+	return false
 }
 
 func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.BlockReferenceCallback) {
@@ -224,6 +214,7 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 }
 
 func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
+	mlog.Printf2("fs/fs", "fs.getBlockDataId %d", len(b))
 	self.lock.AssertLocked()
 	h := sha256.Sum256(b)
 	bid := h[:]
@@ -233,11 +224,10 @@ func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
 	}
 	block := self.storage.ReferOrStoreBlock(id, b)
 	self.storage.ReleaseBlockId(block.Id)
-	// By default this won't increase references; however, stuff
-	// that happens 'elsewhere' (e.g. taking root reference) does,
-	// and due to thattransitively, also this does.
-	self.bidMap[block.Id] = true
-	return ibtree.BlockId(block.Id)
+	r := ibtree.BlockId(block.Id)
+	mlog.Printf2("fs/fs", " fs.getBlockDataId = %x", r)
+	block.Close()
+	return r
 }
 
 func (self *Fs) loadNodeFromBytes(bd []byte) *ibtree.IBNodeData {
@@ -260,10 +250,11 @@ func (self *Fs) loadNodeFromBytes(bd []byte) *ibtree.IBNodeData {
 }
 
 func (self *Fs) loadNode(id ibtree.BlockId) *ibtree.IBNodeData {
-	mlog.Printf2("fs/fs", "fs.LoadNode %x", id)
+	mlog.Printf2("fs/fs", "fs.loadNode %x", id)
 	b := self.storage.GetBlockById(string(id))
 	if b == nil {
 		return nil
 	}
+	defer b.Close()
 	return self.loadNodeFromBytes(b.GetData())
 }

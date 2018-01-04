@@ -4,14 +4,18 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Wed Jan  3 18:39:55 2018 mstenber
- * Edit time:     59 min
+ * Last modified: Thu Jan  4 18:42:13 2018 mstenber
+ * Edit time:     60 min
  *
  */
 
 package storage
 
-import "log"
+import (
+	"log"
+
+	"github.com/fingon/go-tfhfs/mlog"
+)
 
 // InMemoryBlockBackend provides In-memory storage; data is always
 // assumed to be available and is just stored in maps.
@@ -31,6 +35,7 @@ func (self InMemoryBlockBackend) Init() *InMemoryBlockBackend {
 }
 
 func (self *InMemoryBlockBackend) DeleteBlock(b *Block) {
+	mlog.Printf2("storage/inmemory", "im.DeleteBlock %x", b.Id)
 	if !self.in_flush {
 		log.Fatal("DeleteBlock outside flush")
 	}
@@ -78,6 +83,7 @@ func (self *InMemoryBlockBackend) StoreBlock(b *Block) {
 	if self.id2Block[b.Id] != nil {
 		log.Fatal("Existing block id in StoreBlock")
 	}
+	mlog.Printf2("storage/inmemory", "im.StoreBlock %x", b.Id)
 	self.id2Block[b.Id] = b
 }
 
@@ -88,6 +94,7 @@ func (self *InMemoryBlockBackend) UpdateBlock(b *Block) int {
 	if self.id2Block[b.Id] == nil {
 		log.Fatal("Non-existent block id in StoreBlock")
 	}
+	mlog.Printf2("storage/inmemory", "im.UpdateBlock %x", b.Id)
 	return 1
 }
 

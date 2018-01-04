@@ -4,14 +4,18 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Tue Jan  2 14:28:51 2018 mstenber
- * Edit time:     13 min
+ * Last modified: Fri Jan  5 00:10:25 2018 mstenber
+ * Edit time:     14 min
  *
  */
 
 package ibtree
 
-import "github.com/fingon/go-tfhfs/mlog"
+import (
+	"log"
+
+	"github.com/fingon/go-tfhfs/mlog"
+)
 
 // IBTransaction is convenience API for dealing with the chaining of
 // things in the ibtree. While API wise it is same as dealing with
@@ -27,6 +31,9 @@ type IBTransaction struct {
 func NewTransaction(root *IBNode) *IBTransaction {
 	t := &IBTransaction{original: root}
 	t.stack.nodes[0] = root
+	if root == nil {
+		log.Panicf("nil root")
+	}
 	return t
 }
 

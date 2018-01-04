@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Jan  4 15:31:25 2018 mstenber
-# Edit time:     61 min
+# Last modified: Fri Jan  5 01:04:42 2018 mstenber
+# Edit time:     63 min
 #
 #
 
@@ -27,7 +27,7 @@ bench: .done.buildable
 
 get: .done.getprebuild
 
-generate: .done.buildable $(GENERATED)
+generate: .done.generated
 
 storage/block_map_gen.go: Makefile
 	peds -maps 'BlockMap<string,*Block>' -pkg storage -file storage/block_map_gen.go
@@ -92,7 +92,10 @@ update-deps:
 	for FILE in $(GREENPACKS); do greenpack $(GREENPACK_OPTS) -file $$FILE ; done
 	touch $@
 
-.done.buildable: .done.greenpack .done.mlog .done.get2
+.done.buildable: .done.greenpack .done.mlog .done.generated .done.get2
+	touch $@
+
+.done.generated: $(GENERATED)
 	touch $@
 
 .done.test: .done.buildable $(wildcard */*.go)

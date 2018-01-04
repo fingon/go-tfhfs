@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan  4 12:24:51 2018 mstenber
- * Last modified: Thu Jan  4 12:26:48 2018 mstenber
- * Edit time:     2 min
+ * Last modified: Thu Jan  4 13:21:59 2018 mstenber
+ * Edit time:     3 min
  *
  */
 
@@ -20,7 +20,7 @@ import (
 
 func Test(t *testing.T) {
 	t.Parallel()
-	var l MutexLocked
+	var l RMutexLocked
 
 	var wg sync.WaitGroup
 	wg.Add(10)
@@ -28,6 +28,8 @@ func Test(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer wg.Done()
+			defer l.Locked()()
+			// double lock, do that with normal Go :-p
 			defer l.Locked()()
 			j++
 		}()

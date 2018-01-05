@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Fri Jan  5 11:44:38 2018 mstenber
- * Edit time:     140 min
+ * Last modified: Fri Jan  5 13:55:50 2018 mstenber
+ * Edit time:     141 min
  *
  */
 
@@ -72,7 +72,7 @@ func (self *badgerBackend) getKKValue(prefix, suffix []byte) (v []byte, err erro
 		k := append(prefix, suffix...)
 		i, err := txn.Get(k)
 		if err == nil {
-			v, err = i.Value()
+			v, err = i.ValueCopy(nil)
 		}
 		return err
 	})
@@ -136,10 +136,9 @@ func (self *badgerBackend) SetNameToBlockId(name, block_id string) {
 }
 
 func (self *badgerBackend) StoreBlock(b *storage.Block) {
-	data := b.GetCodecData()
-	mlog.Printf2("storage/badger", "bad.StoreBlock %x (%d b)", b.Id, len(data))
+	mlog.Printf2("storage/badger", "bad.StoreBlock %x (%d b)", b.Id, len(b.Data))
 	self.updateBlock(b)
-	self.setKKValue([]byte("2"), []byte(b.Id), []byte(data))
+	self.setKKValue([]byte("2"), []byte(b.Id), b.Data)
 }
 
 func (self *badgerBackend) updateBlock(b *storage.Block) {

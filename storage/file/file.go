@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:44:41 2018 mstenber
- * Last modified: Fri Jan  5 12:02:35 2018 mstenber
- * Edit time:     72 min
+ * Last modified: Fri Jan  5 12:39:03 2018 mstenber
+ * Edit time:     73 min
  *
  */
 
@@ -163,8 +163,7 @@ func (self *fileBackend) SetNameToBlockId(name, block_id string) {
 func (self *fileBackend) StoreBlock(bl *storage.Block) {
 	dir, path := self.blockPath(bl, nil)
 	self.mkdirAll(dir)
-	data := bl.GetCodecData()
-	err := ioutil.WriteFile(path, []byte(data), 0600)
+	err := ioutil.WriteFile(path, bl.Data, 0600)
 	if err != nil {
 		log.Panic(err)
 	}

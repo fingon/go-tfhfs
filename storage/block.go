@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Fri Jan  5 11:59:07 2018 mstenber
- * Edit time:     117 min
+ * Last modified: Fri Jan  5 14:19:46 2018 mstenber
+ * Edit time:     145 min
  *
  */
 
@@ -13,16 +13,11 @@ package storage
 
 import (
 	"log"
-	"sync/atomic"
-	"unsafe"
 
 	"github.com/fingon/go-tfhfs/mlog"
 )
 
-// Block is externally usable read-only structure that is handled
-// using BlockStorer interface. Notably changes to 'Id' and 'Data' are
-// not allowed, and Status should be mutated only via
-// UpdateBlockStatus call of BlockStorer.
+// Block is abstraction used between Storage and its Backends.
 type Block struct {
 	BlockMetadata // contains RefCount, Status
 
@@ -31,9 +26,8 @@ type Block struct {
 	Id string
 
 	// Actually plaintext data (if available; GetData() should be
-	// used to get it always). Backends should use
-	// GetCodecData() when writing things to disk and
-	// SetCodecData() when loading from disk.
+	// used to get it always when accessing from outside backends
+	// as it may not be set at that point otherwise).
 	Data []byte
 
 	// Node is the actual btree node encoded within this
@@ -62,7 +56,11 @@ func (self *Block) GetData() []byte {
 		} else {
 			mlog.Printf2("storage/block", "b.GetData - calling s.be.GetBlockData")
 			data := self.storage.Backend.GetBlockData(self)
-			self.SetCodecData(data)
+			b, err := self.storage.Codec.DecodeBytes(data, []byte(self.Id))
+			if err != nil {
+				log.Panic("Decoding failed", err)
+			}
+			self.Data = b
 			self.storage.reads++
 			self.storage.readbytes += len(data)
 		}
@@ -70,40 +68,12 @@ func (self *Block) GetData() []byte {
 	return self.Data
 }
 
-func (self *Block) GetCodecData() []byte {
-	b := self.GetData()
-	if self.storage == nil {
-		return b
-	}
-	b, err := self.storage.Codec.EncodeBytes(b, []byte(self.Id))
-	if err != nil {
-		log.Panic("Encoding failed", err)
-	}
-	return b
-}
-
-func (self *Block) SetCodecData(b []byte) {
-	if self.storage == nil {
-		self.Data = b
-		return
-	}
-	b, err := self.storage.Codec.DecodeBytes(b, []byte(self.Id))
-	if err != nil {
-		log.Panic("Decoding failed", err)
-	}
-	self.Data = b
-}
-
-func (self *Block) deleteWithDeps() {
-}
-
 func (self *Block) flush() int {
-	if !self.storage.dirtyBlocks.Remove(self) {
-		return 0
-	}
-	defer self.storage.dirtyLock.Locked()()
 	mlog.Printf2("storage/block", "b.flush %p %v %v", self, self.RefCount, self.storageRefCount)
 	// self.Stored MUST be set, otherwise we wouldn't be dirty!
+	if self.Stored == nil {
+		log.Panicf("self.Stored not set?!?")
+	}
 	ops := 0
 	if self.RefCount == 0 {
 		if self.Backend != nil {
@@ -114,50 +84,44 @@ func (self *Block) flush() int {
 		// We want to be added to backend
 		self.storage.writes++
 		self.storage.writebytes += len(self.GetData())
-		self.storage.dirtyLock.Unlock()
-		self.storage.Backend.StoreBlock(self)
+
+		b, err := self.storage.Codec.EncodeBytes(self.Data, []byte(self.Id))
+		if err != nil {
+			log.Panic("Encoding failed", err)
+		}
+		bl := *self
+		bl.Data = b
+
+		self.storage.Backend.StoreBlock(&bl)
 		self.Backend = self.storage.Backend
-		self.storage.dirtyLock.Lock()
 		ops++
 	} else {
 		if self.Stored.Status != self.Status {
-			self.flushStatus()
+			// self.Stored.status != self.status
+			if self.Status == BlockStatus_MISSING {
+				// old type = NORMAL
+			} else if self.Status == BlockStatus_WANT_WEAK {
+				// old type = WEAK
+			} else {
+				self.storage.updateBlockDataDependencies(self, true, self.Status)
+				self.storage.updateBlockDataDependencies(self, false, self.Stored.Status)
+			}
 			ops = ops + 1
 		}
 		ops += self.storage.Backend.UpdateBlock(self)
 	}
 	self.Stored = nil
 	self.addStorageRefCount(-1)
+	delete(self.storage.dirtyBlocks, self.Id)
 	return ops
 }
 
-func (self *Block) flushStatus() {
-	// self.Stored.status != self.status
-	if self.Status == BlockStatus_MISSING {
-		// old type = NORMAL
-		return
-	}
-	if self.Status == BlockStatus_WANT_WEAK {
-		// old type = WEAK
-		return
-	}
-	self.storage.updateBlockDataDependencies(self, true, self.Status)
-	self.storage.updateBlockDataDependencies(self, false, self.Stored.Status)
-
-}
-
-func (self *Block) getCacheSize() int {
-	s := int(unsafe.Sizeof(*self))
-	return s + len(self.Id) + len(self.Data)
-}
-
 func (self *Block) addRefCount(count int32) {
-	self.storage.dirtyLock.AssertLocked()
 	mlog.Printf2("storage/block", "b.addRefCount %p %v -> %v", self, count, self.RefCount+count)
 	self.markDirty()
+	self.RefCount += count
 	hadRefs := self.Stored.RefCount != 0
 	haveRefs := self.RefCount != 0
-	self.RefCount += count
 	if hadRefs != haveRefs {
 		mlog.Printf2("storage/block", " dependencies changed")
 		self.storage.updateBlockDataDependencies(self, haveRefs, self.Status)
@@ -165,48 +129,15 @@ func (self *Block) addRefCount(count int32) {
 }
 
 func (self *Block) setStatus(st BlockStatus) {
-	self.storage.dirtyLock.AssertLocked()
 	mlog.Printf2("storage/block", "setStatus %p %v", self, st)
 	self.markDirty()
 	self.Status = st
 
 }
 
-func (self *BlockMapAtomicPointer) Add(b *Block) bool {
-	for {
-		m := self.Get()
-		_, ok := m.Load(b.Id)
-		if ok {
-			return false
-		}
-		nm := m.Store(b.Id, b)
-		if self.SetIfEqualTo(nm, m) {
-			return true
-		}
-		mlog.Printf2("storage/block", "bmap.Add failed")
-	}
-}
-
-func (self *BlockMapAtomicPointer) Remove(b *Block) bool {
-	for {
-		m := self.Get()
-		v, ok := m.Load(b.Id)
-		if !ok {
-			return false
-		}
-		if v != b {
-			return false
-		}
-		nm := m.Delete(b.Id)
-		if self.SetIfEqualTo(nm, m) {
-			return true
-		}
-		mlog.Printf2("storage/block", "bmap.Remove failed")
-	}
-}
-
 func (self *Block) addStorageRefCount(v int32) {
-	nv := atomic.AddInt32(&self.storageRefCount, v)
+	self.storageRefCount += v
+	nv := self.storageRefCount
 	mlog.Printf2("storage/block", "b.addStorageRefCount %p: %v -> %v", self, v, nv)
 	if nv <= 0 {
 		if nv < 0 {
@@ -216,13 +147,8 @@ func (self *Block) addStorageRefCount(v int32) {
 			log.Panic("Storage reference count before flush?")
 		}
 		mlog.Printf2("storage/block", " removed block %x", self.Id)
-		self.storage.blocks.Remove(self)
+		delete(self.storage.blocks, self.Id)
 	}
-}
-
-func (self *Block) Close() {
-	mlog.Printf2("storage/block", "b.Close %p", self)
-	self.addStorageRefCount(-1)
 }
 
 func (self *Block) markDirty() {
@@ -234,53 +160,32 @@ func (self *Block) markDirty() {
 	self.addStorageRefCount(1)
 	self.Stored = &BlockMetadata{Status: self.Status,
 		RefCount: self.RefCount}
-	self.storage.dirtyBlocks.Add(self)
+	self.storage.dirtyBlocks[self.Id] = self
 }
 
-// GetBlockById returns Block (if any) that matches id. The block
-// reference MUST be eventually Close()d.
-func (self *Storage) GetBlockById(id string) *Block {
+// getBlockById returns Block (if any) that matches id.
+func (self *Storage) getBlockById(id string) *Block {
 	mlog.Printf2("storage/block", "st.GetBlockById %x", id)
-	for {
-		b, ok := self.blocks.Get().Load(id)
-		if !ok {
-			b = self.Backend.GetBlockById(id)
-			if b == nil {
-				mlog.Printf2("storage/block", " does not exist according to backend")
-				return nil
-			}
-			b.storage = self
-			b.addStorageRefCount(1)
-			self.blocks.Add(b)
-		} else {
-			b.addStorageRefCount(1)
+	b, ok := self.blocks[id]
+	if !ok {
+		b = self.Backend.GetBlockById(id)
+		if b == nil {
+			mlog.Printf2("storage/block", " does not exist according to backend")
+			return nil
 		}
-
-		// Ensure no crafty remove+add occurred in parallel
-		b2, ok2 := self.blocks.Get().Load(id)
-		if ok2 && b2 == b {
-			return b
-		}
-
-		mlog.Printf2("storage/block", " parallel access, retry GetBlockById")
-
-		// We added reference just moment ago, just in case
-		b.addStorageRefCount(-1)
+		b.storage = self
+		self.blocks[id] = b
 	}
+	return b
 }
 
 func (self *Storage) gocBlockById(id string) *Block {
 	mlog.Printf2("storage/block", "st.gocBlockById %x", id)
-	for {
-		b := self.GetBlockById(id)
-		if b != nil {
-			return b
-		}
-		b = &Block{Id: id, storage: self}
-		b.addStorageRefCount(1)
-		if self.blocks.Add(b) {
-			return b
-		}
-		b.addStorageRefCount(-1)
+	b := self.getBlockById(id)
+	if b != nil {
+		return b
 	}
+	b = &Block{Id: id, storage: self}
+	self.blocks[id] = b
+	return b
 }

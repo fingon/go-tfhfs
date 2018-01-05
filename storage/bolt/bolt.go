@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 22:49:15 2018 mstenber
- * Last modified: Fri Jan  5 11:56:52 2018 mstenber
- * Edit time:     25 min
+ * Last modified: Fri Jan  5 12:38:10 2018 mstenber
+ * Edit time:     26 min
  *
  */
 
@@ -127,7 +127,10 @@ func (self *boltBackend) SetNameToBlockId(name, block_id string) {
 }
 
 func (self *boltBackend) StoreBlock(b *storage.Block) {
-	data := b.GetCodecData()
+	data := b.Data
+	if data == nil {
+		log.Panicf("data not set in StoreBlock")
+	}
 	bid := []byte(b.Id)
 	mlog.Printf2("storage/bolt", "bbolt.StoreBlock %x (%d b)", bid, len(data))
 	self.updateBlock(b)

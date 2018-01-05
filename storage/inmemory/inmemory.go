@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Fri Jan  5 12:07:08 2018 mstenber
+ * Last modified: Fri Jan  5 12:44:30 2018 mstenber
  * Edit time:     63 min
  *
  */
@@ -24,7 +24,6 @@ import (
 type inMemoryBackend struct {
 	id2Block map[string]*storage.Block
 	name2Id  map[string]string
-	in_flush bool
 	lock     util.MutexLocked
 }
 
@@ -44,9 +43,6 @@ func (self *inMemoryBackend) Close() {
 
 func (self *inMemoryBackend) DeleteBlock(b *storage.Block) {
 	mlog.Printf2("storage/inmemory", "im.DeleteBlock %x", b.Id)
-	if !self.in_flush {
-		log.Fatal("DeleteBlock outside flush")
-	}
 	delete(self.id2Block, b.Id)
 }
 
@@ -72,26 +68,13 @@ func (self *inMemoryBackend) GetBytesUsed() uint64 {
 	return 0
 }
 
-func (self *inMemoryBackend) SetInFlush(value bool) {
-	if self.in_flush == value {
-		log.Fatal("Same in flush value in SetInFlush")
-	}
-	self.in_flush = value
-}
-
 func (self *inMemoryBackend) SetNameToBlockId(name, block_id string) {
 	defer self.lock.Locked()()
-	if !self.in_flush {
-		log.Fatal("SetNameToBlockId outside flush")
-	}
 	self.name2Id[name] = block_id
 }
 
 func (self *inMemoryBackend) StoreBlock(b *storage.Block) {
 	defer self.lock.Locked()()
-	if !self.in_flush {
-		log.Fatal("StoreBlock outside flush")
-	}
 	if self.id2Block[b.Id] != nil {
 		log.Fatal("Existing block id in StoreBlock")
 	}
@@ -101,9 +84,6 @@ func (self *inMemoryBackend) StoreBlock(b *storage.Block) {
 
 func (self *inMemoryBackend) UpdateBlock(b *storage.Block) int {
 	defer self.lock.Locked()()
-	if !self.in_flush {
-		log.Fatal("UpdateBlock outside flush")
-	}
 	if self.id2Block[b.Id] == nil {
 		log.Fatal("Non-existent block id in StoreBlock")
 	}

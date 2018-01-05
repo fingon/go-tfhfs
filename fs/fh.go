@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Fri Jan  5 10:56:44 2018 mstenber
+ * Last modified: Fri Jan  5 14:33:29 2018 mstenber
  * Edit time:     207 min
  *
  */
@@ -181,7 +181,7 @@ func (self *inodeFH) read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 				log.Panicf("Block %x not found at all", *bidp)
 			}
 			defer bl.Close()
-			b = bl.GetData()
+			b = bl.Data()
 			if b[0] != byte(BDT_EXTENT) {
 				log.Panicf("Wrong extent type in read - block content: %x", b)
 			}

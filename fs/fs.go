@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Jan  5 02:52:46 2018 mstenber
- * Edit time:     270 min
+ * Last modified: Fri Jan  5 14:34:11 2018 mstenber
+ * Edit time:     273 min
  *
  */
 
@@ -58,6 +58,7 @@ type Fs struct {
 
 func (self *Fs) Close() {
 	self.Flush()
+	self.storage.Close()
 	self.storage.Backend.Close()
 	self.closing <- true
 }
@@ -76,14 +77,13 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 	return v.(*ibtree.IBNodeData)
 }
 
-func (self *Fs) Flush() int {
+func (self *Fs) Flush() {
 	defer self.lock.Locked()()
 	mlog.Printf2("fs/fs", "fs.Flush started")
 	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 	// ^ done in each commit, so pointless here?
-	rv := self.storage.Flush()
+	self.storage.Flush()
 	mlog.Printf2("fs/fs", " .. done with fs.Flush")
-	return rv
 }
 
 // ibtree.IBTreeBackend API
@@ -223,7 +223,7 @@ func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
 		self.nodeDataCache.Set(ibtree.BlockId(id), nd)
 	}
 	block := self.storage.ReferOrStoreBlock0(id, b)
-	r := ibtree.BlockId(block.Id)
+	r := ibtree.BlockId(block.Id())
 	mlog.Printf2("fs/fs", " fs.getBlockDataId = %x", r)
 	block.Close()
 	return r
@@ -255,5 +255,5 @@ func (self *Fs) loadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 		return nil
 	}
 	defer b.Close()
-	return self.loadNodeFromBytes(b.GetData())
+	return self.loadNodeFromBytes(b.Data())
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 11:14:11 2018 mstenber
- * Last modified: Fri Jan  5 11:22:23 2018 mstenber
- * Edit time:     4 min
+ * Last modified: Fri Jan  5 12:34:06 2018 mstenber
+ * Edit time:     5 min
  *
  */
 
@@ -14,7 +14,10 @@ package storage
 // Backend is the shadow behind the throne; it actually handles the
 // low-level operations of blocks. It provides an API that returns
 // results that are consistent with the previous calls. How it does
-// this in practise is left as an exercise to the implementor.
+// this in practise is left as an exercise to the implementor. There
+// is no guarantee it will not be called from multiple goroutines at
+// once, and it is again the problem of the implementor to ensure that
+// the results are consistent.
 type Backend interface {
 	// Close the backend
 	Close()

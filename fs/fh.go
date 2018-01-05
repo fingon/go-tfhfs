@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Fri Jan  5 03:00:01 2018 mstenber
- * Edit time:     200 min
+ * Last modified: Fri Jan  5 10:56:44 2018 mstenber
+ * Edit time:     207 min
  *
  */
 
@@ -299,13 +299,14 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		bbuf := obuf[:len(obuf)-len(wbuf)]
 		mlog.Printf2("fs/fh", " bbuf %v", len(bbuf))
 
+		meta := self.inode.Meta()
 		if meta.StSize <= embeddedSize && end <= embeddedSize {
 			// in .Data this will live long -> make new copy of
 			// the (small) slice
 			nbuf := bbuf[1:]
 			defer self.Fs().lock.Locked()()
+			meta := self.inode.Meta()
 			meta.Data = nbuf
-			meta.StSize = uint64(len(nbuf))
 			self.inode.SetMeta(meta)
 			mlog.Printf2("fs/fh", " meta %d bytes", len(nbuf))
 		} else {
@@ -317,15 +318,18 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 			tr.Set(ibtree.IBKey(k), string(bid))
 
 			defer self.Fs().lock.Locked()()
+			meta := self.inode.Meta()
 			if len(meta.Data) > 0 {
+				mlog.Printf("cleared in-meta data")
 				meta.Data = nil
 				self.inode.SetMeta(meta)
 			}
 			self.Fs().CommitTransaction(tr)
-			self.inode.SetSize(end)
 		}
 	}()
 
+	defer self.Fs().lock.Locked()()
+	self.inode.SetSize(end)
 	written = uint32(w)
 	mlog.Printf2("fs/fh", " wrote %v", written)
 	return

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Thu Jan  4 14:19:37 2018 mstenber
- * Edit time:     115 min
+ * Last modified: Fri Jan  5 10:52:29 2018 mstenber
+ * Edit time:     119 min
  *
  */
 
@@ -34,14 +34,17 @@ func ProdFsFile1(t *testing.T, u *FSUser, tn, wsize, rsize int) {
 	wd := bytes.Repeat([]byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}, tn/5)
 
 	mlog.Printf2("fs/rawfs_test", " writing file with wsize %d", wsize)
+	written := 0
 	for i := 0; i < tn; i += wsize {
 		wb := wd[i : i+wsize]
 		n, err := f.Write(wb)
+		written += n
 		assert.Nil(t, err)
 		assert.Equal(t, n, wsize)
 	}
 
 	fi, err := u.Stat("/public/file")
+	assert.Equal(t, int(fi.Size()), written)
 	since := time.Now().Sub(fi.ModTime())
 	assert.True(t, since >= 0, "modtime not in past")
 	assert.True(t, since.Minutes() < 1, "modtime too much in past")
@@ -68,7 +71,7 @@ func ProdFsFile1(t *testing.T, u *FSUser, tn, wsize, rsize int) {
 			assert.Equal(t, n, ersize)
 			assert.Equal(t, len(rb), len(eb))
 			if !bytes.Equal(rb, eb) {
-				log.Panicf("content mismatch - got:%x <> expected:%x", rb, eb)
+				log.Panicf("content mismatch @%d - got:%x <> expected:%x", i, rb, eb)
 			}
 		}
 	}

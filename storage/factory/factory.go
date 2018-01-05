@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:22:52 2018 mstenber
- * Last modified: Fri Jan  5 12:26:02 2018 mstenber
- * Edit time:     2 min
+ * Last modified: Fri Jan  5 16:29:49 2018 mstenber
+ * Edit time:     9 min
  *
  */
 
@@ -36,7 +36,7 @@ var backendFactories = map[string]factoryCallback{
 	}}
 
 func List() []string {
-	keys := make([]string, len(backendFactories))
+	keys := make([]string, 0, len(backendFactories))
 	for k, _ := range backendFactories {
 		keys = append(keys, k)
 	}

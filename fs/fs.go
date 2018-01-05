@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Jan  5 17:02:13 2018 mstenber
- * Edit time:     287 min
+ * Last modified: Fri Jan  5 22:47:20 2018 mstenber
+ * Edit time:     294 min
  *
  */
 
@@ -52,10 +52,15 @@ type Fs struct {
 	// e.g. any write operation should grab the lock early on to
 	// make sure writes are consistent.
 	lock          util.MutexLocked
+	lastBlock     *storage.StorageBlock
 	nodeDataCache gcache.Cache
 }
 
 func (self *Fs) Close() {
+
+	if self.lastBlock != nil {
+		self.lastBlock.Close()
+	}
 	mlog.Printf2("fs/fs", "fs.Close")
 
 	// this will kill the underlying goroutine and ensure it has flushed
@@ -91,6 +96,7 @@ func (self *Fs) Flush() {
 
 // ibtree.IBTreeBackend API
 func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
+	self.lock.AssertLocked()
 	bb := make([]byte, nd.Msgsize()+1)
 	bb[0] = byte(BDT_NODE)
 	b, err := nd.MarshalMsg(bb[1:1])
@@ -99,9 +105,12 @@ func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 	}
 	b = bb[0 : 1+len(b)]
 	mlog.Printf2("fs/fs", "SaveNode %d bytes", len(b))
+	if self.lastBlock != nil {
+		self.lastBlock.Close()
+	}
 	bl := self.getStorageBlock(b, nd)
 	bid := ibtree.BlockId(bl.Id())
-	bl.Close()
+	self.lastBlock = bl
 	return bid
 }
 

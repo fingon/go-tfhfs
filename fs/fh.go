@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Fri Jan  5 16:50:40 2018 mstenber
- * Edit time:     211 min
+ * Last modified: Fri Jan  5 22:29:02 2018 mstenber
+ * Edit time:     216 min
  *
  */
 
@@ -238,8 +238,12 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 	end := offset + uint64(len(buf))
 	need := dataExtentSize + dataHeaderMaximumSize
 	meta := self.inode.Meta()
-	if end <= embeddedSize && meta.StSize <= embeddedSize {
-		need = embeddedSize + 1
+	var odata []byte
+	if meta.StSize <= embeddedSize {
+		odata = meta.Data
+		if end <= embeddedSize {
+			need = embeddedSize + 1
+		}
 	}
 
 	// obuf is the master slice to which we gather data, using
@@ -270,13 +274,21 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		// We inherit the block-lock, and release only when we're done
 		defer unlock()
 		if bofs > 0 {
-			r, code = self.read(wbuf[:bofs], offset)
-			if !code.Ok() {
-				return
+			if odata != nil {
+				if len(odata) > bofs {
+					odata = odata[:bofs]
+				}
+				copy(wbuf, odata)
+				wbuf = wbuf[len(odata):]
+			} else {
+				r, code = self.read(wbuf[:bofs], offset)
+				if !code.Ok() {
+					return
+				}
+				tbuf, _ := r.Bytes(nil)
+				wbuf = wbuf[len(tbuf):]
+				mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
 			}
-			tbuf, _ := r.Bytes(nil)
-			wbuf = wbuf[len(tbuf):]
-			mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
 		}
 
 		// This was copied in earlier
@@ -315,8 +327,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 			k := NewblockKeyOffset(self.inode.ino, offset)
 			tr := self.Fs().GetTransaction()
 			defer tr.Close()
-			bl := self.Fs().getStorageBlock(bbuf, nil)
-			defer bl.Close()
+			bl := tr.getStorageBlock(bbuf, nil)
 			bid := bl.Id()
 			mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
 			// mlog.Printf2("fs/fh", " %x", buf)

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Fri Jan  5 23:56:44 2018 mstenber
- * Edit time:     535 min
+ * Last modified: Sat Jan  6 01:09:48 2018 mstenber
+ * Edit time:     540 min
  *
  */
 
@@ -118,15 +118,16 @@ type Storage struct {
 // Init sets up the default values to be usable
 func (self Storage) Init() *Storage {
 	self.names = make(map[string]*oldNewStruct)
-	self.jobChannel = make(chan *jobIn)
+	self.jobChannel = make(chan *jobIn, 100)
 	self.blocks = make(blockMap)
 	self.dirtyBlocks = make(blockMap)
 	self.ref0Blocks = make(blockMap)
 
 	// No need to special case Codec = nil elsewhere with this
-	if self.Codec == nil {
-		self.Codec = &codec.CodecChain{}
+	if self.Codec != nil {
+		self.Backend = codecBackend{}.Init(self.Backend, self.Codec)
 	}
+	// self.Backend = fanoutBackend{}.Init(self.Backend)
 	go func() {
 		self.run()
 	}()

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Fri Jan  5 23:56:17 2018 mstenber
- * Edit time:     171 min
+ * Last modified: Sat Jan  6 00:21:31 2018 mstenber
+ * Edit time:     173 min
  *
  */
 
@@ -57,11 +57,7 @@ func (self *Block) GetData() []byte {
 		} else {
 			mlog.Printf2("storage/block", "%v.GetData - calling s.be.GetBlockData", self)
 			data := self.storage.Backend.GetBlockData(self)
-			b, err := self.storage.Codec.DecodeBytes(data, []byte(self.Id))
-			if err != nil {
-				log.Panic("Decoding failed", err)
-			}
-			self.Data = b
+			self.Data = data
 			self.storage.reads++
 			self.storage.readbytes += len(data)
 		}
@@ -95,15 +91,7 @@ func (self *Block) flush() int {
 		self.storage.writes++
 		data := self.GetData()
 		self.storage.writebytes += len(data)
-
-		b, err := self.storage.Codec.EncodeBytes(data, []byte(self.Id))
-		if err != nil {
-			log.Panic("Encoding failed", err)
-		}
-		bl := *self
-		bl.Data = b
-
-		self.storage.Backend.StoreBlock(&bl)
+		self.storage.Backend.StoreBlock(self)
 		self.Backend = self.storage.Backend
 		ops++
 	} else {

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Fri Jan  5 02:11:17 2018 mstenber
- * Edit time:     193 min
+ * Last modified: Fri Jan  5 03:00:01 2018 mstenber
+ * Edit time:     200 min
  *
  */
 
@@ -227,8 +227,9 @@ func (self *inodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 
 func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse.Status) {
 	e := offset / dataExtentSize
-	defer self.inode.offsetMap.Locked(fmt.Sprintf("%d", e))()
-
+	ln := fmt.Sprintf("%d", e)
+	unlock := self.inode.offsetMap.Locked(ln)
+	locked := self.inode.offsetMap.GetLockedByName(ln)
 	mlog.Printf2("fs/fh", "fh.Write %v @%v", len(buf), offset)
 	var r fuse.ReadResult
 
@@ -261,7 +262,11 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 
 	copy(wbuf[bofs:], buf)
 
+	locked.ClearOwner()
 	go func() {
+		locked.UpdateOwner()
+		// We inherit the block-lock, and release only when we're done
+		defer unlock()
 		if bofs > 0 {
 			r, code = self.read(wbuf[:bofs], offset)
 			if !code.Ok() {
@@ -272,8 +277,10 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 			mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
 		}
 
-		// Now obuf contains header(< bofs) + buf
+		// This was copied in earlier
 		wbuf = wbuf[len(buf):]
+
+		// Now obuf contains header(< bofs) + buf
 
 		// Read leftovers, if any, from the block
 		blockend := offset + dataExtentSize
@@ -296,9 +303,9 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 			// in .Data this will live long -> make new copy of
 			// the (small) slice
 			nbuf := bbuf[1:]
+			defer self.Fs().lock.Locked()()
 			meta.Data = nbuf
 			meta.StSize = uint64(len(nbuf))
-			defer self.Fs().lock.Locked()()
 			self.inode.SetMeta(meta)
 			mlog.Printf2("fs/fh", " meta %d bytes", len(nbuf))
 		} else {

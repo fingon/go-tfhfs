@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Fri Jan  5 00:52:35 2018 mstenber
- * Edit time:     434 min
+ * Last modified: Fri Jan  5 02:54:35 2018 mstenber
+ * Edit time:     438 min
  *
  */
 
@@ -169,14 +169,21 @@ func (self *Storage) GetBlockIdByName(name string) string {
 }
 
 func (self *Storage) ReferOrStoreBlock(id string, data []byte) *Block {
+	b := self.ReferOrStoreBlock0(id, data)
+	if b != nil {
+		defer self.dirtyLock.Locked()()
+		b.addRefCount(1)
+	}
+	return b
+}
+
+func (self *Storage) ReferOrStoreBlock0(id string, data []byte) *Block {
 	b := self.GetBlockById(id)
 	if b != nil {
 		defer self.dirtyLock.Locked()()
-		// storageRefCount was added already
-		b.addRefCount(1)
 		return b
 	}
-	return self.StoreBlock(id, data, BlockStatus_NORMAL)
+	return self.StoreBlock0(id, data, BlockStatus_NORMAL)
 }
 
 // ReleaseBlockId will eventually release block (in Flush), if its
@@ -200,11 +207,10 @@ func (self *Storage) SetNameToBlockId(name, block_id string) {
 	self.getName(name).new_value = block_id
 }
 
-func (self *Storage) StoreBlock(id string, data []byte, status BlockStatus) *Block {
+func (self *Storage) StoreBlock0(id string, data []byte, status BlockStatus) *Block {
 	mlog.Printf2("storage/storage", "st.StoreBlock %x", id)
 	b := self.gocBlockById(id)
 	defer self.dirtyLock.Locked()()
-	b.addRefCount(1)
 	b.setStatus(status)
 	b.Data = data
 	return b

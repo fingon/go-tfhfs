@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Thu Jan  4 18:42:13 2018 mstenber
- * Edit time:     60 min
+ * Last modified: Fri Jan  5 02:49:51 2018 mstenber
+ * Edit time:     62 min
  *
  */
 
@@ -15,6 +15,7 @@ import (
 	"log"
 
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util"
 )
 
 // InMemoryBlockBackend provides In-memory storage; data is always
@@ -23,6 +24,7 @@ type InMemoryBlockBackend struct {
 	id2Block map[string]*Block
 	name2Id  map[string]string
 	in_flush bool
+	lock     util.MutexLocked
 }
 
 var _ BlockBackend = &InMemoryBlockBackend{}
@@ -47,10 +49,12 @@ func (self *InMemoryBlockBackend) GetBlockData(b *Block) []byte {
 }
 
 func (self *InMemoryBlockBackend) GetBlockById(id string) *Block {
+	defer self.lock.Locked()()
 	return self.id2Block[id]
 }
 
 func (self *InMemoryBlockBackend) GetBlockIdByName(name string) string {
+	defer self.lock.Locked()()
 	return self.name2Id[name]
 }
 
@@ -70,6 +74,7 @@ func (self *InMemoryBlockBackend) SetInFlush(value bool) {
 }
 
 func (self *InMemoryBlockBackend) SetNameToBlockId(name, block_id string) {
+	defer self.lock.Locked()()
 	if !self.in_flush {
 		log.Fatal("SetNameToBlockId outside flush")
 	}
@@ -77,6 +82,7 @@ func (self *InMemoryBlockBackend) SetNameToBlockId(name, block_id string) {
 }
 
 func (self *InMemoryBlockBackend) StoreBlock(b *Block) {
+	defer self.lock.Locked()()
 	if !self.in_flush {
 		log.Fatal("StoreBlock outside flush")
 	}
@@ -88,6 +94,7 @@ func (self *InMemoryBlockBackend) StoreBlock(b *Block) {
 }
 
 func (self *InMemoryBlockBackend) UpdateBlock(b *Block) int {
+	defer self.lock.Locked()()
 	if !self.in_flush {
 		log.Fatal("UpdateBlock outside flush")
 	}

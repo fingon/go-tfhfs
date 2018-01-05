@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Thu Jan  4 14:11:27 2018 mstenber
- * Edit time:     247 min
+ * Last modified: Fri Jan  5 02:44:12 2018 mstenber
+ * Edit time:     250 min
  *
  */
 
@@ -564,7 +564,6 @@ func (self *fsOps) Read(input *ReadIn, buf []byte) (ReadResult, Status) {
 }
 
 func (self *fsOps) Write(input *WriteIn, data []byte) (written uint32, code Status) {
-	defer self.fs.lock.Locked()()
 	// Check perm?
 	file := self.fs.GetFileByFh(input.Fh)
 	return file.Write(data, input.Offset)

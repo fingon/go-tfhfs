@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Jan  5 02:08:51 2018 mstenber
- * Edit time:     268 min
+ * Last modified: Fri Jan  5 02:52:46 2018 mstenber
+ * Edit time:     270 min
  *
  */
 
@@ -222,8 +222,7 @@ func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
 	if nd != nil {
 		self.nodeDataCache.Set(ibtree.BlockId(id), nd)
 	}
-	block := self.storage.ReferOrStoreBlock(id, b)
-	self.storage.ReleaseBlockId(block.Id)
+	block := self.storage.ReferOrStoreBlock0(id, b)
 	r := ibtree.BlockId(block.Id)
 	mlog.Printf2("fs/fs", " fs.getBlockDataId = %x", r)
 	block.Close()

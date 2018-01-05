@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Fri Jan  5 17:40:59 2018 mstenber
- * Edit time:     530 min
+ * Last modified: Fri Jan  5 23:56:44 2018 mstenber
+ * Edit time:     535 min
  *
  */
 
@@ -105,7 +105,7 @@ type Storage struct {
 	// as long as someone keeps a reference to one, it stays
 	// here. Being in dirtyBlocks means it also has extra
 	// reference.
-	blocks, dirtyBlocks blockMap
+	blocks, dirtyBlocks, ref0Blocks blockMap
 
 	// Stuff below here is ~DelayedStorage
 	names map[string]*oldNewStruct
@@ -121,6 +121,8 @@ func (self Storage) Init() *Storage {
 	self.jobChannel = make(chan *jobIn)
 	self.blocks = make(blockMap)
 	self.dirtyBlocks = make(blockMap)
+	self.ref0Blocks = make(blockMap)
+
 	// No need to special case Codec = nil elsewhere with this
 	if self.Codec == nil {
 		self.Codec = &codec.CodecChain{}
@@ -246,6 +248,7 @@ func (self *Storage) ReferBlockId(id string) {
 }
 
 func (self *Storage) ReferStorageBlockId(id string) {
+	mlog.Printf2("storage/storage", "ReferStorageBlockId %x", id)
 	self.jobChannel <- &jobIn{jobType: jobUpdateBlockIdStorageRefCount,
 		id: id, count: 1,
 	}
@@ -258,6 +261,7 @@ func (self *Storage) ReleaseBlockId(id string) {
 }
 
 func (self *Storage) ReleaseStorageBlockId(id string) {
+	mlog.Printf2("storage/storage", "ReleaseStorageBlockId %x", id)
 	self.jobChannel <- &jobIn{jobType: jobUpdateBlockIdStorageRefCount,
 		id: id, count: -1,
 	}
@@ -375,6 +379,16 @@ func (self *Storage) flush() int {
 			}
 			ops += b.flush()
 		}
+	}
+
+	if len(self.ref0Blocks) > 0 {
+		for _, b := range self.ref0Blocks {
+			if b.storageRefCount == 0 {
+				mlog.Printf2("storage/storage", " removing %v", b)
+				delete(self.blocks, b.Id)
+			}
+		}
+		self.ref0Blocks = make(blockMap)
 	}
 
 	mlog.Printf2("storage/storage", " ops:%v", ops)

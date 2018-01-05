@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Jan  5 14:34:11 2018 mstenber
- * Edit time:     273 min
+ * Last modified: Fri Jan  5 15:05:25 2018 mstenber
+ * Edit time:     277 min
  *
  */
 
@@ -40,7 +40,7 @@ type Fs struct {
 	// These have their own locking or are used in single-threaded way
 	inodeTracker
 	Ops           fsOps
-	closing       chan bool
+	closing       chan chan struct{}
 	flushInterval time.Duration
 	server        *fuse.Server
 	tree          *ibtree.IBTree
@@ -57,10 +57,17 @@ type Fs struct {
 }
 
 func (self *Fs) Close() {
-	self.Flush()
+	mlog.Printf2("fs/fs", "fs.Close")
+
+	// this will kill the underlying goroutine and ensure it has flushed
+	self.closing <- make(chan struct{})
+
+	// then we can close backend
 	self.storage.Close()
+
+	// and finally backend
 	self.storage.Backend.Close()
-	self.closing <- true
+	mlog.Printf2("fs/fs", " great success at closing Fs")
 }
 
 // ibtree.IBTreeBackend API
@@ -78,7 +85,6 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 }
 
 func (self *Fs) Flush() {
-	defer self.lock.Locked()()
 	mlog.Printf2("fs/fs", "fs.Flush started")
 	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
 	// ^ done in each commit, so pointless here?
@@ -148,7 +154,7 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 		//}).
 		Build()
 	fs.Ops.fs = fs
-	fs.closing = make(chan bool)
+	fs.closing = make(chan chan struct{})
 	fs.flushInterval = 1 * time.Second
 	fs.inodeTracker.Init(fs)
 	fs.tree = ibtree.IBTree{}.Init(fs)
@@ -158,7 +164,11 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	rootbid := st.GetBlockIdByName(rootName)
 	if rootbid != "" {
 		bid := ibtree.BlockId(rootbid)
-		fs.treeRoot.Set(fs.tree.LoadRoot(bid))
+		root := fs.tree.LoadRoot(bid)
+		if root == nil {
+			log.Panicf("Loading of root block %x failed", bid)
+		}
+		fs.treeRoot.Set(root)
 		fs.treeRootBlockId = bid
 	}
 	if fs.treeRoot.Get() == nil {
@@ -171,6 +181,19 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 		meta.StNlink++ // root has always built-in link
 		root.SetMeta(&meta)
 	}
+	go func() {
+		for {
+			select {
+			case done := <-fs.closing:
+				fs.Flush()
+				done <- struct{}{}
+				return
+			case <-time.After(fs.flushInterval):
+				fs.Flush()
+			}
+		}
+	}()
+
 	return fs
 }
 

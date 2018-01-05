@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Fri Jan  5 02:44:12 2018 mstenber
- * Edit time:     250 min
+ * Last modified: Fri Jan  5 14:47:02 2018 mstenber
+ * Edit time:     252 min
  *
  */
 
@@ -31,17 +31,6 @@ var _ RawFileSystem = &fsOps{}
 
 func (self *fsOps) Init(server *Server) {
 	self.fs.server = server
-	flushLoop := func() {
-		for {
-			select {
-			case <-self.fs.closing:
-				return
-			case <-time.After(self.fs.flushInterval):
-				self.fs.Flush()
-			}
-		}
-	}
-	go flushLoop()
 }
 
 func (self *fsOps) String() string {

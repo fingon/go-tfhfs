@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Fri Jan  5 12:28:05 2018 mstenber
+ * Last modified: Fri Jan  5 14:48:57 2018 mstenber
  * Edit time:     43 min
  *
  */
@@ -56,8 +56,6 @@ func main() {
 
 	st := fs.NewCryptoStorage(*password, *salt, backend)
 	myfs := fs.NewFs(st, "xxx")
-
-	defer myfs.Close()
 	opts := &fuse.MountOptions{}
 	if mlog.IsEnabled() {
 		opts.Debug = true
@@ -67,6 +65,7 @@ func main() {
 		log.Panic(err)
 	}
 	server.Serve()
+	myfs.Close()
 
 	if *memprofile != "" {
 		f, err := os.Create(*memprofile)

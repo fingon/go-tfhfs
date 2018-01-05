@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Thu Jan  4 14:31:01 2018 mstenber
- * Edit time:     243 min
+ * Last modified: Fri Jan  5 02:03:54 2018 mstenber
+ * Edit time:     245 min
  *
  */
 
@@ -26,10 +26,11 @@ import (
 )
 
 type inode struct {
-	ino     uint64
-	tracker *inodeTracker
-	refcnt  int64
-	meta    *InodeMeta
+	ino       uint64
+	tracker   *inodeTracker
+	refcnt    int64
+	meta      *InodeMeta
+	offsetMap util.NamedMutexLockedMap
 }
 
 func (self *inode) AddChild(name string, child *inode) {

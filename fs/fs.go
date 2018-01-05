@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Jan  5 00:18:48 2018 mstenber
- * Edit time:     267 min
+ * Last modified: Fri Jan  5 02:08:51 2018 mstenber
+ * Edit time:     268 min
  *
  */
 
@@ -215,7 +215,7 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 
 func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
 	mlog.Printf2("fs/fs", "fs.getBlockDataId %d", len(b))
-	self.lock.AssertLocked()
+	// self.lock.AssertLocked() // should not be necessary
 	h := sha256.Sum256(b)
 	bid := h[:]
 	id := string(bid)

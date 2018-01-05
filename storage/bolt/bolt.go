@@ -73,7 +73,7 @@ func (self *boltBackend) Close() {
 }
 
 func (self *boltBackend) DeleteBlock(b *storage.Block) {
-	mlog.Printf2("storage/bolt", "bbolt.DeleteBlock %x", b.Id)
+	mlog.Printf2("storage/bolt/bolt", "bbolt.DeleteBlock %x", b.Id)
 	bid := []byte(b.Id)
 	self.db.Update(func(tx *bbolt.Tx) error {
 		tx.Bucket(metadataKey).Delete(bid)
@@ -106,7 +106,7 @@ func (self *boltBackend) GetBlockById(id string) *storage.Block {
 	if err != nil {
 		log.Fatal(err)
 	}
-	mlog.Printf2("storage/bolt", "bbolt.GetBlockById %x", id)
+	mlog.Printf2("storage/bolt/bolt", "bbolt.GetBlockById %x", id)
 	return b
 }
 
@@ -132,7 +132,7 @@ func (self *boltBackend) StoreBlock(b *storage.Block) {
 		log.Panicf("data not set in StoreBlock")
 	}
 	bid := []byte(b.Id)
-	mlog.Printf2("storage/bolt", "bbolt.StoreBlock %x (%d b)", bid, len(data))
+	mlog.Printf2("storage/bolt/bolt", "bbolt.StoreBlock %x (%d b)", bid, len(data))
 	self.updateBlock(b)
 	self.db.Update(func(tx *bbolt.Tx) error {
 		tx.Bucket(dataKey).Put(bid, data)
@@ -153,7 +153,7 @@ func (self *boltBackend) updateBlock(b *storage.Block) {
 }
 
 func (self *boltBackend) UpdateBlock(b *storage.Block) int {
-	mlog.Printf2("storage/bolt", "bbolt.UpdateBlock %x", b.Id)
+	mlog.Printf2("storage/bolt/bolt", "bbolt.UpdateBlock %x", b.Id)
 	self.updateBlock(b)
 	return 1
 }

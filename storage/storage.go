@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Fri Jan  5 14:27:40 2018 mstenber
- * Edit time:     499 min
+ * Last modified: Fri Jan  5 15:15:00 2018 mstenber
+ * Edit time:     511 min
  *
  */
 
@@ -103,6 +103,9 @@ func (self Storage) Init() *Storage {
 }
 
 func (self *Storage) Close() {
+	// Implicitly also flush; storage that persists randomly seems bad
+	self.Flush()
+
 	out := make(chan *jobOut)
 	self.jobChannel <- &jobIn{jobType: jobQuit, out: out}
 	<-out
@@ -110,12 +113,14 @@ func (self *Storage) Close() {
 
 func (self *Storage) run() {
 	for job := range self.jobChannel {
+		mlog.Printf2("storage/storage", "st.run job %d", job.jobType)
 		switch job.jobType {
 		case jobQuit:
 			job.out <- nil
 			return
 		case jobFlush:
 			self.flush()
+			job.out <- nil
 		case jobGetBlockById:
 			b := self.getBlockById(job.id)
 			job.out <- &jobOut{sb: NewStorageBlock(b)}
@@ -147,11 +152,14 @@ func (self *Storage) run() {
 		default:
 			log.Panicf("Unknown job type: %d", job.jobType)
 		}
+		mlog.Printf2("storage/storage", " st.run job done")
 	}
 }
 
 func (self *Storage) Flush() {
-	self.jobChannel <- &jobIn{jobType: jobFlush}
+	out := make(chan *jobOut)
+	self.jobChannel <- &jobIn{jobType: jobFlush, out: out}
+	<-out
 }
 
 func (self *Storage) GetBlockById(id string) *StorageBlock {
@@ -227,10 +235,14 @@ func (self *Storage) updateBlockDataDependencies(b *Block, add bool, st BlockSta
 		return
 	}
 	self.IterateReferencesCallback(b.Id, b.GetData(), func(id string) {
+		b := self.getBlockById(id)
+		if b == nil {
+			log.Panicf("Block %x awol in updateBlockDataDependencies", id)
+		}
 		if add {
-			self.ReferBlockId(id)
+			b.addRefCount(1)
 		} else {
-			self.ReleaseBlockId(id)
+			b.addRefCount(-1)
 		}
 	})
 }
@@ -250,10 +262,12 @@ func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
 	mlog.Printf2("storage/storage", "flushBlockName %s=%x", k, v.new_value)
 	self.Backend.SetNameToBlockId(k, v.new_value)
 	if v.new_value != "" {
-		self.ReferBlockId(v.new_value)
+		b := self.getBlockById(v.new_value)
+		b.addRefCount(1)
 	}
 	if v.old_value != "" {
-		self.ReleaseBlockId(v.old_value)
+		b := self.getBlockById(v.old_value)
+		b.addRefCount(-1)
 	}
 	v.old_value = v.new_value
 }

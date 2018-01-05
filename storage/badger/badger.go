@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Fri Jan  5 13:55:50 2018 mstenber
- * Edit time:     141 min
+ * Last modified: Fri Jan  5 14:51:56 2018 mstenber
+ * Edit time:     142 min
  *
  */
 
@@ -53,7 +53,7 @@ func (self *badgerBackend) Close() {
 }
 
 func (self *badgerBackend) DeleteBlock(b *storage.Block) {
-	mlog.Printf2("storage/badger", "bad.DeleteBlock %x", b.Id)
+	mlog.Printf2("storage/badger/badger", "bad.DeleteBlock %x", b.Id)
 	self.db.Update(func(txn *badger.Txn) error {
 		k := append([]byte("1"), []byte(b.Id)...)
 		if err := self.delete(k); err != nil {
@@ -97,7 +97,7 @@ func (self *badgerBackend) GetBlockById(id string) *storage.Block {
 	if err != nil {
 		log.Panic(err)
 	}
-	mlog.Printf2("storage/badger", "b.GetBlockById %x", id)
+	mlog.Printf2("storage/badger/badger", "b.GetBlockById %x", id)
 	return b
 }
 
@@ -132,11 +132,12 @@ func (self *badgerBackend) set(k, v []byte) error {
 }
 
 func (self *badgerBackend) SetNameToBlockId(name, block_id string) {
+	mlog.Printf2("storage/badger/badger", "bad.SetNameToBlockId %s = %x", name, block_id)
 	self.setKKValue([]byte("3"), []byte(name), []byte(block_id))
 }
 
 func (self *badgerBackend) StoreBlock(b *storage.Block) {
-	mlog.Printf2("storage/badger", "bad.StoreBlock %x (%d b)", b.Id, len(b.Data))
+	mlog.Printf2("storage/badger/badger", "bad.StoreBlock %x (%d b)", b.Id, len(b.Data))
 	self.updateBlock(b)
 	self.setKKValue([]byte("2"), []byte(b.Id), b.Data)
 }
@@ -150,7 +151,7 @@ func (self *badgerBackend) updateBlock(b *storage.Block) {
 }
 
 func (self *badgerBackend) UpdateBlock(b *storage.Block) int {
-	mlog.Printf2("storage/badger", "bad.UpdateBlock %x", b.Id)
+	mlog.Printf2("storage/badger/badger", "bad.UpdateBlock %x", b.Id)
 	self.updateBlock(b)
 	return 1
 }

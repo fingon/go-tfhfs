@@ -42,7 +42,7 @@ func (self *inMemoryBackend) Close() {
 }
 
 func (self *inMemoryBackend) DeleteBlock(b *storage.Block) {
-	mlog.Printf2("storage/inmemory", "im.DeleteBlock %x", b.Id)
+	mlog.Printf2("storage/inmemory/inmemory", "im.DeleteBlock %x", b.Id)
 	delete(self.id2Block, b.Id)
 }
 
@@ -78,7 +78,7 @@ func (self *inMemoryBackend) StoreBlock(b *storage.Block) {
 	if self.id2Block[b.Id] != nil {
 		log.Fatal("Existing block id in StoreBlock")
 	}
-	mlog.Printf2("storage/inmemory", "im.StoreBlock %x", b.Id)
+	mlog.Printf2("storage/inmemory/inmemory", "im.StoreBlock %x", b.Id)
 	self.id2Block[b.Id] = b
 }
 
@@ -87,6 +87,6 @@ func (self *inMemoryBackend) UpdateBlock(b *storage.Block) int {
 	if self.id2Block[b.Id] == nil {
 		log.Fatal("Non-existent block id in StoreBlock")
 	}
-	mlog.Printf2("storage/inmemory", "im.UpdateBlock %x", b.Id)
+	mlog.Printf2("storage/inmemory/inmemory", "im.UpdateBlock %x", b.Id)
 	return 1
 }

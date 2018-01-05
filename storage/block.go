@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Fri Jan  5 14:19:46 2018 mstenber
- * Edit time:     145 min
+ * Last modified: Fri Jan  5 15:11:51 2018 mstenber
+ * Edit time:     147 min
  *
  */
 
@@ -77,7 +77,11 @@ func (self *Block) flush() int {
 	ops := 0
 	if self.RefCount == 0 {
 		if self.Backend != nil {
+			// just in case grab data if we already do not
+			// have it and we have to re-add this back
+			self.GetData()
 			self.Backend.DeleteBlock(self)
+			self.Backend = nil
 		}
 		ops++
 	} else if self.Backend == nil {

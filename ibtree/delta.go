@@ -4,12 +4,14 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:53:36 2017 mstenber
- * Last modified: Sat Dec 30 15:41:01 2017 mstenber
- * Edit time:     52 min
+ * Last modified: Fri Jan  5 23:20:41 2018 mstenber
+ * Edit time:     62 min
  *
  */
 
 package ibtree
+
+import "github.com/fingon/go-tfhfs/mlog"
 
 type IBDeltaCallback func(old, new *IBNodeDataChild)
 
@@ -24,10 +26,12 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 	st0.nodes[0] = original
 	st.nodes[0] = self
 
+	mlog.Printf2("ibtree/delta", "%v.IterateDelta", self)
 	for {
 		c0 := st0.child()
 		if c0 == nil {
 			if st0.top > 0 {
+				mlog.Printf2("ibtree/delta", " original up level")
 				st0.popNode()
 				st0.nextIndex()
 				continue
@@ -36,6 +40,7 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		c := st.child()
 		if c == nil {
 			if st.top > 0 {
+				mlog.Printf2("ibtree/delta", " self up level")
 				st.popNode()
 				st.nextIndex()
 				continue
@@ -43,11 +48,9 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		}
 
 		if c == nil && c0 == nil {
+			mlog.Printf2("ibtree/delta", " no more children")
 			return
 		}
-		//mlog.Printf2("ibtree/delta", "@delta c0:%v@%v c:%v@%v",
-		//	c0, st0.indexes[:st0.top+1],
-		//	c, st.indexes[:st.top+1])
 
 		n := st.node()
 		n0 := st0.node()
@@ -55,6 +58,7 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		// Best cast first - they seem to be same exactly;
 		// direct omit and no need to recurse
 		if n.Leafy == n0.Leafy && c != nil && c0 != nil && *c == *c0 {
+			mlog.Printf2("ibtree/delta", " same -> next")
 			st0.nextIndex()
 			st.nextIndex()
 			continue
@@ -64,12 +68,14 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		if c == nil || c0 == nil || c.Key != c0.Key {
 			cst := &st
 			if c == nil || (c0 != nil && c.Key > c0.Key) {
+				mlog.Printf2("ibtree/delta", " original has something we do not")
 				cst = &st0
 			}
 
 			// cst has the lower key
 			if !cst.node().Leafy {
 				// Go deeper
+				mlog.Printf2("ibtree/delta", " recursing")
 				cst.pushCurrentIndex()
 				continue
 			}
@@ -88,9 +94,11 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 		push := !n.Leafy
 		if push0 || push {
 			if push0 {
+				mlog.Printf2("ibtree/delta", " going deeper in original")
 				st0.pushCurrentIndex()
 			}
 			if push {
+				mlog.Printf2("ibtree/delta", " going deeper in self")
 				st.pushCurrentIndex()
 			}
 			continue
@@ -98,6 +106,7 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 
 		// Both keys same and they're in leafy
 		// nodes. Hooray. It's update.
+		mlog.Printf2("ibtree/delta", " leafy children with same key + different data")
 		deltacb(c0, c)
 
 		st0.nextIndex()

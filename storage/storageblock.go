@@ -4,12 +4,14 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Fri Jan  5 17:26:28 2018 mstenber
- * Edit time:     7 min
+ * Last modified: Fri Jan  5 22:39:39 2018 mstenber
+ * Edit time:     9 min
  *
  */
 
 package storage
+
+import "fmt"
 
 // StorageBlock is the public read-only view of a block to the outside
 // world. All provided methods are synchronous, and actually cause
@@ -52,4 +54,8 @@ func (self *StorageBlock) Status() BlockStatus {
 
 func (self *StorageBlock) SetStatus(status BlockStatus) {
 	self.block.setStatus(status)
+}
+
+func (self *StorageBlock) String() string {
+	return fmt.Sprintf("SB{%v}", self.block)
 }

@@ -4,14 +4,15 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Fri Jan  5 17:25:06 2018 mstenber
- * Edit time:     159 min
+ * Last modified: Fri Jan  5 22:44:15 2018 mstenber
+ * Edit time:     165 min
  *
  */
 
 package storage
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/fingon/go-tfhfs/mlog"
@@ -51,10 +52,10 @@ type Block struct {
 func (self *Block) GetData() []byte {
 	if self.Data == nil {
 		if self.storage == nil {
-			mlog.Printf2("storage/block", "b.GetData %p - calling be.GetBlockData", self)
+			mlog.Printf2("storage/block", "%v.GetData  - calling be.GetBlockData", self)
 			self.Data = self.Backend.GetBlockData(self)
 		} else {
-			mlog.Printf2("storage/block", "b.GetData %p - calling s.be.GetBlockData", self)
+			mlog.Printf2("storage/block", "%v.GetData - calling s.be.GetBlockData", self)
 			data := self.storage.Backend.GetBlockData(self)
 			b, err := self.storage.Codec.DecodeBytes(data, []byte(self.Id))
 			if err != nil {
@@ -69,7 +70,7 @@ func (self *Block) GetData() []byte {
 }
 
 func (self *Block) flush() int {
-	mlog.Printf2("storage/block", "b.flush %p %v %v", self, self.RefCount, self.storageRefCount)
+	mlog.Printf2("storage/block", "%v.flush", self)
 	// self.Stored MUST be set, otherwise we wouldn't be dirty!
 	if self.Stored == nil {
 		log.Panicf("self.Stored not set?!?")
@@ -123,7 +124,7 @@ func (self *Block) flush() int {
 }
 
 func (self *Block) addRefCount(count int32) {
-	mlog.Printf2("storage/block", "b.addRefCount %p %v -> %v", self, count, self.RefCount+count)
+	mlog.Printf2("storage/block", "%v.addRefCount %v", self, count)
 	self.markDirty()
 	self.RefCount += count
 	if self.RefCount < 0 {
@@ -138,16 +139,16 @@ func (self *Block) addRefCount(count int32) {
 }
 
 func (self *Block) setStatus(st BlockStatus) {
-	mlog.Printf2("storage/block", "setStatus %p %v", self, st)
+	mlog.Printf2("storage/block", "%v.setStatus = %v", self, st)
 	self.markDirty()
 	self.Status = st
 
 }
 
 func (self *Block) addStorageRefCount(v int32) {
+	mlog.Printf2("storage/block", "%v.addStorageRefCount %v", self, v)
 	self.storageRefCount += v
 	nv := self.storageRefCount
-	mlog.Printf2("storage/block", "b.addStorageRefCount %p: %v -> %v", self, v, nv)
 	if nv <= 0 {
 		if nv < 0 {
 			log.Panic("Negative reference count", nv)
@@ -155,17 +156,17 @@ func (self *Block) addStorageRefCount(v int32) {
 		if self.Stored != nil {
 			log.Panic("Storage reference count before flush - reference mismatch?")
 		}
-		mlog.Printf2("storage/block", " removed block %x", self.Id)
+		mlog.Printf2("storage/block", " removing block")
 		delete(self.storage.blocks, self.Id)
 	}
 }
 
 func (self *Block) markDirty() {
 	if self.Stored != nil {
-		mlog.Printf2("storage/block", "b.markDirty %p (already)", self)
+		mlog.Printf2("storage/block", "%v.markDirty (already)", self)
 		return
 	}
-	mlog.Printf2("storage/block", "b.markDirty %p (fresh)", self)
+	mlog.Printf2("storage/block", "%v.markDirty (fresh)", self)
 	self.addStorageRefCount(1)
 	self.Stored = &BlockMetadata{Status: self.Status,
 		RefCount: self.RefCount}
@@ -186,4 +187,8 @@ func (self *Storage) getBlockById(id string) *Block {
 		self.blocks[id] = b
 	}
 	return b
+}
+
+func (self *Block) String() string {
+	return fmt.Sprintf("Bl@%p{Id:%x, rc:%v/src:%v}", self, self.Id[:4], self.RefCount, self.storageRefCount)
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Fri Jan  5 00:31:48 2018 mstenber
- * Edit time:     700 min
+ * Last modified: Fri Jan  5 23:17:03 2018 mstenber
+ * Edit time:     705 min
  *
  */
 
@@ -101,6 +101,9 @@ type IBNode struct {
 	tree    *IBTree
 }
 
+func (self *IBNodeData) String() string {
+	return fmt.Sprintf("IBNode{%p}", self)
+}
 func (self *IBNode) Delete(key IBKey, st *IBStack) *IBNode {
 	self.search(key, st)
 	c := st.child()
@@ -269,8 +272,7 @@ func (self *IBNode) childNode(idx int) *IBNode {
 	bid := BlockId(c.Value)
 	nd := self.tree.backend.LoadNode(bid)
 	if nd == nil {
-		mlog.Printf2("ibtree/ibtree", "childNode - backend LoadNode for %x failed", bid)
-		return nil
+		log.Panicf("childNode - backend LoadNode for %x failed", bid)
 	}
 	return &IBNode{tree: self.tree, blockId: &bid, IBNodeData: *nd}
 }

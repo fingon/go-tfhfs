@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Sat Jan  6 01:21:09 2018 mstenber
- * Edit time:     71 min
+ * Last modified: Sat Jan  6 01:47:22 2018 mstenber
+ * Edit time:     72 min
  *
  */
 
@@ -88,7 +88,9 @@ func (self *inMemoryBackend) StoreBlock(b *storage.Block) {
 		log.Fatal("Existing block id in StoreBlock")
 	}
 	mlog.Printf2("storage/inmemory/inmemory", "im.StoreBlock %x", b.Id)
-	self.id2Block[b.Id] = *b
+	nb := *b
+	nb.Backend = self
+	self.id2Block[b.Id] = nb
 }
 
 func (self *inMemoryBackend) UpdateBlock(b *storage.Block) int {

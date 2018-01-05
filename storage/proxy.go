@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sat Jan  6 00:08:05 2018 mstenber
- * Last modified: Sat Jan  6 00:11:39 2018 mstenber
- * Edit time:     3 min
+ * Last modified: Sat Jan  6 01:45:35 2018 mstenber
+ * Edit time:     4 min
  *
  */
 
@@ -36,7 +36,11 @@ func (self *proxyBackend) GetBlockData(b *Block) []byte {
 }
 
 func (self *proxyBackend) GetBlockById(id string) *Block {
-	return self.backend.GetBlockById(id)
+	bl := self.backend.GetBlockById(id)
+	if bl != nil {
+		bl.Backend = self
+	}
+	return bl
 }
 
 func (self *proxyBackend) GetBlockIdByName(name string) string {

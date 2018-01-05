@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sat Jan  6 00:13:13 2018 mstenber
- * Last modified: Sat Jan  6 01:22:50 2018 mstenber
- * Edit time:     5 min
+ * Last modified: Sat Jan  6 01:46:01 2018 mstenber
+ * Edit time:     6 min
  *
  */
 
@@ -30,6 +30,9 @@ func (self codecBackend) Init(backend Backend, codec codec.Codec) *codecBackend 
 
 func (self *codecBackend) GetBlockById(id string) *Block {
 	b := self.backend.GetBlockById(id)
+	if b != nil {
+		b.Backend = self
+	}
 	if b == nil || b.Data == nil {
 		return b
 	}

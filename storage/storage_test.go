@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Fri Jan  5 16:33:16 2018 mstenber
- * Edit time:     182 min
+ * Last modified: Sat Jan  6 01:44:04 2018 mstenber
+ * Edit time:     192 min
  *
  */
 
@@ -197,20 +197,31 @@ func TestBackend(t *testing.T) {
 func BenchmarkBackend(b *testing.B) {
 	for _, k := range factory.List() {
 		k := k
-		dir, _ := ioutil.TempDir("", k)
-		defer os.RemoveAll(dir)
-		be := factory.New(k, dir)
-		defer be.Close()
+		setup := func() (storage.Backend, func()) {
+			dir, _ := ioutil.TempDir("", k)
+			be := factory.New(k, dir)
+			return be, func() {
+				be.Close()
+				os.RemoveAll(dir)
+
+			}
+		}
 		bl := &storage.Block{Id: "foo", Data: []byte("data")}
 
 		b.Run(fmt.Sprintf("%s-set", k),
 			func(b *testing.B) {
+				be, undo := setup()
+				defer undo()
+				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
+					bl := &storage.Block{Id: fmt.Sprintf("foo%d", i), Data: []byte("data")}
 					be.StoreBlock(bl)
 				}
 			})
 		b.Run(fmt.Sprintf("%s-get", k),
 			func(b *testing.B) {
+				be, undo := setup()
+				defer undo()
 				be.StoreBlock(bl)
 				be.GetBlockById("foo")
 				b.ResetTimer()
@@ -218,8 +229,12 @@ func BenchmarkBackend(b *testing.B) {
 					be.GetBlockById("foo")
 				}
 			})
-		b.Run(fmt.Sprintf("%s-get", k),
+		b.Run(fmt.Sprintf("%s-getdata", k),
 			func(b *testing.B) {
+				be, undo := setup()
+				defer undo()
+
+				be.StoreBlock(bl)
 				bl2 := be.GetBlockById("foo")
 				bl2.GetData()
 				b.ResetTimer()

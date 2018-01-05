@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Jan  5 14:35:59 2018 mstenber
-# Edit time:     64 min
+# Last modified: Fri Jan  5 15:19:24 2018 mstenber
+# Edit time:     67 min
 #
 #
 
@@ -89,6 +89,6 @@ update-deps:
 	go test ./...
 	touch $@
 
-.done.mlog: $(wildcard */*.go)
-	python3 mlog/fix-print2.py */*.go
+.done.mlog: Makefile $(wildcard */*.go)
+	find . -type f -name '*.go' | sed 's/^\.\///' | xargs python3 mlog/fix-print2.py
 	touch $@

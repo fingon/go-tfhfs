@@ -4,12 +4,12 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:44:41 2018 mstenber
- * Last modified: Thu Jan  4 16:59:02 2018 mstenber
- * Edit time:     70 min
+ * Last modified: Fri Jan  5 12:02:35 2018 mstenber
+ * Edit time:     72 min
  *
  */
 
-package storage
+package file
 
 import (
 	"fmt"
@@ -21,9 +21,10 @@ import (
 	"strings"
 
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/storage"
 )
 
-// FileBlockBackend stores the blocks in file directory hierarchy.
+// FileBackend stores the blocks in file directory hierarchy.
 //
 // Name encoding:
 //
@@ -40,22 +41,28 @@ import (
 
 const directoryBytes = 2 // 65536 subdirs should be plenty
 
-type FileBlockBackend struct {
-	DirectoryBlockBackendBase
+type fileBackend struct {
+	storage.DirectoryBackendBase
 	created map[string]bool
 }
 
-var _ BlockBackend = &FileBlockBackend{}
+var _ storage.Backend = &fileBackend{}
 
-func (self *FileBlockBackend) DeleteBlock(bl *Block) {
-	_, path := self.blockPath(bl, bl.stored)
+func NewFileBackend(dir string) storage.Backend {
+	self := &fileBackend{}
+	(&self.DirectoryBackendBase).Init(dir)
+	return self
+}
+
+func (self *fileBackend) DeleteBlock(bl *storage.Block) {
+	_, path := self.blockPath(bl, bl.Stored)
 	err := os.Remove(path)
 	if err != nil {
 		log.Panic(err)
 	}
 }
 
-func (self *FileBlockBackend) mkdirAll(path string) {
+func (self *fileBackend) mkdirAll(path string) {
 	if self.created == nil {
 		self.created = make(map[string]bool)
 	}
@@ -65,7 +72,7 @@ func (self *FileBlockBackend) mkdirAll(path string) {
 	if self.created[path] {
 		return
 	}
-	if path != self.dir {
+	if path != self.Dir {
 		dir, _ := filepath.Split(path)
 		if len(dir) < len(path) {
 			self.mkdirAll(dir)
@@ -76,8 +83,8 @@ func (self *FileBlockBackend) mkdirAll(path string) {
 
 }
 
-func (self *FileBlockBackend) GetBlockData(bl *Block) []byte {
-	_, path := self.blockPath(bl, bl.stored)
+func (self *fileBackend) GetBlockData(bl *storage.Block) []byte {
+	_, path := self.blockPath(bl, bl.Stored)
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		log.Panic(err)
@@ -85,9 +92,9 @@ func (self *FileBlockBackend) GetBlockData(bl *Block) []byte {
 	return b
 }
 
-func (self *FileBlockBackend) GetBlockById(id string) *Block {
+func (self *fileBackend) GetBlockById(id string) *storage.Block {
 	mlog.Printf2("storage/file", "fbb.GetBlockById %x", id)
-	dir := fmt.Sprintf("%s/blocks/%x", self.dir, id[:directoryBytes])
+	dir := fmt.Sprintf("%s/blocks/%x", self.Dir, id[:directoryBytes])
 	prefix := fmt.Sprintf("%x_", id[directoryBytes:])
 	fis, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -112,16 +119,17 @@ func (self *FileBlockBackend) GetBlockById(id string) *Block {
 			continue
 		}
 		mlog.Printf2("storage/file", " found")
-		return &Block{Id: id, backend: self,
-			BlockMetadata: BlockMetadata{RefCount: int32(refcount),
-				Status: BlockStatus(status)}}
+		meta := storage.BlockMetadata{RefCount: int32(refcount),
+			Status: storage.BlockStatus(status)}
+		return &storage.Block{Id: id, Backend: self,
+			BlockMetadata: meta}
 	}
 	return nil
 }
 
-func (self *FileBlockBackend) GetBlockIdByName(name string) string {
+func (self *fileBackend) GetBlockIdByName(name string) string {
 	mlog.Printf2("storage/file", "fbb.GetBlockIdByName %v", name)
-	path := fmt.Sprintf("%s/names/%x", self.dir, name)
+	path := fmt.Sprintf("%s/names/%x", self.Dir, name)
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		mlog.Printf2("storage/file", " nope, %v", err)
@@ -130,12 +138,12 @@ func (self *FileBlockBackend) GetBlockIdByName(name string) string {
 	return string(b)
 }
 
-func (self *FileBlockBackend) SetInFlush(value bool) {
+func (self *fileBackend) SetInFlush(value bool) {
 }
 
-func (self *FileBlockBackend) SetNameToBlockId(name, block_id string) {
+func (self *fileBackend) SetNameToBlockId(name, block_id string) {
 	mlog.Printf2("storage/file", "fbb.SetNameToBlockId %v %x", name, block_id)
-	dir := fmt.Sprintf("%s/names", self.dir)
+	dir := fmt.Sprintf("%s/names", self.Dir)
 	path := fmt.Sprintf("%s/%x", dir, name)
 	self.mkdirAll(dir)
 	if block_id == "" {
@@ -152,7 +160,7 @@ func (self *FileBlockBackend) SetNameToBlockId(name, block_id string) {
 	mlog.Printf2("storage/file", " wrote to %v", path)
 }
 
-func (self *FileBlockBackend) StoreBlock(bl *Block) {
+func (self *fileBackend) StoreBlock(bl *storage.Block) {
 	dir, path := self.blockPath(bl, nil)
 	self.mkdirAll(dir)
 	data := bl.GetCodecData()
@@ -163,12 +171,12 @@ func (self *FileBlockBackend) StoreBlock(bl *Block) {
 	mlog.Printf2("storage/file", "fbb.StoreBlock %x to %v", bl.Id, path)
 }
 
-func (self *FileBlockBackend) UpdateBlock(bl *Block) int {
+func (self *fileBackend) UpdateBlock(bl *storage.Block) int {
 	mlog.Printf2("storage/file", "fbb.UpdateBlock %x", bl.Id)
-	if bl.stored == nil {
-		log.Panic(".stored is not set")
+	if bl.Stored == nil {
+		log.Panic(".Stored is not set")
 	}
-	_, oldpath := self.blockPath(bl, bl.stored)
+	_, oldpath := self.blockPath(bl, bl.Stored)
 	mlog.Printf2("storage/file", " oldpath:%v", oldpath)
 	_, newpath := self.blockPath(bl, nil)
 	mlog.Printf2("storage/file", " newpath:%v", newpath)
@@ -180,14 +188,14 @@ func (self *FileBlockBackend) UpdateBlock(bl *Block) int {
 	return 1
 }
 
-func (self *FileBlockBackend) Close() {
+func (self *fileBackend) Close() {
 }
 
-func (self *FileBlockBackend) blockPath(b *Block, metadata *BlockMetadata) (dir string, full string) {
+func (self *fileBackend) blockPath(b *storage.Block, metadata *storage.BlockMetadata) (dir string, full string) {
 	if metadata == nil {
 		metadata = &b.BlockMetadata
 	}
-	dir = fmt.Sprintf("%s/blocks/%x", self.dir, b.Id[:directoryBytes])
+	dir = fmt.Sprintf("%s/blocks/%x", self.Dir, b.Id[:directoryBytes])
 	full = fmt.Sprintf("%s/%x_%v_%v",
 		dir, b.Id[directoryBytes:], metadata.RefCount, metadata.Status)
 	return

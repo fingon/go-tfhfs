@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Fri Jan  5 00:46:27 2018 mstenber
- * Edit time:     112 min
+ * Last modified: Fri Jan  5 11:59:07 2018 mstenber
+ * Edit time:     117 min
  *
  */
 
@@ -41,16 +41,16 @@ type Block struct {
 	//Node *TreeNode
 
 	// Backend this is fetched from, if any
-	backend BlockBackend
+	Backend Backend
+
+	// Stored version of the block metadata, if any. Set only if
+	// something has changed locally. For fresh blocks, is nil.
+	Stored *BlockMetadata
 
 	// Storage this is stored on, if any
 	storage *Storage
 
-	// Stored version of the block metadata, if any. Set only if
-	// something has changed locally. For fresh blocks, is nil.
-	stored *BlockMetadata
-
-	// Reference count (from within Storage)
+	// In-memory reference count (from within Storage)
 	storageRefCount int32
 }
 
@@ -58,7 +58,7 @@ func (self *Block) GetData() []byte {
 	if self.Data == nil {
 		if self.storage == nil {
 			mlog.Printf2("storage/block", "b.GetData - calling be.GetBlockData")
-			self.Data = self.backend.GetBlockData(self)
+			self.Data = self.Backend.GetBlockData(self)
 		} else {
 			mlog.Printf2("storage/block", "b.GetData - calling s.be.GetBlockData")
 			data := self.storage.Backend.GetBlockData(self)
@@ -103,36 +103,36 @@ func (self *Block) flush() int {
 	}
 	defer self.storage.dirtyLock.Locked()()
 	mlog.Printf2("storage/block", "b.flush %p %v %v", self, self.RefCount, self.storageRefCount)
-	// self.stored MUST be set, otherwise we wouldn't be dirty!
+	// self.Stored MUST be set, otherwise we wouldn't be dirty!
 	ops := 0
 	if self.RefCount == 0 {
-		if self.backend != nil {
-			self.backend.DeleteBlock(self)
+		if self.Backend != nil {
+			self.Backend.DeleteBlock(self)
 		}
 		ops++
-	} else if self.backend == nil {
+	} else if self.Backend == nil {
 		// We want to be added to backend
 		self.storage.writes++
 		self.storage.writebytes += len(self.GetData())
 		self.storage.dirtyLock.Unlock()
 		self.storage.Backend.StoreBlock(self)
-		self.backend = self.storage.Backend
+		self.Backend = self.storage.Backend
 		self.storage.dirtyLock.Lock()
 		ops++
 	} else {
-		if self.stored.Status != self.Status {
+		if self.Stored.Status != self.Status {
 			self.flushStatus()
 			ops = ops + 1
 		}
 		ops += self.storage.Backend.UpdateBlock(self)
 	}
-	self.stored = nil
+	self.Stored = nil
 	self.addStorageRefCount(-1)
 	return ops
 }
 
 func (self *Block) flushStatus() {
-	// self.stored.status != self.status
+	// self.Stored.status != self.status
 	if self.Status == BlockStatus_MISSING {
 		// old type = NORMAL
 		return
@@ -142,7 +142,7 @@ func (self *Block) flushStatus() {
 		return
 	}
 	self.storage.updateBlockDataDependencies(self, true, self.Status)
-	self.storage.updateBlockDataDependencies(self, false, self.stored.Status)
+	self.storage.updateBlockDataDependencies(self, false, self.Stored.Status)
 
 }
 
@@ -155,7 +155,7 @@ func (self *Block) addRefCount(count int32) {
 	self.storage.dirtyLock.AssertLocked()
 	mlog.Printf2("storage/block", "b.addRefCount %p %v -> %v", self, count, self.RefCount+count)
 	self.markDirty()
-	hadRefs := self.stored.RefCount != 0
+	hadRefs := self.Stored.RefCount != 0
 	haveRefs := self.RefCount != 0
 	self.RefCount += count
 	if hadRefs != haveRefs {
@@ -212,7 +212,7 @@ func (self *Block) addStorageRefCount(v int32) {
 		if nv < 0 {
 			log.Panic("Negative reference count", nv)
 		}
-		if self.stored != nil {
+		if self.Stored != nil {
 			log.Panic("Storage reference count before flush?")
 		}
 		mlog.Printf2("storage/block", " removed block %x", self.Id)
@@ -226,13 +226,13 @@ func (self *Block) Close() {
 }
 
 func (self *Block) markDirty() {
-	if self.stored != nil {
+	if self.Stored != nil {
 		mlog.Printf2("storage/block", "b.markDirty %p (already)", self)
 		return
 	}
 	mlog.Printf2("storage/block", "b.markDirty %p (fresh)", self)
 	self.addStorageRefCount(1)
-	self.stored = &BlockMetadata{Status: self.Status,
+	self.Stored = &BlockMetadata{Status: self.Status,
 		RefCount: self.RefCount}
 	self.storage.dirtyBlocks.Add(self)
 }

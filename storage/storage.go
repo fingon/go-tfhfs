@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Fri Jan  5 02:54:35 2018 mstenber
- * Edit time:     438 min
+ * Last modified: Fri Jan  5 11:34:33 2018 mstenber
+ * Edit time:     439 min
  *
  */
 
@@ -19,52 +19,15 @@ import (
 	"github.com/fingon/go-tfhfs/util"
 )
 
-// BlockBackend is the shadow behind the throne; it actually
-// handles the low-level operations of blocks.
-type BlockBackend interface {
-	// Close the backend
-	Close()
-
-	// DeleteBlock removes block from storage, and it MUST exist.
-	DeleteBlock(b *Block)
-
-	// GetBlockData retrieves lazily (if need be) block data
-	GetBlockData(b *Block) []byte
-
-	// GetBlockById returns block by id or nil.
-	GetBlockById(id string) *Block
-
-	// GetBlockIdByName returns block id mapped to particular name.
-	GetBlockIdByName(name string) string
-
-	// GetBytesAvailable returns number of bytes available.
-	GetBytesAvailable() uint64
-
-	// GetBytesUsed returns number of bytes used.
-	GetBytesUsed() uint64
-
-	// Update inflush status
-	SetInFlush(bool)
-
-	// SetBlockIdName sets the logical name to map to particular block id.
-	SetNameToBlockId(name, block_id string)
-
-	// StoreBlock adds new block to storage. It MUST NOT exist.
-	StoreBlock(b *Block)
-
-	// UpdateBlock updates block metadata in storage. It MUST exist.
-	UpdateBlock(b *Block) int
-}
-
 type BlockReferenceCallback func(string)
 type BlockIterateReferencesCallback func(string, []byte, BlockReferenceCallback)
 
 // Storage is essentially DelayedStorage of Python prototype; it has
-// dirty tracking of blocks, delayed flush to BlockBackend, and
+// dirty tracking of blocks, delayed flush to Backend, and
 // caching of data.
 type oldNewStruct struct{ old_value, new_value string }
 type Storage struct {
-	Backend                   BlockBackend
+	Backend                   Backend
 	IterateReferencesCallback BlockIterateReferencesCallback
 	Codec                     codec.Codec
 
@@ -133,8 +96,6 @@ func (self *Storage) Flush() int {
 	self.readbytes = 0
 	self.writes = 0
 	self.writebytes = 0
-	self.Backend.SetInFlush(true)
-	defer self.Backend.SetInFlush(false)
 
 	// _flush_names in Python prototype
 	ops := self.flushBlockNames()

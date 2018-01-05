@@ -4,39 +4,45 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Fri Jan  5 02:49:51 2018 mstenber
- * Edit time:     62 min
+ * Last modified: Fri Jan  5 12:07:08 2018 mstenber
+ * Edit time:     63 min
  *
  */
 
-package storage
+package inmemory
 
 import (
 	"log"
 
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/util"
 )
 
-// InMemoryBlockBackend provides In-memory storage; data is always
+// inMemoryBackend provides In-memory storage; data is always
 // assumed to be available and is just stored in maps.
-type InMemoryBlockBackend struct {
-	id2Block map[string]*Block
+type inMemoryBackend struct {
+	id2Block map[string]*storage.Block
 	name2Id  map[string]string
 	in_flush bool
 	lock     util.MutexLocked
 }
 
-var _ BlockBackend = &InMemoryBlockBackend{}
+var _ storage.Backend = &inMemoryBackend{}
 
 // Init makes the instance actually useful
-func (self InMemoryBlockBackend) Init() *InMemoryBlockBackend {
-	self.id2Block = make(map[string]*Block)
+func NewInMemoryBackend() storage.Backend {
+	self := &inMemoryBackend{}
+	self.id2Block = make(map[string]*storage.Block)
 	self.name2Id = make(map[string]string)
-	return &self
+	return self
 }
 
-func (self *InMemoryBlockBackend) DeleteBlock(b *Block) {
+func (self *inMemoryBackend) Close() {
+
+}
+
+func (self *inMemoryBackend) DeleteBlock(b *storage.Block) {
 	mlog.Printf2("storage/inmemory", "im.DeleteBlock %x", b.Id)
 	if !self.in_flush {
 		log.Fatal("DeleteBlock outside flush")
@@ -44,36 +50,36 @@ func (self *InMemoryBlockBackend) DeleteBlock(b *Block) {
 	delete(self.id2Block, b.Id)
 }
 
-func (self *InMemoryBlockBackend) GetBlockData(b *Block) []byte {
+func (self *inMemoryBackend) GetBlockData(b *storage.Block) []byte {
 	return b.Data
 }
 
-func (self *InMemoryBlockBackend) GetBlockById(id string) *Block {
+func (self *inMemoryBackend) GetBlockById(id string) *storage.Block {
 	defer self.lock.Locked()()
 	return self.id2Block[id]
 }
 
-func (self *InMemoryBlockBackend) GetBlockIdByName(name string) string {
+func (self *inMemoryBackend) GetBlockIdByName(name string) string {
 	defer self.lock.Locked()()
 	return self.name2Id[name]
 }
 
-func (self *InMemoryBlockBackend) GetBytesAvailable() uint64 {
+func (self *inMemoryBackend) GetBytesAvailable() uint64 {
 	return 0
 }
 
-func (self *InMemoryBlockBackend) GetBytesUsed() uint64 {
+func (self *inMemoryBackend) GetBytesUsed() uint64 {
 	return 0
 }
 
-func (self *InMemoryBlockBackend) SetInFlush(value bool) {
+func (self *inMemoryBackend) SetInFlush(value bool) {
 	if self.in_flush == value {
 		log.Fatal("Same in flush value in SetInFlush")
 	}
 	self.in_flush = value
 }
 
-func (self *InMemoryBlockBackend) SetNameToBlockId(name, block_id string) {
+func (self *inMemoryBackend) SetNameToBlockId(name, block_id string) {
 	defer self.lock.Locked()()
 	if !self.in_flush {
 		log.Fatal("SetNameToBlockId outside flush")
@@ -81,7 +87,7 @@ func (self *InMemoryBlockBackend) SetNameToBlockId(name, block_id string) {
 	self.name2Id[name] = block_id
 }
 
-func (self *InMemoryBlockBackend) StoreBlock(b *Block) {
+func (self *inMemoryBackend) StoreBlock(b *storage.Block) {
 	defer self.lock.Locked()()
 	if !self.in_flush {
 		log.Fatal("StoreBlock outside flush")
@@ -93,7 +99,7 @@ func (self *InMemoryBlockBackend) StoreBlock(b *Block) {
 	self.id2Block[b.Id] = b
 }
 
-func (self *InMemoryBlockBackend) UpdateBlock(b *Block) int {
+func (self *inMemoryBackend) UpdateBlock(b *storage.Block) int {
 	defer self.lock.Locked()()
 	if !self.in_flush {
 		log.Fatal("UpdateBlock outside flush")
@@ -103,8 +109,4 @@ func (self *InMemoryBlockBackend) UpdateBlock(b *Block) int {
 	}
 	mlog.Printf2("storage/inmemory", "im.UpdateBlock %x", b.Id)
 	return 1
-}
-
-func (self *InMemoryBlockBackend) Close() {
-
 }

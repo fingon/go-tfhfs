@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Thu Jan  4 13:28:23 2018 mstenber
+ * Last modified: Fri Jan  5 12:29:40 2018 mstenber
  * Edit time:     20 min
  *
  */
@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/fingon/go-tfhfs/ibtree"
-	"github.com/fingon/go-tfhfs/storage"
+	"github.com/fingon/go-tfhfs/storage/factory"
 	"github.com/stvp/assert"
 )
 
@@ -35,12 +35,13 @@ func TestblockKey(t *testing.T) {
 }
 
 func BenchmarkBadgerFs(b *testing.B) {
-	dir, _ := ioutil.TempDir("", "badger")
+	bename := "badger"
+	dir, _ := ioutil.TempDir("", bename)
 	defer os.RemoveAll(dir)
 
 	// Add some items we can access/delete/set
 	n := 100000
-	backend := storage.BadgerBlockBackend{}.Init(dir)
+	backend := factory.New(bename, dir)
 	st := NewCryptoStorage("assword", "alt", backend)
 	fs := NewFs(st, "toor")
 

@@ -174,7 +174,7 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	return fs
 }
 
-func NewCryptoStorage(password, salt string, backend storage.BlockBackend) *storage.Storage {
+func NewCryptoStorage(password, salt string, backend storage.Backend) *storage.Storage {
 	c1 := codec.EncryptingCodec{}.Init([]byte(password), []byte(salt), iterations)
 	c2 := &codec.CompressingCodec{}
 	c := codec.CodecChain{}.Init(c1, c2)

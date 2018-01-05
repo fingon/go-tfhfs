@@ -32,12 +32,12 @@ func TestLockedMap(t *testing.T) {
 	go func() {
 		mut2.Lock()
 		mut3.Unlock()
-		mlog.Printf("goroutine")
+		mlog.Printf2("util/lockedmap_test", "goroutine")
 		defer mut.Unlock()
 		defer l.Locked("foo")()
 	}()
 	defer l.Locked("bar")()
 	mut2.Unlock()
 	mut3.Lock()
-	mlog.Printf("exiting")
+	mlog.Printf2("util/lockedmap_test", "exiting")
 }

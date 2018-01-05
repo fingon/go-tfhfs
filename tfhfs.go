@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Thu Jan  4 12:07:12 2018 mstenber
- * Edit time:     38 min
+ * Last modified: Fri Jan  5 12:28:05 2018 mstenber
+ * Edit time:     43 min
  *
  */
 
@@ -20,7 +20,7 @@ import (
 
 	"github.com/fingon/go-tfhfs/fs"
 	"github.com/fingon/go-tfhfs/mlog"
-	"github.com/fingon/go-tfhfs/storage"
+	"github.com/fingon/go-tfhfs/storage/factory"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -31,7 +31,8 @@ func main() {
 	}
 	password := flag.String("password", "siikret", "Password")
 	salt := flag.String("salt", "salt", "Salt")
-	backendp := flag.String("backend", "badger", "Backend to use (possible: file, badger, bolt, inmemory)")
+	backendp := flag.String("backend", "badger",
+		fmt.Sprintf("Backend to use (possible: %v)", factory.List()))
 	cpuprofile := flag.String("cpuprofile", "", "CPU profile file")
 	memprofile := flag.String("memprofile", "", "Memory profile file")
 
@@ -51,21 +52,7 @@ func main() {
 		flag.Usage()
 		os.Exit(1)
 	}
-	var backend storage.BlockBackend
-	switch *backendp {
-	case "bolt":
-		backend = storage.BoltBlockBackend{}.Init(storedir)
-	case "badger":
-		backend = storage.BadgerBlockBackend{}.Init(storedir)
-	case "file":
-		be := &storage.FileBlockBackend{}
-		be.Init(storedir)
-		backend = be
-	case "inmemory":
-		backend = storage.InMemoryBlockBackend{}.Init()
-	default:
-		log.Panicf("Invalid backend: %s", *backendp)
-	}
+	backend := factory.New(*backendp, storedir)
 
 	st := fs.NewCryptoStorage(*password, *salt, backend)
 	myfs := fs.NewFs(st, "xxx")

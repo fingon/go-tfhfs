@@ -32,25 +32,25 @@ func (self *NamedMutexLockedMap) Locked(name string) func() {
 	}
 	ll := self.m[name]
 	if ll == nil {
-		mlog.Printf("Locked created lock %s", name)
+		mlog.Printf2("util/lockedmap", "Locked created lock %s", name)
 		ll = &MutexLocked{}
 		self.m[name] = ll
 	}
 	self.q[name]++
 	self.l.Unlock()
 	ul := ll.Locked()
-	mlog.Printf("Locked %s", name)
+	mlog.Printf2("util/lockedmap", "Locked %s", name)
 	return func() {
 		defer self.l.Locked()()
-		mlog.Printf("Releasing %s", name)
+		mlog.Printf2("util/lockedmap", "Releasing %s", name)
 		self.q[name]--
 		if self.q[name] == 0 {
-			mlog.Printf(" was last -> gone")
+			mlog.Printf2("util/lockedmap", " was last -> gone")
 			delete(self.m, name)
 			delete(self.q, name)
 			return
 		}
-		mlog.Printf(" plain unlock")
+		mlog.Printf2("util/lockedmap", " plain unlock")
 		// normally unlock only mutex that is not outright deleted
 		ul()
 	}

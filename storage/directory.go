@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:55:15 2018 mstenber
- * Last modified: Wed Jan  3 18:49:56 2018 mstenber
- * Edit time:     34 min
+ * Last modified: Fri Jan  5 12:01:43 2018 mstenber
+ * Edit time:     36 min
  *
  */
 
@@ -66,8 +66,8 @@ func (self *delayedUInt64Value) update(value uint64) {
 	self.valueTime = time.Now()
 }
 
-type DirectoryBlockBackendBase struct {
-	dir string
+type DirectoryBackendBase struct {
+	Dir string
 
 	// ValueUpdateInterval describes how often cached values (e.g.
 	// statfs stuff) are updated _in background_.
@@ -76,8 +76,8 @@ type DirectoryBlockBackendBase struct {
 	available, used delayedUInt64Value
 }
 
-func (self *DirectoryBlockBackendBase) Init(dir string) *DirectoryBlockBackendBase {
-	self.dir = dir
+func (self *DirectoryBackendBase) Init(dir string) *DirectoryBackendBase {
+	self.Dir = dir
 	minimumInterval := 5 * time.Second
 	if self.ValueUpdateInterval < minimumInterval {
 		self.ValueUpdateInterval = minimumInterval
@@ -110,10 +110,10 @@ func calculateUsed(dir string) (sum uint64) {
 	return sum
 }
 
-func (self *DirectoryBlockBackendBase) GetBytesAvailable() uint64 {
+func (self *DirectoryBackendBase) GetBytesAvailable() uint64 {
 	return self.available.Value()
 }
 
-func (self *DirectoryBlockBackendBase) GetBytesUsed() uint64 {
+func (self *DirectoryBackendBase) GetBytesUsed() uint64 {
 	return self.used.Value()
 }

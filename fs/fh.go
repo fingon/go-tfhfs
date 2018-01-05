@@ -320,7 +320,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 			defer self.Fs().lock.Locked()()
 			meta := self.inode.Meta()
 			if len(meta.Data) > 0 {
-				mlog.Printf("cleared in-meta data")
+				mlog.Printf2("fs/fh", "cleared in-meta data")
 				meta.Data = nil
 				self.inode.SetMeta(meta)
 			}

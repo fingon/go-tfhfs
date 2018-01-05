@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Fri Jan  5 10:52:29 2018 mstenber
- * Edit time:     119 min
+ * Last modified: Fri Jan  5 12:30:17 2018 mstenber
+ * Edit time:     120 min
  *
  */
 
@@ -21,6 +21,7 @@ import (
 
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
+	"github.com/fingon/go-tfhfs/storage/factory"
 	"github.com/hanwen/go-fuse/fuse"
 	"github.com/stvp/assert"
 )
@@ -332,7 +333,7 @@ func TestFs(t *testing.T) {
 				t.Parallel()
 				mlog.Printf2("fs/rawfs_test", "starting")
 				rootName := "toor"
-				backend := storage.InMemoryBlockBackend{}.Init()
+				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
 				fs := NewFs(st, rootName)
 				if gen != nil {

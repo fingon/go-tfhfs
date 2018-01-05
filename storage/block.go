@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Fri Jan  5 15:11:51 2018 mstenber
- * Edit time:     147 min
+ * Last modified: Fri Jan  5 16:21:15 2018 mstenber
+ * Edit time:     157 min
  *
  */
 
@@ -51,10 +51,10 @@ type Block struct {
 func (self *Block) GetData() []byte {
 	if self.Data == nil {
 		if self.storage == nil {
-			mlog.Printf2("storage/block", "b.GetData - calling be.GetBlockData")
+			mlog.Printf2("storage/block", "b.GetData %p - calling be.GetBlockData", self)
 			self.Data = self.Backend.GetBlockData(self)
 		} else {
-			mlog.Printf2("storage/block", "b.GetData - calling s.be.GetBlockData")
+			mlog.Printf2("storage/block", "b.GetData %p - calling s.be.GetBlockData", self)
 			data := self.storage.Backend.GetBlockData(self)
 			b, err := self.storage.Codec.DecodeBytes(data, []byte(self.Id))
 			if err != nil {
@@ -87,9 +87,10 @@ func (self *Block) flush() int {
 	} else if self.Backend == nil {
 		// We want to be added to backend
 		self.storage.writes++
-		self.storage.writebytes += len(self.GetData())
+		data := self.GetData()
+		self.storage.writebytes += len(data)
 
-		b, err := self.storage.Codec.EncodeBytes(self.Data, []byte(self.Id))
+		b, err := self.storage.Codec.EncodeBytes(data, []byte(self.Id))
 		if err != nil {
 			log.Panic("Encoding failed", err)
 		}
@@ -107,10 +108,11 @@ func (self *Block) flush() int {
 			} else if self.Status == BlockStatus_WANT_WEAK {
 				// old type = WEAK
 			} else {
+				mlog.Printf(" status changed")
 				self.storage.updateBlockDataDependencies(self, true, self.Status)
 				self.storage.updateBlockDataDependencies(self, false, self.Stored.Status)
 			}
-			ops = ops + 1
+			ops++
 		}
 		ops += self.storage.Backend.UpdateBlock(self)
 	}
@@ -169,7 +171,7 @@ func (self *Block) markDirty() {
 
 // getBlockById returns Block (if any) that matches id.
 func (self *Storage) getBlockById(id string) *Block {
-	mlog.Printf2("storage/block", "st.GetBlockById %x", id)
+	mlog.Printf2("storage/block", "st.getBlockById %x", id)
 	b, ok := self.blocks[id]
 	if !ok {
 		b = self.Backend.GetBlockById(id)
@@ -180,16 +182,5 @@ func (self *Storage) getBlockById(id string) *Block {
 		b.storage = self
 		self.blocks[id] = b
 	}
-	return b
-}
-
-func (self *Storage) gocBlockById(id string) *Block {
-	mlog.Printf2("storage/block", "st.gocBlockById %x", id)
-	b := self.getBlockById(id)
-	if b != nil {
-		return b
-	}
-	b = &Block{Id: id, storage: self}
-	self.blocks[id] = b
 	return b
 }

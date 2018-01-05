@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Fri Jan  5 15:15:00 2018 mstenber
- * Edit time:     511 min
+ * Last modified: Fri Jan  5 16:22:53 2018 mstenber
+ * Edit time:     524 min
  *
  */
 
@@ -134,12 +134,16 @@ func (self *Storage) run() {
 				continue
 			}
 			job.status = BlockStatus_NORMAL
+			mlog.Printf("fallthrough to storing block")
 			fallthrough
 		case jobStoreBlock:
-			b := self.gocBlockById(job.id)
+			b := &Block{Id: job.id,
+				Data:    job.data,
+				storage: self,
+			}
+			self.blocks[job.id] = b
 			b.setStatus(job.status)
 			b.addRefCount(job.count)
-			b.Data = job.data
 			job.out <- &jobOut{sb: NewStorageBlock(b)}
 		case jobUpdateBlockIdRefCount:
 			b := self.getBlockById(job.id)
@@ -181,6 +185,9 @@ func (self *Storage) GetBlockIdByName(name string) string {
 }
 
 func (self *Storage) storeBlockInternal(jobType int, id string, data []byte, count int32) *StorageBlock {
+	if data == nil {
+		mlog.Printf("no data given")
+	}
 	out := make(chan *jobOut)
 	self.jobChannel <- &jobIn{jobType: jobType, out: out,
 		id: id, data: data, count: count, status: BlockStatus_NORMAL,
@@ -301,7 +308,7 @@ func (self *Storage) flush() int {
 	// flush_dirty_stored_blocks in Python
 	for len(self.dirtyBlocks) > 0 {
 		oops := ops
-		mlog.Printf2("storage/storage", " flush_dirty_stored_blocks; %d to go", len(self.dirtyBlocks))
+		mlog.Printf2("storage/storage", " flushing %d dirty", len(self.dirtyBlocks))
 		// first nonzero refcounts as they may add references;
 		// then zero refcounts as they reduce references
 		for _, b := range self.dirtyBlocks {
@@ -314,7 +321,11 @@ func (self *Storage) flush() int {
 		}
 
 		// only removals left
+		mlog.Printf(" flushing refcnt=0")
 		for _, b := range self.dirtyBlocks {
+			if b.RefCount != 0 {
+				break
+			}
 			ops += b.flush()
 		}
 	}

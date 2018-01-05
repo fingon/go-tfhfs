@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Fri Jan  5 14:31:32 2018 mstenber
- * Edit time:     166 min
+ * Last modified: Fri Jan  5 16:33:16 2018 mstenber
+ * Edit time:     182 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/fingon/go-tfhfs/codec"
@@ -70,8 +71,9 @@ func ProdBackend(t *testing.T, factory func() storage.Backend) {
 	bs = factory()
 	bn = bs.GetBlockIdByName("noname")
 	assert.Equal(t, bn, "")
-	ProdStorage(t, factory)
 	bs.Close()
+
+	ProdStorage(t, factory)
 }
 
 func ProdStorageOne(t *testing.T, s *storage.Storage) {
@@ -124,6 +126,32 @@ func ProdStorageOne(t *testing.T, s *storage.Storage) {
 	// assert.Equal(t, s.blocks.Get().Len(), 0)
 }
 
+func ProdStorageDeps(t *testing.T, s *storage.Storage) {
+	mlog.Printf("ProdStorageDeps")
+	world := []struct {
+		key, value string
+	}{
+		{"sub11", " "},
+		{"sub12", " "},
+		{"sub1", "sub11 sub12"},
+		{"sub2", " "},
+		{"sub", "sub1 sub2"},
+	}
+	for _, v := range world {
+		s.ReferOrStoreBlock(v.key, []byte(v.value)).Close()
+	}
+	s.SetNameToBlockId("name", "sub")
+	for _, v := range world {
+		s.ReleaseBlockId(v.key)
+	}
+	s.Flush()
+	n := s.GetBlockIdByName("name")
+	assert.Equal(t, n, "sub")
+	b := s.GetBlockById("sub12")
+	assert.True(t, b != nil)
+	b.Close()
+}
+
 func ProdStorage(t *testing.T, factory func() storage.Backend) {
 	bs := factory()
 	mlog.Printf2("storage/storage_test", "ProdStorage %v", bs)
@@ -135,13 +163,26 @@ func ProdStorage(t *testing.T, factory func() storage.Backend) {
 
 	c := codec.CodecChain{}.Init(&codec.CompressingCodec{})
 	s2 := storage.Storage{Backend: bs, Codec: c}.Init()
-	defer s2.Close()
 	ProdStorageOne(t, s2)
+	s2.Close()
+
+	s3 := storage.Storage{Backend: bs,
+		Codec: c,
+		IterateReferencesCallback: func(id string, data []byte, cb storage.BlockReferenceCallback) {
+			for _, subid := range strings.Split(string(data), " ") {
+				if subid != "" {
+					cb(subid)
+				}
+			}
+		}}.Init()
+	ProdStorageDeps(t, s3)
+	s3.Close()
 
 }
 
 func TestBackend(t *testing.T) {
 	for _, k := range factory.List() {
+		k := k
 		t.Run(k, func(t *testing.T) {
 			t.Parallel()
 			dir, _ := ioutil.TempDir("", k)
@@ -155,6 +196,7 @@ func TestBackend(t *testing.T) {
 
 func BenchmarkBackend(b *testing.B) {
 	for _, k := range factory.List() {
+		k := k
 		dir, _ := ioutil.TempDir("", k)
 		defer os.RemoveAll(dir)
 		be := factory.New(k, dir)

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan  4 12:21:40 2018 mstenber
- * Last modified: Thu Jan  4 14:15:09 2018 mstenber
- * Edit time:     26 min
+ * Last modified: Fri Jan  5 02:39:29 2018 mstenber
+ * Edit time:     28 min
  *
  */
 
@@ -113,5 +113,17 @@ func (self *MutexLocked) Locked() (unlock func()) {
 	self.Lock()
 	return func() {
 		self.Unlock()
+	}
+}
+
+func (self *MutexLocked) ClearOwner() {
+	if mlog.IsEnabled() {
+		atomic.StoreUint64(&self.owner, 0)
+	}
+}
+
+func (self *MutexLocked) UpdateOwner() {
+	if mlog.IsEnabled() {
+		atomic.StoreUint64(&self.owner, GetGoroutineID())
 	}
 }

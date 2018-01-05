@@ -4,17 +4,24 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 01:52:26 2018 mstenber
- * Last modified: Fri Jan  5 02:03:26 2018 mstenber
- * Edit time:     8 min
+ * Last modified: Fri Jan  5 02:56:57 2018 mstenber
+ * Edit time:     14 min
  *
  */
 
 package util
 
+import "github.com/fingon/go-tfhfs/mlog"
+
 type NamedMutexLockedMap struct {
 	l MutexLocked
 	m map[string]*MutexLocked
 	q map[string]int
+}
+
+func (self *NamedMutexLockedMap) GetLockedByName(name string) *MutexLocked {
+	defer self.l.Locked()()
+	return self.m[name]
 }
 
 func (self *NamedMutexLockedMap) Locked(name string) func() {
@@ -25,20 +32,25 @@ func (self *NamedMutexLockedMap) Locked(name string) func() {
 	}
 	ll := self.m[name]
 	if ll == nil {
+		mlog.Printf("Locked created lock %s", name)
 		ll = &MutexLocked{}
 		self.m[name] = ll
 	}
 	self.q[name]++
 	self.l.Unlock()
 	ul := ll.Locked()
+	mlog.Printf("Locked %s", name)
 	return func() {
 		defer self.l.Locked()()
+		mlog.Printf("Releasing %s", name)
 		self.q[name]--
 		if self.q[name] == 0 {
+			mlog.Printf(" was last -> gone")
 			delete(self.m, name)
 			delete(self.q, name)
 			return
 		}
+		mlog.Printf(" plain unlock")
 		// normally unlock only mutex that is not outright deleted
 		ul()
 	}

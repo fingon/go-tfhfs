@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Fri Jan  5 16:21:15 2018 mstenber
- * Edit time:     157 min
+ * Last modified: Fri Jan  5 17:25:06 2018 mstenber
+ * Edit time:     159 min
  *
  */
 
@@ -108,7 +108,7 @@ func (self *Block) flush() int {
 			} else if self.Status == BlockStatus_WANT_WEAK {
 				// old type = WEAK
 			} else {
-				mlog.Printf(" status changed")
+				mlog.Printf2("storage/block", " status changed")
 				self.storage.updateBlockDataDependencies(self, true, self.Status)
 				self.storage.updateBlockDataDependencies(self, false, self.Stored.Status)
 			}
@@ -126,6 +126,9 @@ func (self *Block) addRefCount(count int32) {
 	mlog.Printf2("storage/block", "b.addRefCount %p %v -> %v", self, count, self.RefCount+count)
 	self.markDirty()
 	self.RefCount += count
+	if self.RefCount < 0 {
+		log.Panicf("RefCount below 0 for %x", self.Id)
+	}
 	hadRefs := self.Stored.RefCount != 0
 	haveRefs := self.RefCount != 0
 	if hadRefs != haveRefs {
@@ -150,7 +153,7 @@ func (self *Block) addStorageRefCount(v int32) {
 			log.Panic("Negative reference count", nv)
 		}
 		if self.Stored != nil {
-			log.Panic("Storage reference count before flush?")
+			log.Panic("Storage reference count before flush - reference mismatch?")
 		}
 		mlog.Printf2("storage/block", " removed block %x", self.Id)
 		delete(self.storage.blocks, self.Id)

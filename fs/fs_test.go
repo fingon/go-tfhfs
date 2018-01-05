@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Fri Jan  5 12:29:40 2018 mstenber
- * Edit time:     20 min
+ * Last modified: Fri Jan  5 17:00:24 2018 mstenber
+ * Edit time:     22 min
  *
  */
 
@@ -48,9 +48,9 @@ func BenchmarkBadgerFs(b *testing.B) {
 	tr := fs.GetTransaction()
 	for i := 0; i < n; i++ {
 		k := ibtree.IBKey(NewblockKey(uint64(i), BST_META, ""))
-		tr.Set(k, fmt.Sprintf("v%d", i))
+		tr.t.Set(k, fmt.Sprintf("v%d", i))
 	}
-	fs.CommitTransaction(tr)
+	tr.Commit()
 
 	b.Run("Get1", func(b *testing.B) {
 		b.ResetTimer()
@@ -58,17 +58,19 @@ func BenchmarkBadgerFs(b *testing.B) {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
-			tr.Get(k)
+			tr.t.Get(k)
+			tr.Close()
 		}
 	})
 
 	b.Run("GetN", func(b *testing.B) {
-		tr := fs.GetTransaction()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
-			tr.Get(k)
+			tr.t.Get(k)
+			tr.Close()
 		}
 	})
 
@@ -78,7 +80,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
-			tr.Set(k, fmt.Sprintf("V%d%d", j, i))
+			tr.t.Set(k, fmt.Sprintf("V%d%d", j, i))
 			tr.Commit()
 		}
 	})
@@ -86,10 +88,10 @@ func BenchmarkBadgerFs(b *testing.B) {
 	b.Run("Delete", func(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			tr := ibtree.NewTransaction(fs.treeRoot.Get())
+			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
-			tr.Delete(k)
+			tr.t.Delete(k)
 			tr.Commit()
 		}
 	})

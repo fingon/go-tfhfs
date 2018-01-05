@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Jan  5 15:05:25 2018 mstenber
- * Edit time:     277 min
+ * Last modified: Fri Jan  5 17:02:13 2018 mstenber
+ * Edit time:     287 min
  *
  */
 
@@ -46,14 +46,13 @@ type Fs struct {
 	tree          *ibtree.IBTree
 	storage       *storage.Storage
 	rootName      string
-	treeRoot      IBNodeAtomicPointer
+	root          fsTreeRootAtomicPointer
 
 	// data covers the things below here that involve writing
 	// e.g. any write operation should grab the lock early on to
 	// make sure writes are consistent.
-	lock            util.MutexLocked
-	treeRootBlockId ibtree.BlockId
-	nodeDataCache   gcache.Cache
+	lock          util.MutexLocked
+	nodeDataCache gcache.Cache
 }
 
 func (self *Fs) Close() {
@@ -86,8 +85,6 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 
 func (self *Fs) Flush() {
 	mlog.Printf2("fs/fs", "fs.Flush started")
-	// self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
-	// ^ done in each commit, so pointless here?
 	self.storage.Flush()
 	mlog.Printf2("fs/fs", " .. done with fs.Flush")
 }
@@ -102,24 +99,15 @@ func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 	}
 	b = bb[0 : 1+len(b)]
 	mlog.Printf2("fs/fs", "SaveNode %d bytes", len(b))
-	return self.getBlockDataId(b, nd)
+	bl := self.getStorageBlock(b, nd)
+	bid := ibtree.BlockId(bl.Id())
+	bl.Close()
+	return bid
 }
 
-func (self *Fs) GetTransaction() *ibtree.IBTransaction {
+func (self *Fs) GetTransaction() *fsTransaction {
 	// mlog.Printf2("fs/fs", "GetTransaction of %p", self.treeRoot)
-	return ibtree.NewTransaction(self.treeRoot.Get())
-}
-
-func (self *Fs) CommitTransaction(t *ibtree.IBTransaction) {
-	self.lock.AssertLocked()
-	root, bid := t.Commit()
-	// TBD: Make real merging scheme ro merge newRoot with what
-	// the transaction started with and current root
-	self.treeRoot.Set(root)
-	self.treeRootBlockId = bid
-	mlog.Printf2("fs/fs", "CommitTransaction %p", self.treeRoot)
-	root.PrintToMLogDirty()
-	self.storage.SetNameToBlockId(self.rootName, string(self.treeRootBlockId))
+	return newFsTransaction(self)
 }
 
 // ListDir provides testing utility as output of ReadDir/ReadDirPlus
@@ -164,15 +152,16 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 	rootbid := st.GetBlockIdByName(rootName)
 	if rootbid != "" {
 		bid := ibtree.BlockId(rootbid)
-		root := fs.tree.LoadRoot(bid)
-		if root == nil {
+		node := fs.tree.LoadRoot(bid)
+		if node == nil {
 			log.Panicf("Loading of root block %x failed", bid)
 		}
-		fs.treeRoot.Set(root)
-		fs.treeRootBlockId = bid
+		block := fs.storage.GetBlockById(string(bid))
+		root := &fsTreeRoot{node, block}
+		fs.root.Set(root)
 	}
-	if fs.treeRoot.Get() == nil {
-		fs.treeRoot.Set(fs.tree.NewRoot())
+	if fs.root.Get() == nil {
+		fs.root.Set(&fsTreeRoot{node: fs.tree.NewRoot()})
 		// getInode succeeds always; Get does not
 		defer fs.inodeLock.Locked()()
 		root := fs.getInode(fuse.FUSE_ROOT_ID)
@@ -236,8 +225,8 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 	}
 }
 
-func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
-	mlog.Printf2("fs/fs", "fs.getBlockDataId %d", len(b))
+func (self *Fs) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *storage.StorageBlock {
+	mlog.Printf2("fs/fs", "fs.getStorageBlock %d", len(b))
 	// self.lock.AssertLocked() // should not be necessary
 	h := sha256.Sum256(b)
 	bid := h[:]
@@ -245,11 +234,7 @@ func (self *Fs) getBlockDataId(b []byte, nd *ibtree.IBNodeData) ibtree.BlockId {
 	if nd != nil {
 		self.nodeDataCache.Set(ibtree.BlockId(id), nd)
 	}
-	block := self.storage.ReferOrStoreBlock0(id, b)
-	r := ibtree.BlockId(block.Id())
-	mlog.Printf2("fs/fs", " fs.getBlockDataId = %x", r)
-	block.Close()
-	return r
+	return self.storage.ReferOrStoreBlock0(id, b)
 }
 
 func (self *Fs) loadNodeFromBytes(bd []byte) *ibtree.IBNodeData {

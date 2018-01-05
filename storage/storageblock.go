@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Fri Jan  5 13:17:08 2018 mstenber
- * Edit time:     4 min
+ * Last modified: Fri Jan  5 17:26:28 2018 mstenber
+ * Edit time:     7 min
  *
  */
 
@@ -22,12 +22,20 @@ func NewStorageBlock(b *Block) *StorageBlock {
 	if b == nil {
 		return nil
 	}
+	// These are created only in main goroutine so this is fine;
+	// however, as the objects are passed to clients, see below..
 	b.addStorageRefCount(1)
 	return &StorageBlock{block: b}
 }
 
 func (self *StorageBlock) Close() {
-	self.block.addStorageRefCount(-1)
+	// direct path is tempting, but bad; do it via the channel so
+	// we don't kill things too soon or without proper locking of
+	// maps etc.
+	//
+	// self.block.addStorageRefCount(-1)
+
+	self.block.storage.ReleaseStorageBlockId(self.block.Id)
 }
 
 func (self *StorageBlock) Id() string {

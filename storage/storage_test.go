@@ -127,7 +127,7 @@ func ProdStorageOne(t *testing.T, s *storage.Storage) {
 }
 
 func ProdStorageDeps(t *testing.T, s *storage.Storage) {
-	mlog.Printf("ProdStorageDeps")
+	mlog.Printf2("storage/storage_test", "ProdStorageDeps")
 	world := []struct {
 		key, value string
 	}{

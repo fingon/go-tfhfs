@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Fri Jan  5 14:33:29 2018 mstenber
- * Edit time:     207 min
+ * Last modified: Fri Jan  5 16:50:40 2018 mstenber
+ * Edit time:     211 min
  *
  */
 
@@ -38,6 +38,7 @@ func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 	// dentry at lastName (if set) or pos (if not set);
 	// return true if reading was successful (and pos got advanced)
 	tr := self.Fs().GetTransaction()
+	defer tr.Close()
 	kp := self.lastKey
 	mlog.Printf2("fs/fh", "fh.ReadNextinode %v", kp == nil)
 	if kp == nil {
@@ -55,7 +56,7 @@ func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 			})
 	} else {
 		mlog.Printf2("fs/fh", " calling NextKey %x", *kp)
-		nkeyp := tr.NextKey(ibtree.IBKey(*kp))
+		nkeyp := tr.t.NextKey(ibtree.IBKey(*kp))
 		if nkeyp == nil {
 			mlog.Printf2("fs/fh", " next missing")
 			return nil, ""
@@ -71,7 +72,7 @@ func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 		mlog.Printf2("fs/fh", " end - %x", *kp)
 		return nil, ""
 	}
-	inop := tr.Get(ibtree.IBKey(*kp))
+	inop := tr.t.Get(ibtree.IBKey(*kp))
 	ino := binary.BigEndian.Uint64([]byte(*inop))
 	name = string(kp.SubTypeData()[filenameHashSize:])
 	mlog.Printf2("fs/fh", " got %v %s", ino, name)
@@ -172,7 +173,8 @@ func (self *inodeFH) read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 			end = dataExtentSize
 		}
 		tr := self.Fs().GetTransaction()
-		bidp := tr.Get(ibtree.IBKey(k))
+		defer tr.Close()
+		bidp := tr.t.Get(ibtree.IBKey(k))
 		if bidp == nil {
 			mlog.Printf2("fs/fh", "Key %x not found at all", k)
 		} else {
@@ -312,10 +314,13 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		} else {
 			k := NewblockKeyOffset(self.inode.ino, offset)
 			tr := self.Fs().GetTransaction()
-			bid := self.Fs().getBlockDataId(bbuf, nil)
+			defer tr.Close()
+			bl := self.Fs().getStorageBlock(bbuf, nil)
+			defer bl.Close()
+			bid := bl.Id()
 			mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
 			// mlog.Printf2("fs/fh", " %x", buf)
-			tr.Set(ibtree.IBKey(k), string(bid))
+			tr.t.Set(ibtree.IBKey(k), bid)
 
 			defer self.Fs().lock.Locked()()
 			meta := self.inode.Meta()
@@ -324,7 +329,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 				meta.Data = nil
 				self.inode.SetMeta(meta)
 			}
-			self.Fs().CommitTransaction(tr)
+			tr.Commit()
 		}
 	}()
 

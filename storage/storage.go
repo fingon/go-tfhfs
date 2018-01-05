@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Fri Jan  5 16:22:53 2018 mstenber
- * Edit time:     524 min
+ * Last modified: Fri Jan  5 17:27:46 2018 mstenber
+ * Edit time:     527 min
  *
  */
 
@@ -35,10 +35,11 @@ const (
 	jobFlush int = iota
 	jobGetBlockById
 	jobGetBlockIdByName
-	jobReferOrStoreBlock     // ReferOrStoreBlock, ReferOrStoreBlock0
-	jobUpdateBlockIdRefCount // ReferBlockId, ReleaseBlockId
 	jobSetNameToBlockId
-	jobStoreBlock // StoreBlock, StoreBlock0
+	jobReferOrStoreBlock            // ReferOrStoreBlock, ReferOrStoreBlock0
+	jobUpdateBlockIdRefCount        // ReferBlockId, ReleaseBlockId
+	jobUpdateBlockIdStorageRefCount // ReleaseStorageBlockId
+	jobStoreBlock                   // StoreBlock, StoreBlock0
 	jobQuit
 )
 
@@ -134,7 +135,7 @@ func (self *Storage) run() {
 				continue
 			}
 			job.status = BlockStatus_NORMAL
-			mlog.Printf("fallthrough to storing block")
+			mlog.Printf2("storage/storage", "fallthrough to storing block")
 			fallthrough
 		case jobStoreBlock:
 			b := &Block{Id: job.id,
@@ -151,6 +152,12 @@ func (self *Storage) run() {
 				log.Panicf("block id %x disappeared", job.id)
 			}
 			b.addRefCount(job.count)
+		case jobUpdateBlockIdStorageRefCount:
+			b := self.getBlockById(job.id)
+			if b == nil {
+				log.Panicf("block id %x disappeared", job.id)
+			}
+			b.addStorageRefCount(job.count)
 		case jobSetNameToBlockId:
 			self.getName(job.name).new_value = job.id
 		default:
@@ -186,7 +193,7 @@ func (self *Storage) GetBlockIdByName(name string) string {
 
 func (self *Storage) storeBlockInternal(jobType int, id string, data []byte, count int32) *StorageBlock {
 	if data == nil {
-		mlog.Printf("no data given")
+		mlog.Printf2("storage/storage", "no data given")
 	}
 	out := make(chan *jobOut)
 	self.jobChannel <- &jobIn{jobType: jobType, out: out,
@@ -212,6 +219,12 @@ func (self *Storage) ReferBlockId(id string) {
 
 func (self *Storage) ReleaseBlockId(id string) {
 	self.jobChannel <- &jobIn{jobType: jobUpdateBlockIdRefCount,
+		id: id, count: -1,
+	}
+}
+
+func (self *Storage) ReleaseStorageBlockId(id string) {
+	self.jobChannel <- &jobIn{jobType: jobUpdateBlockIdStorageRefCount,
 		id: id, count: -1,
 	}
 }
@@ -321,7 +334,7 @@ func (self *Storage) flush() int {
 		}
 
 		// only removals left
-		mlog.Printf(" flushing refcnt=0")
+		mlog.Printf2("storage/storage", " flushing refcnt=0")
 		for _, b := range self.dirtyBlocks {
 			if b.RefCount != 0 {
 				break

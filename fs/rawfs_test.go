@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Fri Jan  5 12:30:17 2018 mstenber
- * Edit time:     120 min
+ * Last modified: Fri Jan  5 17:01:21 2018 mstenber
+ * Edit time:     122 min
  *
  */
 
@@ -320,8 +320,8 @@ func (self *DummyGenerator) CreateInodeNumber() uint64 {
 
 func TestFs(t *testing.T) {
 	check := func(t *testing.T, fs *Fs) {
-		mlog.Printf2("fs/rawfs_test", "Root: %s = %x", fs.rootName, fs.treeRootBlockId)
-		fs.treeRoot.Get().PrintToMLogAll()
+		mlog.Printf2("fs/rawfs_test", "Root: %s = %x", fs.rootName, fs.root.Get().block.Id())
+		fs.root.Get().node.PrintToMLogAll()
 		root := NewFSUser(fs)
 		_, err := root.Stat("/public")
 		assert.Nil(t, err)

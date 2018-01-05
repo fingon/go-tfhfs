@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Jan  5 15:19:24 2018 mstenber
-# Edit time:     67 min
+# Last modified: Fri Jan  5 16:57:29 2018 mstenber
+# Edit time:     68 min
 #
 #
 
@@ -14,7 +14,7 @@ GREENPACK_OPTS=-alltuple
 # ^ remove -alltuple someday if we want to pretend to be compatible over versions
 
 GENERATED=\
-	fs/ibnodepointer_gen.go
+	fs/fstreerootpointer_gen.go
 
 SUBDIRS=codec fs ibtree storage
 
@@ -27,12 +27,11 @@ get: .done.getprebuild
 
 generate: .done.generated
 
-fs/ibnodepointer_gen.go: Makefile xxx/pointer.go
+fs/fstreerootpointer_gen.go: Makefile xxx/pointer.go
 	( echo "package fs" ; \
-		echo 'import "github.com/fingon/go-tfhfs/ibtree"' ; \
 		egrep -A 9999 '^import' xxx/pointer.go | \
 		egrep -v '^(type XXX|// XXX)Type' | \
-		sed 's/XXXType/(*ibtree.IBNode)/g;s/XXX/IBNode/g' | \
+		sed 's/XXXType/(*fsTreeRoot)/g;s/XXX/fsTreeRoot/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

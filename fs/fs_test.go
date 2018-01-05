@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Fri Jan  5 17:00:24 2018 mstenber
- * Edit time:     22 min
+ * Last modified: Fri Jan  5 23:32:08 2018 mstenber
+ * Edit time:     31 min
  *
  */
 
@@ -19,6 +19,7 @@ import (
 	"testing"
 
 	"github.com/fingon/go-tfhfs/ibtree"
+	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/storage/factory"
 	"github.com/stvp/assert"
 )
@@ -32,6 +33,51 @@ func TestblockKey(t *testing.T) {
 	assert.Equal(t, k.Ino(), ino)
 	assert.Equal(t, k.SubType(), bst)
 	assert.Equal(t, k.SubTypeData(), bstd)
+}
+
+func TestFsTransaction(t *testing.T) {
+	t.Parallel()
+
+	rootName := "toor"
+	backend := factory.New("inmemory", "")
+	st := storage.Storage{Backend: backend}.Init()
+	fs := NewFs(st, rootName)
+	defer fs.lock.Locked()()
+
+	// simulate 3 parallel operations
+
+	tr1 := newFsTransaction(fs)
+	tr1.t.Set("foo1", "v1")
+
+	tr2 := newFsTransaction(fs)
+	tr2.t.Set("foo2", "v2")
+
+	tr3 := newFsTransaction(fs)
+	tr3.t.Set("foo3", "v3")
+
+	tr1.Commit()
+	tr2.Commit()
+	tr3.Commit()
+
+	tr1 = newFsTransaction(fs)
+	tr2 = newFsTransaction(fs)
+	tr3 = newFsTransaction(fs)
+	assert.Equal(t, *tr1.t.Get("foo1"), "v1")
+	assert.Equal(t, *tr1.t.Get("foo2"), "v2")
+	assert.Equal(t, *tr1.t.Get("foo3"), "v3")
+
+	// Now tr1 updates, tr2 deletes one key, and second key vice versa
+	tr1.t.Set("foo1", "v11")
+	tr1.t.Delete("foo2")
+	tr2.t.Delete("foo1")
+	tr2.t.Set("foo2", "v21")
+	tr1.Commit()
+	tr2.Commit()
+
+	// Most recent write wins in this case -> should have what tr2 did
+	tr1 = newFsTransaction(fs)
+	assert.Nil(t, tr1.t.Get("foo1"))
+	assert.Equal(t, *tr1.t.Get("foo2"), "v21")
 }
 
 func BenchmarkBadgerFs(b *testing.B) {

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Fri Jan  5 22:34:06 2018 mstenber
- * Edit time:     30 min
+ * Last modified: Fri Jan  5 23:31:23 2018 mstenber
+ * Edit time:     49 min
  *
  */
 
@@ -25,55 +25,85 @@ type fsTreeRoot struct {
 }
 
 type fsTransaction struct {
-	fs     *Fs
-	root   fsTreeRoot
-	t      *ibtree.IBTransaction
-	blocks []*storage.StorageBlock
+	fs           *Fs
+	originalRoot *fsTreeRoot
+	root         fsTreeRoot
+	t            *ibtree.IBTransaction
+	blocks       []*storage.StorageBlock
 }
 
 func newFsTransaction(fs *Fs) *fsTransaction {
-	root := *fs.root.Get()
-	// +1 ref when transaction starts
+	originalRoot := fs.root.Get()
+	root := *originalRoot
+	// +1 ref when transaction starts (old root copy we got)
 	if root.block != nil {
 		bid := root.block.Id()
 		mlog.Printf2("fs/fstransaction", "newFsTransaction - root id:%x", bid)
 		fs.storage.ReferStorageBlockId(bid)
 	}
-	return &fsTransaction{fs, root,
+	return &fsTransaction{fs, originalRoot, root,
 		ibtree.NewTransaction(root.node), make([]*storage.StorageBlock, 0)}
 }
 
 func (self *fsTransaction) Commit() {
-	mlog.Printf("fst.Commit")
-	self.fs.lock.AssertLocked()
+	mlog.Printf2("fs/fstransaction", "fst.Commit")
+	defer self.Close()
 	node, bid := self.t.Commit()
-	// +1 ref for new root
+	if node == self.originalRoot.node {
+		mlog.Printf2("fs/fstransaction", " no changes for fst.Commit")
+		return
+	}
+	// +1 ref for new root (that we are about to store)
 	block := self.fs.storage.GetBlockById(string(bid))
 	if block == nil {
 		log.Panicf("immediate commit + get = nil for %x", string(bid))
 	}
-	self.fs.storage.SetNameToBlockId(self.fs.rootName, string(bid))
-	self.Close()
-	// TBD: Should maybe do actual delta thing here, but this is
-	// low-probability occurence hopefully..
 	root := &fsTreeRoot{node, block}
-	for {
-		old := self.fs.root.Get()
-		if self.fs.root.SetIfEqualTo(root, old) {
-			if old.block != nil {
-				// -1 ref for old root
-				old.block.Close()
-			}
-			return
-		}
+	if !self.fs.root.SetIfEqualTo(root, self.originalRoot) {
+		// block not stored anywhere
+		defer block.Close()
+
+		mlog.Printf2("fs/fstransaction", " root has changed under us; doing delta")
+		tr := newFsTransaction(self.fs)
+		node.IterateDelta(self.originalRoot.node,
+			func(oldC, newC *ibtree.IBNodeDataChild) {
+				if newC == nil {
+					// Delete
+					v := tr.t.Get(oldC.Key)
+					if v != nil {
+						mlog.Printf2("fs/fstransaction", " delete %x", oldC.Key)
+						tr.t.Delete(oldC.Key)
+					}
+				} else if oldC == nil {
+					// Insert
+					mlog.Printf2("fs/fstransaction", " insert %x", newC.Key)
+					tr.t.Set(newC.Key, newC.Value)
+				} else {
+					// Update
+					mlog.Printf2("fs/fstransaction", " update %x", newC.Key)
+					tr.t.Set(newC.Key, newC.Value)
+				}
+			})
+		mlog.Printf2("fs/fstransaction", " delta done")
+		tr.Commit()
+		return
+	}
+	// In thory there is a race here; in practise I doubt it very
+	// much it matters (as we next update will anyway have us
+	// sticking in the updated version of the tree, as it was
+	// correctly updated)
+	self.fs.storage.SetNameToBlockId(self.fs.rootName, string(bid))
+	if self.originalRoot.block != nil {
+		// -1 ref for old root
+		self.originalRoot.block.Close()
 	}
 }
 
 func (self *fsTransaction) Close() {
-	mlog.Printf("fst.Close")
-	// -1 ref when transaction expires
+	mlog.Printf2("fs/fstransaction", "fst.Close")
+	// -1 ref when transaction expires (old root)
 	if self.root.block == nil {
-		mlog.Printf(" no root")
+		mlog.Printf2("fs/fstransaction", " no root")
 		return
 	}
 	for _, v := range self.blocks {

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Sat Jan  6 00:21:31 2018 mstenber
- * Edit time:     173 min
+ * Last modified: Sat Jan  6 02:21:18 2018 mstenber
+ * Edit time:     178 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"log"
 
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util"
 )
 
 // Block is abstraction used between Storage and its Backends.
@@ -29,7 +30,7 @@ type Block struct {
 	// Actually plaintext data (if available; GetData() should be
 	// used to get it always when accessing from outside backends
 	// as it may not be set at that point otherwise).
-	Data []byte
+	Data util.ByteSliceAtomicPointer
 
 	// Node is the actual btree node encoded within this
 	// block. Used to derive Data as needed.
@@ -50,19 +51,20 @@ type Block struct {
 }
 
 func (self *Block) GetData() []byte {
-	if self.Data == nil {
+	if self.Data.Get() == nil {
 		if self.storage == nil {
 			mlog.Printf2("storage/block", "%v.GetData  - calling be.GetBlockData", self)
-			self.Data = self.Backend.GetBlockData(self)
+			b := self.Backend.GetBlockData(self)
+			self.Data.Set(&b)
 		} else {
 			mlog.Printf2("storage/block", "%v.GetData - calling s.be.GetBlockData", self)
 			data := self.storage.Backend.GetBlockData(self)
-			self.Data = data
+			self.Data.Set(&data)
 			self.storage.reads++
 			self.storage.readbytes += len(data)
 		}
 	}
-	return self.Data
+	return *self.Data.Get()
 }
 
 func (self *Block) String() string {

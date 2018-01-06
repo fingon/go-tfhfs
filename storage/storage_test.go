@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sat Jan  6 01:44:04 2018 mstenber
- * Edit time:     192 min
+ * Last modified: Sat Jan  6 02:25:44 2018 mstenber
+ * Edit time:     194 min
  *
  */
 
@@ -30,9 +30,11 @@ func ProdBackend(t *testing.T, factory func() storage.Backend) {
 	bs := factory()
 	mlog.Printf2("storage/storage_test", "ProdBackend %v", bs)
 
-	b1 := &storage.Block{Id: "foo", Data: []byte("data"),
+	b1 := &storage.Block{Id: "foo",
 		BlockMetadata: storage.BlockMetadata{RefCount: 123,
 			Status: storage.BlockStatus_NORMAL}}
+	data := []byte("data")
+	b1.Data.Set(&data)
 	bs.SetNameToBlockId("name", "foo")
 	bs.StoreBlock(b1)
 
@@ -206,7 +208,9 @@ func BenchmarkBackend(b *testing.B) {
 
 			}
 		}
-		bl := &storage.Block{Id: "foo", Data: []byte("data")}
+		bl := &storage.Block{Id: "foo"}
+		data := []byte("data")
+		bl.Data.Set(&data)
 
 		b.Run(fmt.Sprintf("%s-set", k),
 			func(b *testing.B) {
@@ -214,7 +218,8 @@ func BenchmarkBackend(b *testing.B) {
 				defer undo()
 				b.ResetTimer()
 				for i := 0; i < b.N; i++ {
-					bl := &storage.Block{Id: fmt.Sprintf("foo%d", i), Data: []byte("data")}
+					bl := &storage.Block{Id: fmt.Sprintf("foo%d", i)}
+					bl.Data.Set(&data)
 					be.StoreBlock(bl)
 				}
 			})
@@ -240,7 +245,7 @@ func BenchmarkBackend(b *testing.B) {
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
-					bl2.Data = nil
+					bl2.Data.Set(nil)
 					bl2.GetData()
 				}
 

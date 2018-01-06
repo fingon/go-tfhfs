@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Sat Jan  6 01:09:48 2018 mstenber
- * Edit time:     540 min
+ * Last modified: Sat Jan  6 02:22:39 2018 mstenber
+ * Edit time:     542 min
  *
  */
 
@@ -170,9 +170,9 @@ func (self *Storage) run() {
 			fallthrough
 		case jobStoreBlock:
 			b := &Block{Id: job.id,
-				Data:    job.data,
 				storage: self,
 			}
+			b.Data.Set(&job.data)
 			self.blocks[job.id] = b
 			b.setStatus(job.status)
 			b.addRefCount(job.count)

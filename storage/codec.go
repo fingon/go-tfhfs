@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sat Jan  6 00:13:13 2018 mstenber
- * Last modified: Sat Jan  6 01:46:01 2018 mstenber
- * Edit time:     6 min
+ * Last modified: Sat Jan  6 02:22:13 2018 mstenber
+ * Edit time:     8 min
  *
  */
 
@@ -33,11 +33,11 @@ func (self *codecBackend) GetBlockById(id string) *Block {
 	if b != nil {
 		b.Backend = self
 	}
-	if b == nil || b.Data == nil {
+	if b == nil || b.Data.Get() == nil {
 		return b
 	}
 	nb := *b
-	nb.Data = nil
+	nb.Data.Set(nil)
 	return &nb
 }
 
@@ -51,11 +51,12 @@ func (self *codecBackend) GetBlockData(bl *Block) []byte {
 }
 
 func (self *codecBackend) StoreBlock(bl *Block) {
-	b, err := self.codec.EncodeBytes(bl.Data, []byte(bl.Id))
+	dp := bl.Data.Get()
+	b, err := self.codec.EncodeBytes(*dp, []byte(bl.Id))
 	if err != nil {
 		log.Panic("Encoding failed", err)
 	}
 	bl2 := *bl
-	bl2.Data = b
+	bl2.Data.Set(&b)
 	self.backend.StoreBlock(&bl2)
 }

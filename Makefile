@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Jan  5 16:57:29 2018 mstenber
-# Edit time:     68 min
+# Last modified: Sat Jan  6 02:19:45 2018 mstenber
+# Edit time:     70 min
 #
 #
 
@@ -14,8 +14,8 @@ GREENPACK_OPTS=-alltuple
 # ^ remove -alltuple someday if we want to pretend to be compatible over versions
 
 GENERATED=\
-	fs/fstreerootpointer_gen.go
-
+	fs/fstreerootpointer_gen.go \
+	util/byteslicepointer_gen.go
 SUBDIRS=codec fs ibtree storage
 
 all: generate test tfhfs
@@ -34,6 +34,15 @@ fs/fstreerootpointer_gen.go: Makefile xxx/pointer.go
 		sed 's/XXXType/(*fsTreeRoot)/g;s/XXX/fsTreeRoot/g' | \
 		cat ) > $@.new
 	mv $@.new $@
+
+
+util/byteslicepointer_gen.go: Makefile xxx/pointer.go
+       ( echo "package util" ; \
+               egrep -A 9999 '^import' xxx/pointer.go | \
+               egrep -v '^(type XXX|// XXX)Type' | \
+               sed 's/XXXType/(*[]byte)/g;s/XXX/ByteSlice/g' | \
+               cat ) > $@.new
+       mv $@.new $@
 
 html-cover-%: .done.cover.%
 	go tool cover -html=$<

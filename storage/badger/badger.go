@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Fri Jan  5 14:51:56 2018 mstenber
+ * Last modified: Sat Jan  6 02:23:31 2018 mstenber
  * Edit time:     142 min
  *
  */
@@ -137,9 +137,10 @@ func (self *badgerBackend) SetNameToBlockId(name, block_id string) {
 }
 
 func (self *badgerBackend) StoreBlock(b *storage.Block) {
-	mlog.Printf2("storage/badger/badger", "bad.StoreBlock %x (%d b)", b.Id, len(b.Data))
+	data := *b.Data.Get()
+	mlog.Printf2("storage/badger/badger", "bad.StoreBlock %x (%d b)", b.Id, len(data))
 	self.updateBlock(b)
-	self.setKKValue([]byte("2"), []byte(b.Id), b.Data)
+	self.setKKValue([]byte("2"), []byte(b.Id), data)
 }
 
 func (self *badgerBackend) updateBlock(b *storage.Block) {

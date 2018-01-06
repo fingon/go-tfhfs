@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 22:49:15 2018 mstenber
- * Last modified: Fri Jan  5 12:38:10 2018 mstenber
- * Edit time:     26 min
+ * Last modified: Sat Jan  6 02:23:05 2018 mstenber
+ * Edit time:     27 min
  *
  */
 
@@ -127,15 +127,15 @@ func (self *boltBackend) SetNameToBlockId(name, block_id string) {
 }
 
 func (self *boltBackend) StoreBlock(b *storage.Block) {
-	data := b.Data
+	data := b.Data.Get()
 	if data == nil {
 		log.Panicf("data not set in StoreBlock")
 	}
 	bid := []byte(b.Id)
-	mlog.Printf2("storage/bolt/bolt", "bbolt.StoreBlock %x (%d b)", bid, len(data))
+	mlog.Printf2("storage/bolt/bolt", "bbolt.StoreBlock %x (%d b)", bid, len(*data))
 	self.updateBlock(b)
 	self.db.Update(func(tx *bbolt.Tx) error {
-		tx.Bucket(dataKey).Put(bid, data)
+		tx.Bucket(dataKey).Put(bid, *data)
 		return nil
 	})
 }

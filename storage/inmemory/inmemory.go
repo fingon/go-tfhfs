@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Sat Jan  6 01:47:22 2018 mstenber
+ * Last modified: Sat Jan  6 02:23:57 2018 mstenber
  * Edit time:     72 min
  *
  */
@@ -51,7 +51,7 @@ func (self *inMemoryBackend) GetBlockData(bl *storage.Block) []byte {
 	if !ok {
 		log.Fatal("Non-existent block id in GetBlockData")
 	}
-	return b.Data
+	return *b.Data.Get()
 }
 
 func (self *inMemoryBackend) GetBlockById(id string) *storage.Block {

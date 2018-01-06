@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 14:31:18 2017 mstenber
- * Last modified: Sat Dec 30 16:28:52 2017 mstenber
- * Edit time:     20 min
+ * Last modified: Sat Jan  6 01:54:57 2018 mstenber
+ * Edit time:     23 min
  *
  */
 
@@ -109,4 +109,27 @@ func BenchmarkMutexLockUnlock(b *testing.B) {
 		m.Lock()
 		m.Unlock()
 	}
+}
+
+func BenchmarkChannelSendReceive(b *testing.B) {
+	c := make(chan int, 1)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		c <- 1
+		<-c
+	}
+}
+
+func BenchmarkChannelPing(b *testing.B) {
+	c := make(chan int)
+	b.ResetTimer()
+	go func() {
+		for {
+			<-c
+		}
+	}()
+	for i := 0; i < b.N; i++ {
+		c <- 1
+	}
+	close(c)
 }

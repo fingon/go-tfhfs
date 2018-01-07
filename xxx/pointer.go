@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan  4 11:44:09 2018 mstenber
- * Last modified: Thu Jan  4 12:01:46 2018 mstenber
- * Edit time:     9 min
+ * Last modified: Sun Jan  7 16:52:20 2018 mstenber
+ * Edit time:     11 min
  *
  */
 
@@ -15,9 +15,6 @@ import (
 	"sync/atomic"
 	"unsafe"
 )
-
-// XXXType must be pointer type, or interface type.
-type XXXType *string
 
 // XXXAtomicPointer provides typesafe access to type
 type XXXAtomicPointer struct {

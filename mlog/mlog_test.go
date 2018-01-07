@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 14:31:18 2017 mstenber
- * Last modified: Sat Jan  6 01:54:57 2018 mstenber
- * Edit time:     23 min
+ * Last modified: Sun Jan  7 16:05:21 2018 mstenber
+ * Edit time:     26 min
  *
  */
 
@@ -129,6 +129,18 @@ func BenchmarkChannelPing(b *testing.B) {
 		}
 	}()
 	for i := 0; i < b.N; i++ {
+		c <- 1
+	}
+	close(c)
+}
+
+func BenchmarkNewGoroutineChannelPing(b *testing.B) {
+	c := make(chan int)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		go func() {
+			<-c
+		}()
 		c <- 1
 	}
 	close(c)

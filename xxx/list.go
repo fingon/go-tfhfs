@@ -4,12 +4,14 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 16:53:09 2018 mstenber
- * Last modified: Sun Jan  7 17:23:26 2018 mstenber
- * Edit time:     16 min
+ * Last modified: Sun Jan  7 17:32:24 2018 mstenber
+ * Edit time:     20 min
  *
  */
 
 package xxx
+
+import "fmt"
 
 // XXXList provides doubly linked list which does not have inefficient
 // operations, is typesafe, and does minimum amount of extra
@@ -70,6 +72,19 @@ func (self *XXXList) Remove(e *XXXListElement) {
 	e.Prev = nil
 	e.Next = self.freeList
 	self.freeList = e
+}
+
+func (self *XXXList) String() string {
+	llen := func(l *XXXListElement) int {
+		len := 0
+		for ; l != nil; l = l.Next {
+			len++
+		}
+		return len
+	}
+
+	return fmt.Sprintf("XXXList<%d entries/%d free>", llen(self.Front), llen(self.freeList))
+
 }
 
 type XXXListElement struct {

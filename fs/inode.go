@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Mon Jan  8 16:41:33 2018 mstenber
- * Edit time:     303 min
+ * Last modified: Mon Jan  8 17:30:19 2018 mstenber
+ * Edit time:     305 min
  *
  */
 
@@ -157,6 +157,7 @@ func (self *inode) GetFile(flags uint32) *inodeFH {
 }
 
 func (self *inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
+	defer self.offsetMap.Locked(-1)()
 	k := NewblockKey(self.ino, BST_XATTR, attr)
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
@@ -193,6 +194,7 @@ func (self *inode) IterateSubTypeKeys(bst BlockSubType,
 }
 
 func (self *inode) RemoveXAttr(attr string) (code fuse.Status) {
+	defer self.offsetMap.Locked(-1)()
 	self.Fs().Update(func(tr *fsTransaction) {
 		k := ibtree.IBKey(NewblockKey(self.ino, BST_XATTR, attr))
 		mlog.Printf2("fs/inode", "RemoveXAttr %s - deleting %x", attr, k)
@@ -207,6 +209,7 @@ func (self *inode) RemoveXAttr(attr string) (code fuse.Status) {
 }
 
 func (self *inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
+	defer self.offsetMap.Locked(-1)()
 	self.Fs().Update(func(tr *fsTransaction) {
 		k := NewblockKey(self.ino, BST_XATTR, attr)
 		mlog.Printf2("fs/inode", "SetXAttr %s - setting %x", attr, k)

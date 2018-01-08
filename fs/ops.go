@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Mon Jan  8 16:36:47 2018 mstenber
- * Edit time:     283 min
+ * Last modified: Mon Jan  8 17:30:36 2018 mstenber
+ * Edit time:     284 min
  *
  */
 
@@ -452,6 +452,8 @@ func (self *fsOps) SetXAttr(input *SetXAttrIn, attr string, data []byte) (code S
 func (self *fsOps) ListXAttr(input *InHeader) (data []byte, code Status) {
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
+
+	defer inode.offsetMap.Locked(-1)()
 
 	code = self.access(inode, R_OK, false, &input.Context)
 	if !code.Ok() {

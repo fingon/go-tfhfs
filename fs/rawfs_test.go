@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Mon Jan  8 16:38:15 2018 mstenber
- * Edit time:     139 min
+ * Last modified: Mon Jan  8 17:48:41 2018 mstenber
+ * Edit time:     147 min
  *
  */
 
@@ -51,7 +51,7 @@ func ProdFsFile1(t *testing.T, u *FSUser, tn, wsize, rsize int) {
 	assert.Equal(t, int(fi.Size()), written)
 	since := time.Now().Sub(fi.ModTime())
 	assert.True(t, since >= 0, "modtime not in past")
-	assert.True(t, since.Minutes() < 1, "modtime too much in past")
+	assert.True(t, since.Minutes() < 10, "modtime too much in past")
 	assert.Nil(t, err)
 	mlog.Printf2("fs/rawfs_test", " write size %v", fi.Size())
 
@@ -264,7 +264,8 @@ func ProdFs(t *testing.T, fs *Fs) {
 	wg.Go(func() {
 		l, err := root.ListXAttr("/public")
 		assert.Nil(t, err)
-		assert.Equal(t, len(l), 1)
+		assert.Equal(t, len(l), 1,
+			"(post-SetXAttr) wrong # of xattrs: 1 != ", len(l))
 		assert.Equal(t, string(l[0]), "foo")
 	})
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Fri Jan  5 17:01:21 2018 mstenber
- * Edit time:     122 min
+ * Last modified: Mon Jan  8 10:28:10 2018 mstenber
+ * Edit time:     133 min
  *
  */
 
@@ -15,13 +15,13 @@ import (
 	"bytes"
 	"log"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/storage/factory"
+	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
 	"github.com/stvp/assert"
 )
@@ -111,27 +111,23 @@ func ProdFs(t *testing.T, fs *Fs) {
 	assert.Nil(t, err)
 	assert.Equal(t, len(arr), 0)
 
-	var wg sync.WaitGroup
+	var wg util.SimpleWaitGroup
 
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err = root.Mkdir("/public", 0777)
 		assert.Nil(t, err)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err = root.Mkdir("/private", 0007)
 		assert.Nil(t, err)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		err = root.Mkdir("/nobody", 0)
 		assert.Nil(t, err)
 
-	}()
+	})
 	mlog.Printf2("fs/rawfs_test", "ProdFs wait 1")
 	wg.Wait()
 
@@ -178,81 +174,67 @@ func ProdFs(t *testing.T, fs *Fs) {
 	u3.Gid = 123
 
 	u1.Mkdir("/u1", 0777)
-	wg.Add(3)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		u1.Mkdir("/u1/u", 0700)
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		u1.Mkdir("/u1/g", 0070)
-	}()
-	go func() {
-		defer wg.Done()
+	})
+	wg.Go(func() {
 		u1.Mkdir("/u1/o", 0007)
-	}()
+	})
 	mlog.Printf2("fs/rawfs_test", "ProdFs wait 2")
 	wg.Wait()
 
-	wg.Add(9)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err := u2.Stat("/u1/u/.")
 		assert.True(t, err != nil)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err := u1.Stat("/u1/u/.")
 		assert.Nil(t, err)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err := u3.Stat("/u1/g/.")
 		assert.True(t, err != nil)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err := u2.Stat("/u1/g/.")
 		assert.Nil(t, err)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err := u2.Stat("/u1/o/.")
 		assert.Nil(t, err)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err = u3.Stat("/u1/o/.")
 		assert.Nil(t, err)
 
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		var sfo fuse.StatfsOut
 		code := fs.Ops.StatFs(&root.InHeader, &sfo)
 		assert.True(t, code.Ok())
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		// Initially no xattr - list should be empty
 
 		l, err := root.ListXAttr("/public")
 		assert.Nil(t, err)
 		assert.Equal(t, len(l), 0)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err = root.GetXAttr("/public", "foo")
 		assert.True(t, err != nil)
-	}()
+	})
 
 	mlog.Printf2("fs/rawfs_test", "ProdFs wait 3")
 	wg.Wait()
@@ -262,23 +244,20 @@ func ProdFs(t *testing.T, fs *Fs) {
 	err = root.SetXAttr("/public", "foo", []byte("bar"))
 	assert.Nil(t, err)
 
-	wg.Add(2)
 	// Xattr should be accessible
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		b, err := root.GetXAttr("/public", "foo")
 		assert.Nil(t, err)
 		assert.Equal(t, string(b), "bar")
 
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		l, err := root.ListXAttr("/public")
 		assert.Nil(t, err)
 		assert.Equal(t, len(l), 1)
 		assert.Equal(t, string(l[0]), "foo")
-	}()
+	})
 
 	mlog.Printf2("fs/rawfs_test", "ProdFs wait 4")
 	wg.Wait()
@@ -288,19 +267,16 @@ func ProdFs(t *testing.T, fs *Fs) {
 	err = root.RemoveXAttr("/public", "foo")
 	assert.Nil(t, err)
 
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		l, err := root.ListXAttr("/public")
 		assert.Nil(t, err)
 		assert.Equal(t, len(l), 0)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		_, err := root.GetXAttr("/public", "foo")
 		assert.True(t, err != nil)
-	}()
+	})
 
 	mlog.Printf2("fs/rawfs_test", "ProdFs wait 5")
 	wg.Wait()

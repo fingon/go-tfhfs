@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Mon Jan  8 17:11:05 2018 mstenber
+ * Last modified: Mon Jan  8 22:52:40 2018 mstenber
  * Edit time:     81 min
  *
  */
@@ -128,7 +128,7 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 }
 
 func (self *fsTransaction) Close() {
-	mlog.Printf2("fs/fstransaction", "fst.Close")
+	// mlog.Printf2("fs/fstransaction", "fst.Close")
 	if self.closed {
 		mlog.Printf2("fs/fstransaction", " duplicate but it is ok")
 		return

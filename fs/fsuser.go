@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Mon Jan  8 14:31:13 2018 mstenber
- * Edit time:     159 min
+ * Last modified: Mon Jan  8 23:20:35 2018 mstenber
+ * Edit time:     170 min
  *
  */
 
@@ -47,6 +47,10 @@ type FSUser struct {
 	fs   *Fs
 	ops  fuse.RawFileSystem
 	lock util.MutexLocked
+}
+
+func (self *FSUser) String() string {
+	return fmt.Sprintf("u{uid:%v,gid:%v}", self.Uid, self.Gid)
 }
 
 type fileInfo struct {
@@ -299,6 +303,10 @@ type fsFile struct {
 	pos  int64
 }
 
+func (self *fsFile) String() string {
+	return fmt.Sprintf("fsFile{%v,fh:%v,pos:%v,u:%v}", self.path, self.fh, self.pos, self.u)
+}
+
 func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *fsFile, err error) {
 	defer self.lock.Locked()()
 	mlog.Printf2("fs/fsuser", "OpenFile %s f:%x perm:%x", path, flag, perm)
@@ -357,11 +365,12 @@ func (self *fsFile) Seek(ofs int64, whence int) (ret int64, err error) {
 		err = errors.New("seek before start")
 		return
 	}
-	if ret >= fi.Size() {
-		err = errors.New("seek after end")
-		return
-	}
+	//if ret >= fi.Size() {
+	//	err = errors.New("seek after end")
+	//	return
+	//}
 	self.pos = ret
+	mlog.Printf2("fs/fsuser", " pos now %v", self.pos)
 	return
 }
 
@@ -394,11 +403,12 @@ func (self *fsFile) Read(b []byte) (n int, err error) {
 		mlog.Printf2("fs/fsuser", " encountered EOF on first read")
 		err = io.EOF
 	}
+	mlog.Printf2("fs/fsuser", " pos now %v", self.pos)
 	return
 }
 
 func (self *fsFile) Write(b []byte) (n int, err error) {
-	mlog.Printf2("fs/fsuser", "Write %d bytes @%v", len(b)-n, self.pos)
+	mlog.Printf2("fs/fsuser", "%v.Write %d bytes @%v", self, len(b), self.pos)
 	for n < len(b) {
 		wi := fuse.WriteIn{Fh: self.fh,
 			Offset: uint64(self.pos),

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Mon Jan  8 11:16:46 2018 mstenber
- * Edit time:     31 min
+ * Last modified: Tue Jan  9 00:22:20 2018 mstenber
+ * Edit time:     32 min
  *
  */
 
@@ -42,6 +42,8 @@ func TestFsTransaction(t *testing.T) {
 	backend := factory.New("inmemory", "")
 	st := storage.Storage{Backend: backend}.Init()
 	fs := NewFs(st, rootName)
+
+	st.IterateReferencesCallback = nil
 
 	// simulate 3 parallel operations
 

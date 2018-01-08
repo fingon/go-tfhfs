@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 00:34:54 2017 mstenber
- * Last modified: Tue Jan  2 10:22:19 2018 mstenber
+ * Last modified: Tue Jan  9 00:19:24 2018 mstenber
  * Edit time:     15 min
  *
  */
@@ -14,6 +14,7 @@ package fs
 import (
 	"encoding/binary"
 	"hash/fnv"
+	"log"
 
 	"github.com/fingon/go-tfhfs/util"
 )
@@ -21,6 +22,9 @@ import (
 type blockKey string
 
 func (self blockKey) SubType() BlockSubType {
+	if len(self) <= blockSubTypeOffset {
+		log.Panicf("SubType asked of too short key %x", string(self))
+	}
 	return BlockSubType(self[blockSubTypeOffset])
 }
 

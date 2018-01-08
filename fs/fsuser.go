@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Thu Jan  4 12:06:57 2018 mstenber
- * Edit time:     149 min
+ * Last modified: Mon Jan  8 14:31:13 2018 mstenber
+ * Edit time:     159 min
  *
  */
 
@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
 )
 
@@ -43,8 +44,9 @@ func s2e(status fuse.Status) error {
 
 type FSUser struct {
 	fuse.InHeader
-	fs  *Fs
-	ops fuse.RawFileSystem
+	fs   *Fs
+	ops  fuse.RawFileSystem
+	lock util.MutexLocked
 }
 
 type fileInfo struct {
@@ -99,6 +101,7 @@ func NewFSUser(fs *Fs) *FSUser {
 }
 
 func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
+	self.lock.AssertLocked()
 	mlog.Printf2("fs/fsuser", "lookup %v", path)
 	inode := uint64(fuse.FUSE_ROOT_ID)
 	oinode := inode
@@ -122,6 +125,7 @@ func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
 }
 
 func (self *FSUser) ListDir(name string) (ret []string, err error) {
+	defer self.lock.Locked()()
 	var eo fuse.EntryOut
 	err = self.lookup(name, &eo)
 	if err != nil {
@@ -173,6 +177,7 @@ func (self *FSUser) ReadDir(dirname string) (ret []os.FileInfo, err error) {
 
 // MkDir is clone of os.MkDir
 func (self *FSUser) Mkdir(path string, perm os.FileMode) (err error) {
+	defer self.lock.Locked()()
 	dirname, basename := filepath.Split(path)
 
 	var eo fuse.EntryOut
@@ -187,6 +192,7 @@ func (self *FSUser) Mkdir(path string, perm os.FileMode) (err error) {
 
 // Stat is clone of os.Stat
 func (self *FSUser) Stat(path string) (fi os.FileInfo, err error) {
+	defer self.lock.Locked()()
 	mlog.Printf2("fs/fsuser", "Stat %v", path)
 	var eo fuse.EntryOut
 	err = self.lookup(path, &eo)
@@ -207,6 +213,7 @@ func (self *FSUser) Remove(path string) (err error) {
 	if err != nil {
 		return
 	}
+	defer self.lock.Locked()()
 	dirname, basename := filepath.Split(path)
 	var eo fuse.EntryOut
 	err = self.lookup(dirname, &eo)
@@ -222,6 +229,7 @@ func (self *FSUser) Remove(path string) (err error) {
 }
 
 func (self *FSUser) GetXAttr(path, attr string) (b []byte, err error) {
+	defer self.lock.Locked()()
 	var eo fuse.EntryOut
 	err = self.lookup(path, &eo)
 	if err != nil {
@@ -244,6 +252,7 @@ func (self *FSUser) GetXAttr(path, attr string) (b []byte, err error) {
 }
 
 func (self *FSUser) ListXAttr(path string) (s []string, err error) {
+	defer self.lock.Locked()()
 	var eo fuse.EntryOut
 	err = self.lookup(path, &eo)
 	if err != nil {
@@ -263,6 +272,7 @@ func (self *FSUser) ListXAttr(path string) (s []string, err error) {
 }
 
 func (self *FSUser) RemoveXAttr(path, attr string) (err error) {
+	defer self.lock.Locked()()
 	var eo fuse.EntryOut
 	err = self.lookup(path, &eo)
 	if err != nil {
@@ -272,6 +282,7 @@ func (self *FSUser) RemoveXAttr(path, attr string) (err error) {
 }
 
 func (self *FSUser) SetXAttr(path, attr string, data []byte) (err error) {
+	defer self.lock.Locked()()
 	var eo fuse.EntryOut
 	err = self.lookup(path, &eo)
 	if err != nil {
@@ -289,6 +300,7 @@ type fsFile struct {
 }
 
 func (self *FSUser) OpenFile(path string, flag uint32, perm uint32) (f *fsFile, err error) {
+	defer self.lock.Locked()()
 	mlog.Printf2("fs/fsuser", "OpenFile %s f:%x perm:%x", path, flag, perm)
 	var eo fuse.EntryOut
 	var oo fuse.OpenOut
@@ -365,13 +377,18 @@ func (self *fsFile) Read(b []byte) (n int, err error) {
 			return
 		}
 		rb, _ := r.Bytes(nil)
-		if len(rb) == 0 {
+		got := len(rb)
+		if got == 0 {
 			mlog.Printf2("fs/fsuser", " nothing was read, abort")
 			break
 		}
+		if len(b[n:]) < got {
+			log.Panicf("Too long read: %v < %v",
+				len(b[n:]), got)
+		}
 		copy(b[n:], rb)
-		n += len(rb)
-		self.pos += int64(len(rb))
+		n += got
+		self.pos += int64(got)
 	}
 	if n == 0 {
 		mlog.Printf2("fs/fsuser", " encountered EOF on first read")
@@ -387,8 +404,8 @@ func (self *fsFile) Write(b []byte) (n int, err error) {
 			Offset: uint64(self.pos),
 			Size:   uint32(len(b) - n)}
 		n32, code := self.u.ops.Write(&wi, b[n:])
-		if n32 == 0 {
-			log.Panic("Write failed?!?")
+		if n32 == 0 || !code.Ok() {
+			log.Panic("Write failed: ", n32, " / ", code)
 		}
 		err = s2e(code)
 		if err != nil {

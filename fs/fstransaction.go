@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Mon Jan  8 12:53:56 2018 mstenber
- * Edit time:     67 min
+ * Last modified: Mon Jan  8 13:00:41 2018 mstenber
+ * Edit time:     69 min
  *
  */
 
@@ -83,6 +83,7 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 
 		if !recursed {
 			defer self.fs.transactionRetryLock.Locked()()
+			mlog.Printf2("fs/fstransaction", " retrying")
 		}
 
 		mlog.Printf2("fs/fstransaction", " root has changed under us; doing delta")
@@ -150,6 +151,7 @@ func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *sto
 // state with the content of the transaction. Therefore cb should be
 // idempotent.
 func (self *Fs) Update(cb func(tr *fsTransaction)) {
+	mlog.Printf2("fs/fstransaction", "fs.Update")
 	first := true
 	for {
 		// Initial one we will try without lock, as cb() may
@@ -169,5 +171,6 @@ func (self *Fs) Update(cb func(tr *fsTransaction)) {
 			defer self.fs.transactionRetryLock.Locked()()
 			first = false
 		}
+		mlog.Printf2("fs/fstransaction", " retrying fs.Update")
 	}
 }

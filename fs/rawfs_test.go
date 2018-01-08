@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Mon Jan  8 10:28:10 2018 mstenber
- * Edit time:     133 min
+ * Last modified: Mon Jan  8 14:02:03 2018 mstenber
+ * Edit time:     136 min
  *
  */
 
@@ -45,6 +45,9 @@ func ProdFsFile1(t *testing.T, u *FSUser, tn, wsize, rsize int) {
 	}
 
 	fi, err := u.Stat("/public/file")
+	if err != nil {
+		log.Panic("unable to stat the just created file: ", err)
+	}
 	assert.Equal(t, int(fi.Size()), written)
 	since := time.Now().Sub(fi.ModTime())
 	assert.True(t, since >= 0, "modtime not in past")
@@ -114,17 +117,17 @@ func ProdFs(t *testing.T, fs *Fs) {
 	var wg util.SimpleWaitGroup
 
 	wg.Go(func() {
-		err = root.Mkdir("/public", 0777)
+		err := root.Mkdir("/public", 0777)
 		assert.Nil(t, err)
 	})
 
 	wg.Go(func() {
-		err = root.Mkdir("/private", 0007)
+		err := root.Mkdir("/private", 0007)
 		assert.Nil(t, err)
 	})
 
 	wg.Go(func() {
-		err = root.Mkdir("/nobody", 0)
+		err := root.Mkdir("/nobody", 0)
 		assert.Nil(t, err)
 
 	})
@@ -212,7 +215,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 	})
 
 	wg.Go(func() {
-		_, err = u3.Stat("/u1/o/.")
+		_, err := u3.Stat("/u1/o/.")
 		assert.Nil(t, err)
 
 	})

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Mon Jan  8 12:44:56 2018 mstenber
- * Edit time:     303 min
+ * Last modified: Mon Jan  8 14:20:21 2018 mstenber
+ * Edit time:     304 min
  *
  */
 
@@ -79,6 +79,8 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 		nd := self.loadNode(id)
 		if nd != nil {
 			self.nodeDataCache.Set(id, nd)
+		} else {
+			log.Panicf("Unable to find node %x", id)
 		}
 		return nd
 	}

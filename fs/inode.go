@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Mon Jan  8 12:44:38 2018 mstenber
- * Edit time:     276 min
+ * Last modified: Mon Jan  8 14:34:46 2018 mstenber
+ * Edit time:     279 min
  *
  */
 
@@ -296,9 +296,7 @@ func (self *inode) Meta() *InodeMeta {
 }
 
 func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *fsTransaction) {
-
 	times := 0
-
 	if meta.StAtimeNs == 0 {
 		times |= 1
 	}
@@ -320,29 +318,25 @@ func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *fsTransaction) {
 	tr.t.Set(ibtree.IBKey(k), string(b))
 }
 
-func (self *inode) SetSize(size uint64) {
-	mlog.Printf("%v.SetSize %v", self, size)
-	self.Fs().Update(func(tr *fsTransaction) {
-		meta := self.Meta()
-		shrink := false
-		if size == meta.StSize {
-			return
-		} else if size < meta.StSize && meta.StSize > dataExtentSize {
-			shrink = true
-		}
-		meta.StSize = size
-		if size > embeddedSize {
-			meta.Data = []byte{}
-		}
-		self.SetMetaInTransaction(meta, tr)
-		if shrink {
-			nextKey := NewblockKeyOffset(self.ino, size+dataExtentSize)
-			mlog.Printf2("fs/inode", "SetSize shrinking inode %v - %x+ gone", self.ino, nextKey)
-			lastKey := NewblockKeyOffset(self.ino, 1<<62)
-			tr.t.DeleteRange(ibtree.IBKey(nextKey), ibtree.IBKey(lastKey))
-		}
-	})
-
+func (self *inode) SetSizeInTransaction(size uint64, tr *fsTransaction) {
+	meta := self.Meta()
+	shrink := false
+	if size == meta.StSize {
+		return
+	} else if size < meta.StSize && meta.StSize > dataExtentSize {
+		shrink = true
+	}
+	meta.StSize = size
+	if size > embeddedSize {
+		meta.Data = []byte{}
+	}
+	self.SetMetaInTransaction(meta, tr)
+	if shrink {
+		nextKey := NewblockKeyOffset(self.ino, size+dataExtentSize)
+		mlog.Printf2("fs/inode", "SetSize shrinking inode %v - %x+ gone", self.ino, nextKey)
+		lastKey := NewblockKeyOffset(self.ino, 1<<62)
+		tr.t.DeleteRange(ibtree.IBKey(nextKey), ibtree.IBKey(lastKey))
+	}
 }
 
 type inodeNumberGenerator interface {

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Mon Jan  8 12:42:57 2018 mstenber
- * Edit time:     262 min
+ * Last modified: Mon Jan  8 14:34:09 2018 mstenber
+ * Edit time:     268 min
  *
  */
 
@@ -13,6 +13,7 @@ package fs
 
 import (
 	"bytes"
+	"log"
 	"os"
 	"sync"
 	"syscall"
@@ -83,6 +84,9 @@ func (self *fsOps) access(inode *inode, mode uint32, orOwn bool, ctx *Context) S
 
 // lookup gets child of a parent.
 func (self *fsOps) lookup(parent *inode, name string, ctx *Context) (child *inode, code Status) {
+	if parent == nil {
+		log.Panicf("invalid lookup() - parent nil")
+	}
 	mlog.Printf2("fs/ops", "ops.lookup %v %s", parent.ino, name)
 	code = self.access(parent, X_OK, false, ctx)
 	if !code.Ok() {
@@ -107,6 +111,10 @@ func (self *fsOps) lookup(parent *inode, name string, ctx *Context) (child *inod
 func (self *fsOps) Lookup(input *InHeader, name string, out *EntryOut) (code Status) {
 	parent := self.fs.GetInode(input.NodeId)
 	defer parent.Release()
+
+	if parent == nil {
+		log.Panic("nil parent inode: ", input.NodeId)
+	}
 
 	child, code := self.lookup(parent, name, &input.Context)
 	defer child.Release()
@@ -219,7 +227,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 				return
 			}
 			if input.Valid&FATTR_SIZE != 0 {
-				inode.SetSize(input.Size)
+				inode.SetSizeInTransaction(input.Size, tr)
 			}
 
 			newmeta.SetCTimeNow()
@@ -275,18 +283,19 @@ func (self *fsOps) Open(input *OpenIn, out *OpenOut) (code Status) {
 		return
 	}
 
-	// No ATime for now
-	if flags&W_OK != 0 {
-		self.fs.Update(func(tr *fsTransaction) {
+	self.fs.Update(func(tr *fsTransaction) {
+
+		// No ATime for now
+		if flags&W_OK != 0 {
 			meta := inode.Meta()
 			meta.SetMTimeNow()
 			inode.SetMetaInTransaction(meta, tr)
-		})
-	}
+		}
 
-	if input.Flags&uint32(os.O_TRUNC) != 0 {
-		inode.SetSize(0)
-	}
+		if input.Flags&uint32(os.O_TRUNC) != 0 {
+			inode.SetSizeInTransaction(0, tr)
+		}
+	})
 
 	out.Fh = inode.GetFile(input.Flags).fh
 	return OK

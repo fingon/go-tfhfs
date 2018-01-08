@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Mon Jan  8 12:38:12 2018 mstenber
- * Edit time:     243 min
+ * Last modified: Mon Jan  8 14:40:06 2018 mstenber
+ * Edit time:     293 min
  *
  */
 
@@ -231,127 +231,157 @@ func (self *inodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 
 }
 
+func (self *inodeFH) writeInTransaction(tr *fsTransaction, buf, odata, obuf, wbuf []byte, bofs int, offset, end uint64) {
+	meta := self.inode.Meta()
+	if bofs > 0 {
+		if odata != nil {
+			if len(odata) > bofs {
+				odata = odata[:bofs]
+			}
+			copy(wbuf, odata)
+		} else {
+			r, code := self.read(wbuf[:bofs], offset)
+			if !code.Ok() {
+				return
+			}
+			mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
+		}
+		wbuf = wbuf[bofs:]
+	}
+
+	// This was copied in earlier
+	wbuf = wbuf[len(buf):]
+
+	// Now obuf contains header(< bofs) + buf
+
+	// Read leftovers, if any, from the block
+	blockend := offset + dataExtentSize
+	if blockend > end {
+		extra := blockend - end
+		r, code := self.read(wbuf, extra)
+		if !code.Ok() {
+			return
+		}
+		tbuf, _ := r.Bytes(nil)
+		wbuf = wbuf[len(tbuf):]
+	}
+
+	// bbuf is actually what we want to store
+	mlog.Printf2("fs/fh", " obuf %v wbuf %v", len(obuf), len(wbuf))
+	bbuf := obuf[:len(obuf)-len(wbuf)]
+	mlog.Printf2("fs/fh", " bbuf %v", len(bbuf))
+
+	if meta.StSize <= embeddedSize && end <= embeddedSize {
+		// in .Data this will live long -> make new copy of
+		// the (small) slice
+		nbuf := bbuf[1:]
+		meta := self.inode.Meta()
+		meta.Data = nbuf
+		self.inode.SetMetaInTransaction(meta, tr)
+	} else {
+		k := NewblockKeyOffset(self.inode.ino, offset)
+		bl := tr.getStorageBlock(bbuf, nil)
+		bid := bl.Id()
+		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
+		// mlog.Printf2("fs/fh", " %x", buf)
+		tr.t.Set(ibtree.IBKey(k), bid)
+	}
+
+}
+
 func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse.Status) {
 	e := offset / dataExtentSize
 	unlock := self.inode.offsetMap.Locked(e)
 	locked := self.inode.offsetMap.GetLockedByName(e)
-	mlog.Printf2("fs/fh", "%v.Write %v @%v", self, len(buf), offset)
-	var r fuse.ReadResult
+
+	done := false
+	var odata, obuf, wbuf []byte
+	var meta *InodeMeta
 
 	end := offset + uint64(len(buf))
-	need := dataExtentSize + dataHeaderMaximumSize
-	meta := self.inode.Meta()
-	var odata []byte
-	if meta.StSize <= embeddedSize {
-		odata = meta.Data
-		if end <= embeddedSize {
-			need = embeddedSize + 1
-		}
-	}
 
-	// obuf is the master slice to which we gather data, using
-	// wbuf slice which moves gradually onward
-	obuf := make([]byte, need)
-	obuf[0] = byte(BDT_EXTENT)
-
-	wbuf := obuf[1:]
-
-	// Grab start of block, if any
 	bofs := int(offset % dataExtentSize)
 	offset -= uint64(bofs)
 
-	// Bytes to write
-	w := len(buf)
-	if w > (dataExtentSize - bofs) {
-		w = dataExtentSize - bofs
+	// Deal with metadata here; it is (relatively) cheap and
+	// therefore we can use normal retrying mechanism for that. In
+	// case of small files, this is all it might take.
+	self.Fs().Update(func(tr *fsTransaction) {
+		mlog.Printf2("fs/fh", "%v.Write %v @%v", self, len(buf), offset)
+		done = false
+		need := dataExtentSize + dataHeaderMaximumSize
+		meta = self.inode.Meta()
+		if meta == nil {
+			return
+		}
+		if meta.StSize <= embeddedSize && e == 0 {
+			odata = meta.Data
+			if end <= embeddedSize {
+				need = embeddedSize + 1
+			}
+		}
+
+		// obuf is the master slice to which we gather data, using
+		// wbuf slice which moves gradually onward
+		if len(obuf) != need {
+			obuf = make([]byte, need)
+			obuf[0] = byte(BDT_EXTENT)
+		}
+
+		wbuf = obuf[1:]
+
+		// Bytes to write
+		w := len(buf)
+		if w > (dataExtentSize - bofs) {
+			w = dataExtentSize - bofs
+		}
+		if len(buf) > w {
+			buf = buf[:w]
+		}
+
+		copy(wbuf[bofs:], buf)
+
+		self.inode.SetSizeInTransaction(end, tr)
+		written = uint32(w)
+
+		mlog.Printf2("fs/fh", " wrote %v", written)
+		if meta.StSize <= embeddedSize && end <= embeddedSize {
+			self.writeInTransaction(tr, buf, odata, obuf, wbuf, bofs, offset, end)
+			done = true
+		} else {
+			if len(meta.Data) > 0 {
+				mlog.Printf2("fs/fh", "cleared in-meta data")
+				meta.Data = nil
+				self.inode.SetMetaInTransaction(meta, tr)
+			}
+		}
+	})
+
+	if meta == nil {
+		unlock()
+		return 0, fuse.ENOENT
 	}
-	if len(buf) > w {
-		buf = buf[:w]
+
+	if done {
+		unlock()
+		return
 	}
-
-	copy(wbuf[bofs:], buf)
-
-	self.inode.SetSize(end)
-	written = uint32(w)
-
-	mlog.Printf2("fs/fh", " wrote %v", written)
 
 	locked.ClearOwner()
+
+	// It wasn't small file. Perform write inside transaction, but
+	// do the read + write part ONLY once. The lock we're holding
+	// should ensure nobody else touches this part of the file in
+	// the meanwhile.
 	go func() {
-		mlog.Printf("%v.Write-2", self)
+		mlog.Printf2("fs/fh", "%v.Write-2", self)
 		locked.UpdateOwner()
 		// We inherit the block-lock, and release only when we're done
 		defer unlock()
-		self.Fs().Update(func(tr *fsTransaction) {
-			// inherited scopewise, but new versions so we can mutate them
-			odata := odata
-			wbuf := wbuf
 
-			meta := self.inode.Meta()
-			if bofs > 0 {
-				if odata != nil {
-					if len(odata) > bofs {
-						odata = odata[:bofs]
-					}
-					copy(wbuf, odata)
-					wbuf = wbuf[len(odata):]
-				} else {
-					r, code = self.read(wbuf[:bofs], offset)
-					if !code.Ok() {
-						return
-					}
-					tbuf, _ := r.Bytes(nil)
-					wbuf = wbuf[len(tbuf):]
-					mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
-				}
-			}
-
-			// This was copied in earlier
-			wbuf = wbuf[len(buf):]
-
-			// Now obuf contains header(< bofs) + buf
-
-			// Read leftovers, if any, from the block
-			blockend := offset + dataExtentSize
-			if blockend > end && end < meta.StSize {
-				extra := blockend - end
-				r, code = self.read(wbuf, extra)
-				if !code.Ok() {
-					return
-				}
-				tbuf, _ := r.Bytes(nil)
-				wbuf = wbuf[len(tbuf):]
-			}
-
-			// bbuf is actually what we want to store
-			mlog.Printf2("fs/fh", " obuf %v wbuf %v", len(obuf), len(wbuf))
-			bbuf := obuf[:len(obuf)-len(wbuf)]
-			mlog.Printf2("fs/fh", " bbuf %v", len(bbuf))
-
-			if meta.StSize <= embeddedSize && end <= embeddedSize {
-				// in .Data this will live long -> make new copy of
-				// the (small) slice
-				nbuf := bbuf[1:]
-				meta := self.inode.Meta()
-				meta.Data = nbuf
-				self.inode.SetMetaInTransaction(meta, tr)
-			} else {
-				k := NewblockKeyOffset(self.inode.ino, offset)
-				bl := tr.getStorageBlock(bbuf, nil)
-				bid := bl.Id()
-				mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
-				// mlog.Printf2("fs/fh", " %x", buf)
-				tr.t.Set(ibtree.IBKey(k), bid)
-
-				meta := self.inode.Meta()
-				if len(meta.Data) > 0 {
-					mlog.Printf2("fs/fh", "cleared in-meta data")
-					meta.Data = nil
-					self.inode.SetMetaInTransaction(meta, tr)
-				}
-			}
-		})
+		tr := self.Fs().GetTransaction()
+		self.writeInTransaction(tr, buf, odata, obuf, wbuf, bofs, offset, end)
+		tr.CommitUntilSucceeds()
 	}()
-
 	return
 }

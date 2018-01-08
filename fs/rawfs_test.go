@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  9 00:22:58 2018 mstenber
- * Edit time:     159 min
+ * Last modified: Tue Jan  9 00:49:56 2018 mstenber
+ * Edit time:     181 min
  *
  */
 
@@ -347,84 +347,92 @@ func TestFs(t *testing.T) {
 func TestFsParallel(t *testing.T) {
 	t.Parallel()
 
-	rootName := "toor"
-	backend := factory.New("inmemory", "")
-	st := storage.Storage{Backend: backend}.Init()
-	fs := NewFs(st, rootName)
+	// nu: # of users
+	// iter: # of iterations
+	// n: data size (up to *iter)
+	// nw: write size (up to *iter)
+	add := func(nu, iter, n, nw int) {
+		cost := nu * iter * iter * (nw + n) / 1000 / 1000
+		t.Run(fmt.Sprintf("%d u/%d iter/%d n/%d nw=%d cost", nu, iter, n, nw, cost),
+			func(t *testing.T) {
+				t.Parallel()
 
-	// # of users
-	nu := 3
+				rootName := "toor"
+				backend := factory.New("inmemory", "")
+				st := storage.Storage{Backend: backend}.Init()
+				fs := NewFs(st, rootName)
 
-	// total data file size per user
-	n := dataExtentSize * 3
-	// n := 10
-	nw := n / 100
+				randomReaderWriter := func(path string, u *FSUser) {
+					f, err := u.OpenFile(path, uint32(os.O_CREATE|os.O_TRUNC|os.O_WRONLY), 0777)
+					assert.Nil(t, err)
+					content := []byte{}
+					for i := 0; i < iter; i++ {
+						awlen := rand.Int() % ((i + 1) * nw)
+						ofs := rand.Int() % ((i + 1) * n)
+						s := fmt.Sprintf("%d", i)
+						b := bytes.Repeat([]byte(s), 1+awlen/len(s))
+						eofs := ofs + len(b)
+						nlen := eofs
+						if nlen < len(content) {
+							nlen = len(content)
+						}
+						ncontent := make([]byte, nlen)
+						mlog.Printf("%v Writing @%v %d bytes of %v", path, ofs, len(b), s)
+						if ofs <= len(content) {
+							copy(ncontent, content[:ofs])
+						} else {
+							copy(ncontent, content)
+						}
+						copy(ncontent[ofs:], b)
+						if len(content) > eofs {
+							copy(ncontent[eofs:], content[eofs:])
+						}
+						mlog.Printf(" eofs:%v", eofs)
+						_, err := f.Seek(int64(ofs), 0)
+						assert.Nil(t, err)
 
-	iter := 100
+						w, err := f.Write(b)
+						assert.Nil(t, err)
+						assert.Equal(t, w, len(b))
 
-	randomReaderWriter := func(path string, u *FSUser) {
-		f, err := u.OpenFile(path, uint32(os.O_CREATE|os.O_TRUNC|os.O_WRONLY), 0777)
-		assert.Nil(t, err)
-		content := []byte{}
-		for i := 0; i < iter; i++ {
-			wlen := rand.Int() % nw
-			ofs := rand.Int() % n
-			s := fmt.Sprintf("%d", i)
-			b := bytes.Repeat([]byte(s), 1+wlen/len(s))
-			eofs := ofs + len(b)
-			nlen := eofs
-			if nlen < len(content) {
-				nlen = len(content)
-			}
-			ncontent := make([]byte, nlen)
-			mlog.Printf("%v Writing @%v %d bytes of %v", path, ofs, len(b), s)
-			if ofs <= len(content) {
-				copy(ncontent, content[:ofs])
-			} else {
-				copy(ncontent, content)
-			}
-			copy(ncontent[ofs:], b)
-			if len(content) > eofs {
-				copy(ncontent[eofs:], content[eofs:])
-			}
-			mlog.Printf(" eofs:%v", eofs)
-			_, err := f.Seek(int64(ofs), 0)
-			assert.Nil(t, err)
+						_, err = f.Seek(0, 0)
+						assert.Nil(t, err)
 
-			w, err := f.Write(b)
-			assert.Nil(t, err)
-			assert.Equal(t, w, len(b))
+						mlog.Printf("%v Reading %d bytes, ensuring they are same", path, nlen)
 
-			_, err = f.Seek(0, 0)
-			assert.Nil(t, err)
+						rcontent := make([]byte, nlen)
+						r, err := f.Read(rcontent)
+						assert.Nil(t, err)
+						assert.Equal(t, r, nlen)
 
-			mlog.Printf("%v Reading %d bytes, ensuring they are same", path, nlen)
+						// mlog.Printf("exp: %x", ncontent)
+						// mlog.Printf("got: %x", rcontent)
+						assert.Equal(t, ncontent, rcontent, "exp<>read mismatch")
+						if !bytes.Equal(ncontent, rcontent) {
+							log.Panic(".. snif")
+						}
+						assert.True(t, len(content) <= len(ncontent))
+						content = ncontent
+					}
+				}
 
-			rcontent := make([]byte, nlen)
-			r, err := f.Read(rcontent)
-			assert.Nil(t, err)
-			assert.Equal(t, r, nlen)
+				var wg util.SimpleWaitGroup
+				for i := 0; i < nu; i++ {
+					u := NewFSUser(fs)
+					u.Uid = uint32(42 + i)
+					u.Gid = uint32(7 + i)
 
-			// mlog.Printf("exp: %x", ncontent)
-			// mlog.Printf("got: %x", rcontent)
-			assert.Equal(t, ncontent, rcontent, "exp<>read mismatch")
-			if !bytes.Equal(ncontent, rcontent) {
-				log.Panic(".. snif")
-			}
-			assert.True(t, len(content) <= len(ncontent))
-			content = ncontent
-		}
+					wg.Go(func() {
+						randomReaderWriter(fmt.Sprintf("/u%d", u.Uid), u)
+					})
+				}
+				wg.Wait()
+
+			})
 	}
+	add(1, 1000, 123, 1)
+	add(3, 200, 123, 1)
+	add(7, 100, 1234, 100)
+	add(13, 20, 12345, 12345)
 
-	var wg util.SimpleWaitGroup
-	for i := 0; i < nu; i++ {
-		u := NewFSUser(fs)
-		u.Uid = uint32(42 + i)
-		u.Gid = uint32(7 + i)
-
-		wg.Go(func() {
-			randomReaderWriter(fmt.Sprintf("/u%d", u.Uid), u)
-		})
-	}
-	wg.Wait()
 }

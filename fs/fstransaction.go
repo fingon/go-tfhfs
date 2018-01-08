@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Fri Jan  5 23:31:23 2018 mstenber
- * Edit time:     49 min
+ * Last modified: Mon Jan  8 12:53:56 2018 mstenber
+ * Edit time:     67 min
  *
  */
 
@@ -45,13 +45,27 @@ func newFsTransaction(fs *Fs) *fsTransaction {
 		ibtree.NewTransaction(root.node), make([]*storage.StorageBlock, 0)}
 }
 
-func (self *fsTransaction) Commit() {
+// CommitUntilSucceeds repeats commit until it the transaction goes
+// through. This should be done only if the resource under question is
+// locked by other means, as otherwise conflicting writes can occur.
+// In general, using e.g. fs.Update() should be done in all cases.
+func (self *fsTransaction) CommitUntilSucceeds() {
+	self.commit(true, false)
+}
+
+// TryCommit attempts to commit once, but if the tree has changed
+// underneath, it will not hold.
+func (self *fsTransaction) TryCommit() bool {
+	return self.commit(false, false)
+}
+
+func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 	mlog.Printf2("fs/fstransaction", "fst.Commit")
 	defer self.Close()
 	node, bid := self.t.Commit()
 	if node == self.originalRoot.node {
 		mlog.Printf2("fs/fstransaction", " no changes for fst.Commit")
-		return
+		return true
 	}
 	// +1 ref for new root (that we are about to store)
 	block := self.fs.storage.GetBlockById(string(bid))
@@ -62,6 +76,14 @@ func (self *fsTransaction) Commit() {
 	if !self.fs.root.SetIfEqualTo(root, self.originalRoot) {
 		// block not stored anywhere
 		defer block.Close()
+
+		if !retryUntilSucceeds {
+			return false
+		}
+
+		if !recursed {
+			defer self.fs.transactionRetryLock.Locked()()
+		}
 
 		mlog.Printf2("fs/fstransaction", " root has changed under us; doing delta")
 		tr := newFsTransaction(self.fs)
@@ -85,8 +107,8 @@ func (self *fsTransaction) Commit() {
 				}
 			})
 		mlog.Printf2("fs/fstransaction", " delta done")
-		tr.Commit()
-		return
+		tr.commit(true, true)
+		return true
 	}
 	// In thory there is a race here; in practise I doubt it very
 	// much it matters (as we next update will anyway have us
@@ -97,6 +119,7 @@ func (self *fsTransaction) Commit() {
 		// -1 ref for old root
 		self.originalRoot.block.Close()
 	}
+	return true
 }
 
 func (self *fsTransaction) Close() {
@@ -121,4 +144,30 @@ func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *sto
 		self.blocks = append(self.blocks, bl)
 	}
 	return bl
+}
+
+// Update (repeatedly) calls cb until it manages to update the global
+// state with the content of the transaction. Therefore cb should be
+// idempotent.
+func (self *Fs) Update(cb func(tr *fsTransaction)) {
+	first := true
+	for {
+		// Initial one we will try without lock, as cb() may
+		// take awhile.
+		tr := self.GetTransaction()
+		defer tr.Close()
+		cb(tr)
+
+		if tr.TryCommit() {
+			return
+		}
+		if first {
+			// Subsequent ones we want lock for, as we do
+			// not want there to be a race that
+			// potentially never ends to update the global
+			// root node.
+			defer self.fs.transactionRetryLock.Locked()()
+			first = false
+		}
+	}
 }

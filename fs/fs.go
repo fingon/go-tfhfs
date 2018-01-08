@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Fri Jan  5 22:47:20 2018 mstenber
- * Edit time:     294 min
+ * Last modified: Mon Jan  8 12:44:56 2018 mstenber
+ * Edit time:     303 min
  *
  */
 
@@ -47,19 +47,17 @@ type Fs struct {
 	storage       *storage.Storage
 	rootName      string
 	root          fsTreeRootAtomicPointer
+	lastBlock     StorageBlockAtomicPointer
 
-	// data covers the things below here that involve writing
-	// e.g. any write operation should grab the lock early on to
-	// make sure writes are consistent.
-	lock          util.MutexLocked
-	lastBlock     *storage.StorageBlock
-	nodeDataCache gcache.Cache
+	nodeDataCache        gcache.Cache
+	transactionRetryLock util.MutexLocked
 }
 
 func (self *Fs) Close() {
 
-	if self.lastBlock != nil {
-		self.lastBlock.Close()
+	lb := self.lastBlock.Get()
+	if lb != nil {
+		lb.Close()
 	}
 	mlog.Printf2("fs/fs", "fs.Close")
 
@@ -96,7 +94,6 @@ func (self *Fs) Flush() {
 
 // ibtree.IBTreeBackend API
 func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
-	self.lock.AssertLocked()
 	bb := make([]byte, nd.Msgsize()+1)
 	bb[0] = byte(BDT_NODE)
 	b, err := nd.MarshalMsg(bb[1:1])
@@ -105,12 +102,17 @@ func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 	}
 	b = bb[0 : 1+len(b)]
 	mlog.Printf2("fs/fs", "SaveNode %d bytes", len(b))
-	if self.lastBlock != nil {
-		self.lastBlock.Close()
-	}
 	bl := self.getStorageBlock(b, nd)
 	bid := ibtree.BlockId(bl.Id())
-	self.lastBlock = bl
+	for {
+		old := self.lastBlock.Get()
+		if self.lastBlock.SetIfEqualTo(bl, old) {
+			if old != nil {
+				old.Close()
+			}
+			break
+		}
+	}
 	return bid
 }
 
@@ -143,7 +145,6 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 
 func NewFs(st *storage.Storage, rootName string) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
-	defer fs.lock.Locked()()
 	fs.nodeDataCache = gcache.New(10000).
 		ARC().
 		//	LoaderFunc(func(k interface{}) (interface{}, error) {
@@ -177,7 +178,9 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 		var meta InodeMeta
 		meta.StMode = 0777 | fuse.S_IFDIR
 		meta.StNlink++ // root has always built-in link
-		root.SetMeta(&meta)
+		fs.Update(func(tr *fsTransaction) {
+			root.SetMetaInTransaction(&meta, tr)
+		})
 	}
 	go func() {
 		for {

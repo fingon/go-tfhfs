@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Fri Jan  5 23:32:08 2018 mstenber
+ * Last modified: Mon Jan  8 11:16:46 2018 mstenber
  * Edit time:     31 min
  *
  */
@@ -42,7 +42,6 @@ func TestFsTransaction(t *testing.T) {
 	backend := factory.New("inmemory", "")
 	st := storage.Storage{Backend: backend}.Init()
 	fs := NewFs(st, rootName)
-	defer fs.lock.Locked()()
 
 	// simulate 3 parallel operations
 
@@ -55,9 +54,9 @@ func TestFsTransaction(t *testing.T) {
 	tr3 := newFsTransaction(fs)
 	tr3.t.Set("foo3", "v3")
 
-	tr1.Commit()
-	tr2.Commit()
-	tr3.Commit()
+	tr1.CommitUntilSucceeds()
+	tr2.CommitUntilSucceeds()
+	tr3.CommitUntilSucceeds()
 
 	tr1 = newFsTransaction(fs)
 	tr2 = newFsTransaction(fs)
@@ -71,8 +70,8 @@ func TestFsTransaction(t *testing.T) {
 	tr1.t.Delete("foo2")
 	tr2.t.Delete("foo1")
 	tr2.t.Set("foo2", "v21")
-	tr1.Commit()
-	tr2.Commit()
+	tr1.CommitUntilSucceeds()
+	tr2.CommitUntilSucceeds()
 
 	// Most recent write wins in this case -> should have what tr2 did
 	tr1 = newFsTransaction(fs)
@@ -96,7 +95,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		k := ibtree.IBKey(NewblockKey(uint64(i), BST_META, ""))
 		tr.t.Set(k, fmt.Sprintf("v%d", i))
 	}
-	tr.Commit()
+	tr.CommitUntilSucceeds()
 
 	b.Run("Get1", func(b *testing.B) {
 		b.ResetTimer()
@@ -127,7 +126,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.t.Set(k, fmt.Sprintf("V%d%d", j, i))
-			tr.Commit()
+			tr.CommitUntilSucceeds()
 		}
 	})
 
@@ -138,7 +137,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 			j := rand.Int() % n
 			k := ibtree.IBKey(NewblockKey(uint64(j), BST_META, ""))
 			tr.t.Delete(k)
-			tr.Commit()
+			tr.CommitUntilSucceeds()
 		}
 	})
 

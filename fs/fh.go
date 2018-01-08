@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Fri Jan  5 22:29:02 2018 mstenber
- * Edit time:     216 min
+ * Last modified: Mon Jan  8 12:38:12 2018 mstenber
+ * Edit time:     243 min
  *
  */
 
@@ -32,6 +32,10 @@ type inodeFH struct {
 
 	// last key in directory at pos (if any)
 	lastKey *blockKey
+}
+
+func (self *inodeFH) String() string {
+	return fmt.Sprintf("fh{#%d %v", self.fh, self.inode)
 }
 
 func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
@@ -222,17 +226,16 @@ func (self *inodeFH) read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 
 func (self *inodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code fuse.Status) {
 	e := offset / dataExtentSize
-	defer self.inode.offsetMap.Locked(fmt.Sprintf("%d", e))()
+	defer self.inode.offsetMap.Locked(e)()
 	return self.read(buf, offset)
 
 }
 
 func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse.Status) {
 	e := offset / dataExtentSize
-	ln := fmt.Sprintf("%d", e)
-	unlock := self.inode.offsetMap.Locked(ln)
-	locked := self.inode.offsetMap.GetLockedByName(ln)
-	mlog.Printf2("fs/fh", "fh.Write %v @%v", len(buf), offset)
+	unlock := self.inode.offsetMap.Locked(e)
+	locked := self.inode.offsetMap.GetLockedByName(e)
+	mlog.Printf2("fs/fh", "%v.Write %v @%v", self, len(buf), offset)
 	var r fuse.ReadResult
 
 	end := offset + uint64(len(buf))
@@ -268,85 +271,87 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 
 	copy(wbuf[bofs:], buf)
 
+	self.inode.SetSize(end)
+	written = uint32(w)
+
+	mlog.Printf2("fs/fh", " wrote %v", written)
+
 	locked.ClearOwner()
 	go func() {
+		mlog.Printf("%v.Write-2", self)
 		locked.UpdateOwner()
 		// We inherit the block-lock, and release only when we're done
 		defer unlock()
-		if bofs > 0 {
-			if odata != nil {
-				if len(odata) > bofs {
-					odata = odata[:bofs]
+		self.Fs().Update(func(tr *fsTransaction) {
+			// inherited scopewise, but new versions so we can mutate them
+			odata := odata
+			wbuf := wbuf
+
+			meta := self.inode.Meta()
+			if bofs > 0 {
+				if odata != nil {
+					if len(odata) > bofs {
+						odata = odata[:bofs]
+					}
+					copy(wbuf, odata)
+					wbuf = wbuf[len(odata):]
+				} else {
+					r, code = self.read(wbuf[:bofs], offset)
+					if !code.Ok() {
+						return
+					}
+					tbuf, _ := r.Bytes(nil)
+					wbuf = wbuf[len(tbuf):]
+					mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
 				}
-				copy(wbuf, odata)
-				wbuf = wbuf[len(odata):]
-			} else {
-				r, code = self.read(wbuf[:bofs], offset)
+			}
+
+			// This was copied in earlier
+			wbuf = wbuf[len(buf):]
+
+			// Now obuf contains header(< bofs) + buf
+
+			// Read leftovers, if any, from the block
+			blockend := offset + dataExtentSize
+			if blockend > end && end < meta.StSize {
+				extra := blockend - end
+				r, code = self.read(wbuf, extra)
 				if !code.Ok() {
 					return
 				}
 				tbuf, _ := r.Bytes(nil)
 				wbuf = wbuf[len(tbuf):]
-				mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
 			}
-		}
 
-		// This was copied in earlier
-		wbuf = wbuf[len(buf):]
+			// bbuf is actually what we want to store
+			mlog.Printf2("fs/fh", " obuf %v wbuf %v", len(obuf), len(wbuf))
+			bbuf := obuf[:len(obuf)-len(wbuf)]
+			mlog.Printf2("fs/fh", " bbuf %v", len(bbuf))
 
-		// Now obuf contains header(< bofs) + buf
+			if meta.StSize <= embeddedSize && end <= embeddedSize {
+				// in .Data this will live long -> make new copy of
+				// the (small) slice
+				nbuf := bbuf[1:]
+				meta := self.inode.Meta()
+				meta.Data = nbuf
+				self.inode.SetMetaInTransaction(meta, tr)
+			} else {
+				k := NewblockKeyOffset(self.inode.ino, offset)
+				bl := tr.getStorageBlock(bbuf, nil)
+				bid := bl.Id()
+				mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
+				// mlog.Printf2("fs/fh", " %x", buf)
+				tr.t.Set(ibtree.IBKey(k), bid)
 
-		// Read leftovers, if any, from the block
-		blockend := offset + dataExtentSize
-		if blockend > end && end < meta.StSize {
-			extra := blockend - end
-			r, code = self.read(wbuf, extra)
-			if !code.Ok() {
-				return
+				meta := self.inode.Meta()
+				if len(meta.Data) > 0 {
+					mlog.Printf2("fs/fh", "cleared in-meta data")
+					meta.Data = nil
+					self.inode.SetMetaInTransaction(meta, tr)
+				}
 			}
-			tbuf, _ := r.Bytes(nil)
-			wbuf = wbuf[len(tbuf):]
-		}
-
-		// bbuf is actually what we want to store
-		mlog.Printf2("fs/fh", " obuf %v wbuf %v", len(obuf), len(wbuf))
-		bbuf := obuf[:len(obuf)-len(wbuf)]
-		mlog.Printf2("fs/fh", " bbuf %v", len(bbuf))
-
-		meta := self.inode.Meta()
-		if meta.StSize <= embeddedSize && end <= embeddedSize {
-			// in .Data this will live long -> make new copy of
-			// the (small) slice
-			nbuf := bbuf[1:]
-			defer self.Fs().lock.Locked()()
-			meta := self.inode.Meta()
-			meta.Data = nbuf
-			self.inode.SetMeta(meta)
-			mlog.Printf2("fs/fh", " meta %d bytes", len(nbuf))
-		} else {
-			k := NewblockKeyOffset(self.inode.ino, offset)
-			tr := self.Fs().GetTransaction()
-			defer tr.Close()
-			bl := tr.getStorageBlock(bbuf, nil)
-			bid := bl.Id()
-			mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
-			// mlog.Printf2("fs/fh", " %x", buf)
-			tr.t.Set(ibtree.IBKey(k), bid)
-
-			defer self.Fs().lock.Locked()()
-			meta := self.inode.Meta()
-			if len(meta.Data) > 0 {
-				mlog.Printf2("fs/fh", "cleared in-meta data")
-				meta.Data = nil
-				self.inode.SetMeta(meta)
-			}
-			tr.Commit()
-		}
+		})
 	}()
 
-	defer self.Fs().lock.Locked()()
-	self.inode.SetSize(end)
-	written = uint32(w)
-	mlog.Printf2("fs/fh", " wrote %v", written)
 	return
 }

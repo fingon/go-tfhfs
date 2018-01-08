@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Mon Jan  8 14:20:21 2018 mstenber
- * Edit time:     304 min
+ * Last modified: Mon Jan  8 15:36:45 2018 mstenber
+ * Edit time:     305 min
  *
  */
 
@@ -177,6 +177,7 @@ func NewFs(st *storage.Storage, rootName string) *Fs {
 		// getInode succeeds always; Get does not
 		defer fs.inodeLock.Locked()()
 		root := fs.getInode(fuse.FUSE_ROOT_ID)
+		defer root.metaWriteLock.Locked()()
 		var meta InodeMeta
 		meta.StMode = 0777 | fuse.S_IFDIR
 		meta.StNlink++ // root has always built-in link

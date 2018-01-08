@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Mon Jan  8 11:16:13 2018 mstenber
-# Edit time:     73 min
+# Last modified: Mon Jan  8 15:31:17 2018 mstenber
+# Edit time:     75 min
 #
 #
 
@@ -15,6 +15,7 @@ GREENPACK_OPTS=-alltuple
 
 GENERATED=\
 	fs/fstreerootpointer_gen.go \
+	fs/inodemetapointer_gen.go \
 	fs/storageblockpointer_gen.go \
 	util/byteslicepointer_gen.go \
 	util/maprunnercallbacklist_gen.go
@@ -34,6 +35,13 @@ fs/fstreerootpointer_gen.go: Makefile xxx/pointer.go
 	( echo "package fs" ; \
 		egrep -A 9999 '^import' xxx/pointer.go | \
 		sed 's/XXXType/(*fsTreeRoot)/g;s/XXX/fsTreeRoot/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+fs/inodemetapointer_gen.go: Makefile xxx/pointer.go
+	( echo "package fs" ; \
+		egrep -A 9999 '^import' xxx/pointer.go | \
+		sed 's/XXXType/(*InodeMeta)/g;s/XXX/InodeMeta/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

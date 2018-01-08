@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Mon Jan  8 14:34:09 2018 mstenber
- * Edit time:     268 min
+ * Last modified: Mon Jan  8 16:36:47 2018 mstenber
+ * Edit time:     283 min
  *
  */
 
@@ -150,6 +150,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		return ENOENT
 	}
 	defer inode.Release()
+	defer inode.metaWriteLock.Locked()()
 
 	self.fs.Update(func(tr *fsTransaction) {
 		meta := inode.Meta()
@@ -227,7 +228,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 				return
 			}
 			if input.Valid&FATTR_SIZE != 0 {
-				inode.SetSizeInTransaction(input.Size, tr)
+				inode.SetMetaSizeInTransaction(meta, input.Size, tr)
 			}
 
 			newmeta.SetCTimeNow()
@@ -270,6 +271,7 @@ func (self *fsOps) Open(input *OpenIn, out *OpenOut) (code Status) {
 	inode := self.fs.GetInode(input.NodeId)
 	mlog.Printf2("fs/ops", "ops.Open %v", input.NodeId)
 	defer inode.Release()
+	defer inode.metaWriteLock.Locked()()
 
 	flags := uint32(0)
 	if input.Flags&uint32(os.O_RDONLY|os.O_RDWR) != 0 {
@@ -284,17 +286,16 @@ func (self *fsOps) Open(input *OpenIn, out *OpenOut) (code Status) {
 	}
 
 	self.fs.Update(func(tr *fsTransaction) {
-
+		meta := inode.Meta()
 		// No ATime for now
 		if flags&W_OK != 0 {
-			meta := inode.Meta()
 			meta.SetMTimeNow()
-			inode.SetMetaInTransaction(meta, tr)
 		}
 
 		if input.Flags&uint32(os.O_TRUNC) != 0 {
-			inode.SetSizeInTransaction(0, tr)
+			inode.SetMetaSizeInTransaction(meta, 0, tr)
 		}
+		inode.SetMetaInTransaction(meta, tr)
 	})
 
 	out.Fh = inode.GetFile(input.Flags).fh
@@ -341,6 +342,7 @@ func (self *fsOps) create(input *InHeader, name string, meta *InodeMeta, allowRe
 	if !code.Ok() {
 		return
 	}
+	defer inode.metaWriteLock.Locked()()
 
 	child = inode.GetChildByName(name)
 	defer child.Release()
@@ -350,13 +352,14 @@ func (self *fsOps) create(input *InHeader, name string, meta *InodeMeta, allowRe
 			return
 		}
 		b := false
-		code = self.unlink(input, name, &b)
+		code = self.unlinkInInode(inode, name, &b, &input.Context)
 		if !code.Ok() {
 			return
 		}
 	}
 
 	child = self.fs.CreateInode()
+	defer child.metaWriteLock.Locked()()
 	self.fs.Update(func(tr *fsTransaction) {
 		child.SetMetaInTransaction(meta, tr)
 	})
@@ -376,17 +379,14 @@ func (self *fsOps) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Statu
 	return OK
 }
 
-func (self *fsOps) unlink(input *InHeader, name string, isdir *bool) (code Status) {
-	inode := self.fs.GetInode(input.NodeId)
-	defer inode.Release()
-
-	child, code := self.lookup(inode, name, &input.Context)
+func (self *fsOps) unlinkInInode(inode *inode, name string, isdir *bool, ctx *Context) (code Status) {
+	child, code := self.lookup(inode, name, ctx)
 	defer child.Release()
 	if !code.Ok() {
 		return
 	}
 
-	code = self.access(inode, W_OK|X_OK, false, &input.Context)
+	code = self.access(inode, W_OK|X_OK, false, ctx)
 	if !code.Ok() {
 		return
 	}
@@ -396,6 +396,13 @@ func (self *fsOps) unlink(input *InHeader, name string, isdir *bool) (code Statu
 	}
 	inode.RemoveChildByName(name)
 	return OK
+}
+
+func (self *fsOps) unlink(input *InHeader, name string, isdir *bool) (code Status) {
+	inode := self.fs.GetInode(input.NodeId)
+	defer inode.Release()
+	defer inode.metaWriteLock.Locked()()
+	return self.unlinkInInode(inode, name, isdir, &input.Context)
 }
 
 func (self *fsOps) Unlink(input *InHeader, name string) (code Status) {
@@ -525,7 +532,7 @@ func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status)
 
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
-
+	defer inode.metaWriteLock.Locked()()
 	code = self.access(inode, W_OK|X_OK, true, &input.Context)
 	if !code.Ok() {
 		return
@@ -538,6 +545,7 @@ func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status)
 		return
 	}
 
+	defer child.metaWriteLock.Locked()()
 	inode.AddChild(name, child)
 	return OK
 

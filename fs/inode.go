@@ -4,14 +4,15 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Mon Jan  8 14:34:46 2018 mstenber
- * Edit time:     279 min
+ * Last modified: Mon Jan  8 16:41:33 2018 mstenber
+ * Edit time:     303 min
  *
  */
 
 package fs
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"log"
@@ -31,6 +32,9 @@ type inode struct {
 	tracker   *inodeTracker
 	refcnt    int64
 	offsetMap util.MutexLockedMap
+
+	meta          InodeMetaAtomicPointer
+	metaWriteLock util.MutexLocked
 }
 
 func (self *inode) AddChild(name string, child *inode) {
@@ -40,6 +44,7 @@ func (self *inode) AddChild(name string, child *inode) {
 		rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
 		tr.t.Set(ibtree.IBKey(k), string(util.Uint64Bytes(child.ino)))
 		tr.t.Set(ibtree.IBKey(rk), "")
+
 		meta := child.Meta()
 		meta.SetCTimeNow()
 		meta.StNlink++
@@ -49,7 +54,6 @@ func (self *inode) AddChild(name string, child *inode) {
 		meta.SetMTimeNow()
 		meta.Nchildren++
 		self.SetMetaInTransaction(meta, tr)
-
 	})
 }
 
@@ -247,13 +251,15 @@ func (self *inode) Forget(nlookup uint64) {
 func (self *inode) RemoveChildByName(name string) {
 	mlog.Printf2("fs/inode", "inode.RemoveChildByName %v", name)
 	var child *inode
+	child = self.GetChildByName(name)
+	if child == nil {
+		mlog.Printf2("fs/inode", " not found")
+		return
+	}
+	defer child.Release()
+	defer child.metaWriteLock.Locked()()
+
 	self.Fs().Update(func(tr *fsTransaction) {
-		child = self.GetChildByName(name)
-		defer child.Release()
-		if child == nil {
-			mlog.Printf2("fs/inode", " not found")
-			return
-		}
 		k := NewblockKeyDirFilename(self.ino, name)
 		rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
 		tr.t.Delete(ibtree.IBKey(k))
@@ -274,9 +280,7 @@ func (self *inode) RemoveChildByName(name string) {
 	}
 }
 
-// Meta caches the current metadata for particular inode.
-// It is valid for the duration of the inode, within validity period anyway.
-func (self *inode) Meta() *InodeMeta {
+func (self *inode) getMeta() *InodeMeta {
 	mlog.Printf2("fs/inode", "inode.Meta #%d", self.ino)
 	k := NewblockKey(self.ino, BST_META, "")
 	tr := self.Fs().GetTransaction()
@@ -295,7 +299,23 @@ func (self *inode) Meta() *InodeMeta {
 	return &m
 }
 
-func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *fsTransaction) {
+func (self *inode) Meta() *InodeMeta {
+	m := self.meta.Get()
+	if m == nil {
+		m = self.getMeta()
+		if m == nil {
+			return nil
+		}
+		// We don't have a lock so this is best we can do
+		self.meta.SetIfEqualTo(m, nil)
+	}
+	// We return a copy so mutation in place is safe
+	nm := *m
+	return &nm
+}
+
+func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *fsTransaction) bool {
+	self.metaWriteLock.AssertLocked()
 	times := 0
 	if meta.StAtimeNs == 0 {
 		times |= 1
@@ -315,28 +335,34 @@ func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *fsTransaction) {
 	if err != nil {
 		log.Panic(err)
 	}
-	tr.t.Set(ibtree.IBKey(k), string(b))
+	old := self.meta.Get()
+	if old == nil || old.InodeMetaData != meta.InodeMetaData || !bytes.Equal(meta.Data, old.Data) {
+		tr.t.Set(ibtree.IBKey(k), string(b))
+		self.meta.Set(meta)
+		return true
+	}
+	return false
 }
 
-func (self *inode) SetSizeInTransaction(size uint64, tr *fsTransaction) {
-	meta := self.Meta()
+func (self *inode) SetMetaSizeInTransaction(meta *InodeMeta, size uint64, tr *fsTransaction) bool {
 	shrink := false
 	if size == meta.StSize {
-		return
+		return false
 	} else if size < meta.StSize && meta.StSize > dataExtentSize {
 		shrink = true
 	}
 	meta.StSize = size
 	if size > embeddedSize {
-		meta.Data = []byte{}
+		mlog.Printf2("fs/inode", "SetSize cleared in-place metadata")
+		meta.Data = nil
 	}
-	self.SetMetaInTransaction(meta, tr)
 	if shrink {
 		nextKey := NewblockKeyOffset(self.ino, size+dataExtentSize)
 		mlog.Printf2("fs/inode", "SetSize shrinking inode %v - %x+ gone", self.ino, nextKey)
 		lastKey := NewblockKeyOffset(self.ino, 1<<62)
 		tr.t.DeleteRange(ibtree.IBKey(nextKey), ibtree.IBKey(lastKey))
 	}
+	return true
 }
 
 type inodeNumberGenerator interface {

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Mon Jan  8 14:02:03 2018 mstenber
- * Edit time:     136 min
+ * Last modified: Mon Jan  8 16:38:15 2018 mstenber
+ * Edit time:     139 min
  *
  */
 
@@ -90,8 +90,14 @@ func ProdFsFile(t *testing.T, u *FSUser) {
 	assert.True(t, err != nil)
 	assert.Equal(t, len(u.fs.fh2ifile), 0, "failed open should not add files")
 
+	// Embedded-only tests
+	tn := embeddedSize / 2
+	ProdFsFile1(t, u, tn, 1, 1)
+	ProdFsFile1(t, u, tn, 7, 3)
+	ProdFsFile1(t, u, tn, 3, 7)
+
 	// Small writes for small blocks
-	tn := 3*embeddedSize + 5
+	tn = 3*embeddedSize + 5
 	assert.True(t, tn%3 != 0)
 	assert.True(t, tn%7 != 0)
 	ProdFsFile1(t, u, tn, 1, 1)

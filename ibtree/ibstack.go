@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Fri Jan  5 00:29:18 2018 mstenber
- * Edit time:     140 min
+ * Last modified: Mon Jan  8 12:00:49 2018 mstenber
+ * Edit time:     146 min
  *
  */
 package ibtree
@@ -471,7 +471,9 @@ func (self *IBStack) iterateMutatingChildLeafFirst(fun func()) *IBNode {
 	self.goDownLeft()
 	for {
 		on := self.child()
-		fun()
+		if on.childNode != nil {
+			fun()
+		}
 		if self.child() == on {
 			if !self.moveRight() {
 				break

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Wed Jan  3 15:07:37 2018 mstenber
- * Edit time:     252 min
+ * Last modified: Mon Jan  8 17:01:28 2018 mstenber
+ * Edit time:     255 min
  *
  */
 
@@ -185,10 +185,19 @@ func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
 		if r != st.nodes[0] {
 			log.Panic("asdf2", r, st.nodes[0])
 		}
+		r0 := r
 		r = r.Set(k, v, &st)
 		if r != st.nodes[0] {
 			log.Panic("asdf3", r, st.nodes[0])
 		}
+		found := false
+		r.IterateDelta(r0, func(old, new *IBNodeDataChild) {
+			assert.Nil(t, old)
+			assert.True(t, new != nil)
+			assert.True(t, !found)
+			found = true
+		})
+		assert.True(t, found)
 	}
 	//EnsureDelta2(t, r0, r, 0, 0, n)
 	//r2 := r0.Set(IBKey("z"), "42")
@@ -207,7 +216,16 @@ func EmptyIBTreeForward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode {
 			mlog.Printf2("ibtree/ibtree_test", "Deleting #%d\n", i)
 		}
 		k := dt.idcb(i)
+		r0 := r
 		r = r.Delete(k, &st)
+		found := false
+		r.IterateDelta(r0, func(old, new *IBNodeDataChild) {
+			assert.Nil(t, new)
+			assert.True(t, old != nil)
+			assert.True(t, !found)
+			found = true
+		})
+		assert.True(t, found)
 	}
 	return r
 }

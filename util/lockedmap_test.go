@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 02:26:21 2018 mstenber
- * Last modified: Fri Jan  5 02:35:14 2018 mstenber
+ * Last modified: Mon Jan  8 11:49:47 2018 mstenber
  * Edit time:     6 min
  *
  */
@@ -20,7 +20,7 @@ import (
 
 func TestLockedMap(t *testing.T) {
 	t.Parallel()
-	l := &NamedMutexLockedMap{}
+	l := &MutexLockedMap{}
 	var mut, mut2, mut3 sync.Mutex
 	// Rather complex lock sequence to ensure that lock reuse also works
 	// (Proof is in the MLOG)

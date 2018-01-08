@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Mon Jan  8 13:00:41 2018 mstenber
- * Edit time:     69 min
+ * Last modified: Mon Jan  8 17:11:05 2018 mstenber
+ * Edit time:     81 min
  *
  */
 
@@ -30,6 +30,7 @@ type fsTransaction struct {
 	root         fsTreeRoot
 	t            *ibtree.IBTransaction
 	blocks       []*storage.StorageBlock
+	closed       bool
 }
 
 func newFsTransaction(fs *Fs) *fsTransaction {
@@ -41,8 +42,8 @@ func newFsTransaction(fs *Fs) *fsTransaction {
 		mlog.Printf2("fs/fstransaction", "newFsTransaction - root id:%x", bid)
 		fs.storage.ReferStorageBlockId(bid)
 	}
-	return &fsTransaction{fs, originalRoot, root,
-		ibtree.NewTransaction(root.node), make([]*storage.StorageBlock, 0)}
+	return &fsTransaction{fs: fs, originalRoot: originalRoot, root: root,
+		t: ibtree.NewTransaction(root.node)}
 }
 
 // CommitUntilSucceeds repeats commit until it the transaction goes
@@ -50,6 +51,7 @@ func newFsTransaction(fs *Fs) *fsTransaction {
 // locked by other means, as otherwise conflicting writes can occur.
 // In general, using e.g. fs.Update() should be done in all cases.
 func (self *fsTransaction) CommitUntilSucceeds() {
+	defer self.Close()
 	self.commit(true, false)
 }
 
@@ -61,7 +63,9 @@ func (self *fsTransaction) TryCommit() bool {
 
 func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 	mlog.Printf2("fs/fstransaction", "fst.Commit")
-	defer self.Close()
+	if self.closed {
+		log.Panicf("Trying to commit closed transaction")
+	}
 	node, bid := self.t.Commit()
 	if node == self.originalRoot.node {
 		mlog.Printf2("fs/fstransaction", " no changes for fst.Commit")
@@ -125,6 +129,11 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 
 func (self *fsTransaction) Close() {
 	mlog.Printf2("fs/fstransaction", "fst.Close")
+	if self.closed {
+		mlog.Printf2("fs/fstransaction", " duplicate but it is ok")
+		return
+	}
+	self.closed = true
 	// -1 ref when transaction expires (old root)
 	if self.root.block == nil {
 		mlog.Printf2("fs/fstransaction", " no root")
@@ -142,6 +151,9 @@ func (self *fsTransaction) Close() {
 func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *storage.StorageBlock {
 	bl := self.fs.getStorageBlock(b, nd)
 	if bl != nil {
+		if self.blocks == nil {
+			self.blocks = make([]*storage.StorageBlock, 0)
+		}
 		self.blocks = append(self.blocks, bl)
 	}
 	return bl

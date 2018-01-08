@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Mon Jan  8 16:43:15 2018 mstenber
- * Edit time:     334 min
+ * Last modified: Mon Jan  8 17:13:50 2018 mstenber
+ * Edit time:     341 min
  *
  */
 
@@ -361,6 +361,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		self.inode.metaWriteLock.UpdateOwner()
 		locked.UpdateOwner()
 		defer unlock()
+		defer tr.Close()
 
 		if changed {
 			tr.CommitUntilSucceeds()
@@ -368,7 +369,6 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		} else {
 			mlog.Printf2("fs/fh", " metadata not changed")
 		}
-		tr.Close()
 		unlockmeta()
 
 		// Here all that is left is persisting data to disk, if need be

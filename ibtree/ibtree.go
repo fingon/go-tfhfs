@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Tue Jan  9 15:06:45 2018 mstenber
- * Edit time:     721 min
+ * Last modified: Tue Jan  9 19:02:49 2018 mstenber
+ * Edit time:     723 min
  *
  */
 
@@ -63,7 +63,7 @@ type IBTree struct {
 	placeholderValue string
 }
 
-const minimumNodeMaximumSize = 1024
+const minimumNodeMaximumSize = 512
 const maximumTreeDepth = 10
 
 func (self IBTree) Init(backend IBTreeBackend) *IBTree {

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Tue Jan  9 15:05:55 2018 mstenber
- * Edit time:     154 min
+ * Last modified: Tue Jan  9 19:59:56 2018 mstenber
+ * Edit time:     175 min
  *
  */
 package ibtree
@@ -32,7 +32,7 @@ type IBStack struct {
 	indexes [maximumTreeDepth]int
 
 	// The highest index of the nodes/indexes arrays with the values set.
-	top int
+	top, maxtop int
 
 	// How many nodes have turned small during lifetime of the stack.
 	smallCount int
@@ -56,7 +56,15 @@ func (self *IBStack) setIndex(idx int) {
 		return
 	}
 	self.indexes[self.top] = idx
-	self.nodes[self.top+1] = nil
+	self.invalidateSubNodes()
+}
+
+func (self *IBStack) invalidateSubNodes() {
+	for i := self.top + 1; i <= self.maxtop; i++ {
+		self.nodes[i] = nil
+	}
+	self.maxtop = self.top
+
 }
 func (self *IBStack) rewriteAtIndex(replace bool, child *IBNodeDataChild) {
 	n := self.node()
@@ -98,7 +106,7 @@ func (self *IBStack) rewriteNodeChildren(children []*IBNodeDataChild) {
 	n.Children = children
 	self.nodes[self.top] = n
 	// This invalidates sub-trees (if any)
-	self.nodes[self.top+1] = nil
+	self.invalidateSubNodes()
 	if n.Leafy && n.Msgsize() <= n.tree.smallSize {
 		self.smallCount++
 	}
@@ -171,6 +179,9 @@ func (self *IBStack) pop() {
 func (self *IBStack) push(index int, node *IBNode) {
 	self.setIndex(index)
 	self.top++
+	if self.maxtop < self.top {
+		self.maxtop = self.top
+	}
 	self.nodes[self.top] = node
 	self.setIndex(0)
 }
@@ -426,7 +437,7 @@ func (self *IBStack) goNextLeaf() bool {
 			} else {
 				self.setIndex(idx)
 			}
-			self.nodes[self.top+1] = nil
+			self.invalidateSubNodes()
 			return true
 
 		}
@@ -545,28 +556,35 @@ func (self *IBStack) addChildAt(child *IBNodeDataChild) {
 	self.nodes[0] = &IBNode{tree: node.tree,
 		IBNodeData: IBNodeData{
 			Children: []*IBNodeDataChild{mechild, nextchild}}}
-	self.nodes[1] = nil
+	self.invalidateSubNodes()
 }
 
 func (self *IBStack) search(key IBKey) {
 	n := self.nodes[0]
 	self.top = 0
-	// mlog.Printf2("ibtree/ibstack", "search %v", key)
+	mlog.Printf2("ibtree/ibstack", "search %x", key)
 	for {
 		var idx int
+		cn := len(n.Children)
 		if n.Leafy {
 			// Look for insertion point
-			idx = sort.Search(len(n.Children),
+			idx = sort.Search(cn,
 				func(i int) bool {
-					return n.Children[i].Key >= key
+					k := n.Children[i].Key
+					r := k >= key
+					mlog.Printf2("ibtree/ibstack", "  check %d: %x >= %x = %v", i, k, key, r)
+					return r
 				})
 			// Last one may point at len(children)
 		} else {
 			// We look for 'next' interior node, and use
 			// the previous one.
-			idx = sort.Search(len(n.Children),
+			idx = sort.Search(cn,
 				func(i int) bool {
-					return n.Children[i].Key > key
+					k := n.Children[i].Key
+					r := k > key
+					mlog.Printf2("ibtree/ibstack", "  check %d: %x > %x = %v", i, k, key, r)
+					return r
 				})
 			idx--
 			if idx < 0 {
@@ -576,10 +594,10 @@ func (self *IBStack) search(key IBKey) {
 			// at valid next nodes as they are used for
 			// subsequent calls, unless tree is empty.
 		}
-		// mlog.Printf2("ibtree/ibstack", " @%d => %d", self.top, idx)
+		mlog.Printf2("ibtree/ibstack", " [@%d] %v => %d/%d", self.top, n, idx, cn)
 		if n.Leafy {
 			self.setIndex(idx)
-			// mlog.Printf2("ibtree/ibstack", " top:%d, n:%v, idx:%d", self.top, n, idx)
+			mlog.Printf2("ibtree/ibstack", " top:%d, n:%v, idx:%d", self.top, n, idx)
 			break
 		}
 		n = self.childNode(idx)

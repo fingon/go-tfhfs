@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Tue Jan  9 12:46:02 2018 mstenber
- * Edit time:     15 min
+ * Last modified: Tue Jan  9 19:08:58 2018 mstenber
+ * Edit time:     17 min
  *
  */
 
@@ -39,31 +39,35 @@ func NewTransaction(root *IBNode) *IBTransaction {
 
 func (self *IBTransaction) Delete(key IBKey) {
 	mlog.Printf2("ibtree/ibtransaction", "tr.Delete %x", key)
-	self.stack.node().Delete(key, &self.stack)
+	self.Root().Delete(key, &self.stack)
 }
 
 func (self *IBTransaction) Commit() (*IBNode, BlockId) {
-	return self.stack.node().Commit()
+	return self.Root().Commit()
 }
 
 func (self *IBTransaction) CommitTo(backend IBTreeSaver) (*IBNode, BlockId) {
-	return self.stack.node().CommitTo(backend)
+	return self.Root().CommitTo(backend)
 }
 
 func (self *IBTransaction) DeleteRange(key1, key2 IBKey) {
 	mlog.Printf2("ibtree/ibtransaction", "tr.DeleteRange %x-%x", key1, key2)
-	self.stack.node().DeleteRange(key1, key2, &self.stack)
+	self.Root().DeleteRange(key1, key2, &self.stack)
 }
 
 func (self *IBTransaction) Get(key IBKey) *string {
-	return self.stack.node().Get(key, &self.stack)
+	return self.Root().Get(key, &self.stack)
 }
 
 func (self *IBTransaction) NextKey(key IBKey) *IBKey {
-	return self.stack.node().NextKey(key, &self.stack)
+	return self.Root().NextKey(key, &self.stack)
+}
+
+func (self *IBTransaction) Root() *IBNode {
+	return self.stack.node()
 }
 
 func (self *IBTransaction) Set(key IBKey, value string) {
 	mlog.Printf2("ibtree/ibtransaction", "tr.Set %x %d bytes", key, len(value))
-	self.stack.node().Set(key, value, &self.stack)
+	self.Root().Set(key, value, &self.stack)
 }

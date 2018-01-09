@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan  4 12:21:40 2018 mstenber
- * Last modified: Mon Jan  8 15:30:04 2018 mstenber
+ * Last modified: Tue Jan  9 09:22:31 2018 mstenber
  * Edit time:     29 min
  *
  */
@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util/gid"
 )
 
 // RMutexLocked is recursive mutex with convenience features
@@ -34,7 +35,7 @@ type RMutexLocked struct {
 }
 
 func (self *RMutexLocked) Lock() {
-	gid := GetGoroutineID()
+	gid := gid.GetGoroutineID()
 	owning_gid := atomic.LoadUint64(&self.owner)
 	if gid == owning_gid {
 		self.ownerMut.Lock()
@@ -80,7 +81,7 @@ type MutexLocked struct {
 
 func (self *MutexLocked) AssertLocked() {
 	if mlog.IsEnabled() {
-		gid := GetGoroutineID()
+		gid := gid.GetGoroutineID()
 		ogid := atomic.LoadUint64(&self.owner)
 		if ogid != gid {
 			log.Panicf("Not locked by us - %v != our %v", ogid, gid)
@@ -91,14 +92,14 @@ func (self *MutexLocked) AssertLocked() {
 func (self *MutexLocked) Lock() {
 	debugging := mlog.IsEnabled()
 	if debugging {
-		gid := GetGoroutineID()
+		gid := gid.GetGoroutineID()
 		if atomic.LoadUint64(&self.owner) == gid {
 			log.Panic("Double lock by us")
 		}
 	}
 	self.mu.Lock()
 	if debugging {
-		atomic.StoreUint64(&self.owner, GetGoroutineID())
+		atomic.StoreUint64(&self.owner, gid.GetGoroutineID())
 	}
 }
 
@@ -124,7 +125,7 @@ func (self *MutexLocked) ClearOwner() {
 
 func (self *MutexLocked) UpdateOwner() {
 	if mlog.IsEnabled() {
-		atomic.StoreUint64(&self.owner, GetGoroutineID())
+		atomic.StoreUint64(&self.owner, gid.GetGoroutineID())
 	}
 }
 

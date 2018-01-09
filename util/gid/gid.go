@@ -4,12 +4,12 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan  4 12:49:31 2018 mstenber
- * Last modified: Thu Jan  4 12:50:12 2018 mstenber
+ * Last modified: Tue Jan  9 09:21:47 2018 mstenber
  * Edit time:     0 min
  *
  */
 
-package util
+package gid
 
 import (
 	"bytes"

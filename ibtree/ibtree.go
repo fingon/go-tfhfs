@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Tue Jan  9 19:02:49 2018 mstenber
- * Edit time:     723 min
+ * Last modified: Wed Jan 10 00:46:13 2018 mstenber
+ * Edit time:     734 min
  *
  */
 
@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util"
 )
 
 const hashSize = 32
@@ -136,15 +137,44 @@ func (self *IBNode) CommitTo(backend IBTreeSaver) (*IBNode, BlockId) {
 
 	cl := self.Children
 	if !self.Leafy {
-		// Need to copy children if not leafy; leafy children
-		// are data-only, and therefore can be copied as is
-		cl = make([]*IBNodeDataChild, len(self.Children))
+		// Scary optimization: Do this in parallel if it does
+		// seem worth it
+		cc := 0
+		var onlyi int
 		for i, c := range self.Children {
 			if c.childNode != nil {
-				_, bid := c.childNode.CommitTo(backend)
-				c = &IBNodeDataChild{Key: c.Key, Value: string(bid)}
+				cc++
+				onlyi = i
 			}
-			cl[i] = c
+		}
+
+		if cc > 0 {
+
+			// Need to copy children if not leafy; leafy children
+			// are data-only, and therefore can be copied as is
+			cl = make([]*IBNodeDataChild, len(self.Children))
+			copy(cl, self.Children)
+
+			handleOne := func(i int) {
+				c := cl[i]
+				_, bid := c.childNode.CommitTo(backend)
+				cl[i] = &IBNodeDataChild{Key: c.Key, Value: string(bid)}
+			}
+
+			if cc == 1 {
+				handleOne(onlyi)
+			} else {
+				wg := &util.SimpleWaitGroup{}
+				for i, c := range self.Children {
+					if c.childNode != nil {
+						i := i
+						wg.Go(func() {
+							handleOne(i)
+						})
+					}
+				}
+				wg.Wait()
+			}
 		}
 	}
 

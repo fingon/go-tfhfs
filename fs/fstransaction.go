@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Wed Jan 10 00:19:17 2018 mstenber
- * Edit time:     136 min
+ * Last modified: Wed Jan 10 01:14:25 2018 mstenber
+ * Edit time:     144 min
  *
  */
 
@@ -19,6 +19,7 @@ import (
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
+	"github.com/fingon/go-tfhfs/util"
 )
 
 type fsTreeRoot struct {
@@ -30,10 +31,11 @@ type fsTransaction struct {
 	fs *Fs
 
 	// root is the root we based this transaction on
-	root   *fsTreeRoot
-	t      *ibtree.IBTransaction
-	blocks []*storage.StorageBlock
-	closed bool
+	root      *fsTreeRoot
+	t         *ibtree.IBTransaction
+	blocks    map[string]*storage.StorageBlock
+	blockLock util.MutexLocked
+	closed    bool
 }
 
 func newFsTransaction(fs *Fs) *fsTransaction {
@@ -93,13 +95,15 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 		mlog.Printf2("fs/fstransaction", " no changes for fst.Commit")
 		return true
 	}
-	// +1 ref for new root (that we are about to store); if it
-	// winds up as new fs.root, the reference is kept there.
-	block := self.fs.storage.GetBlockById(string(bid))
-
+	// +1 ref (essentially) for new root (that we are about to
+	// store); if it winds up as new fs.root, the reference is
+	// kept there and so we take it out of self.blocks.
+	block := self.blocks[string(bid)]
 	if block == nil {
-		log.Panicf("immediate commit + get = nil for %x", string(bid))
+		mlog.Panicf("Did not store what we claimed to?")
 	}
+	delete(self.blocks, string(bid))
+
 	root := &fsTreeRoot{node, block}
 	if !self.fs.root.SetIfEqualTo(root, self.root) {
 		// -1 ref at end of scope as block did not make it to the fs.root
@@ -206,10 +210,11 @@ func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *sto
 	}
 	bl := self.fs.storage.ReferOrStoreBlock0(id, b)
 	if bl != nil {
+		defer self.blockLock.Locked()()
 		if self.blocks == nil {
-			self.blocks = make([]*storage.StorageBlock, 0)
+			self.blocks = make(map[string]*storage.StorageBlock)
 		}
-		self.blocks = append(self.blocks, bl)
+		self.blocks[bl.Id()] = bl
 	}
 	return bl
 }

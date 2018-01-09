@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan  9 11:38:58 2018 mstenber
- * Edit time:     563 min
+ * Last modified: Wed Jan 10 01:03:41 2018 mstenber
+ * Edit time:     573 min
  *
  */
 
@@ -25,7 +25,10 @@ type BlockIterateReferencesCallback func(string, []byte, BlockReferenceCallback)
 // Storage is essentially DelayedStorage of Python prototype; it has
 // dirty tracking of blocks, delayed flush to Backend, and
 // caching of data.
-type oldNewStruct struct{ old_value, new_value string }
+type oldNewStruct struct {
+	oldValue, newValue string
+	gotStorageRef      bool
+}
 
 type jobOut struct {
 	sb *StorageBlock
@@ -156,7 +159,7 @@ func (self *Storage) run() {
 			b := self.getBlockById(job.id)
 			job.out <- &jobOut{sb: NewStorageBlock(b)}
 		case jobGetBlockIdByName:
-			job.out <- &jobOut{id: self.getName(job.name).new_value}
+			job.out <- &jobOut{id: self.getName(job.name).newValue}
 		case jobReferOrStoreBlock:
 			b := self.getBlockById(job.id)
 			if b != nil {
@@ -222,14 +225,15 @@ func (self *Storage) GetBlockIdByName(name string) string {
 }
 
 func (self *Storage) setNameToBlockId(name, bid string) {
+	n := self.getName(name)
 	if bid != "" {
 		self.getBlockById(bid).addStorageRefCount(1)
 	}
-	n := self.getName(name)
-	if n.new_value != "" {
-		self.getBlockById(n.new_value).addStorageRefCount(-1)
+	if n.gotStorageRef {
+		self.getBlockById(n.newValue).addStorageRefCount(-1)
 	}
-	n.new_value = bid
+	n.newValue = bid
+	n.gotStorageRef = true
 }
 
 func (self *Storage) storeBlockInternal(jobType jobType, id string, data []byte, count int32) *StorageBlock {
@@ -300,32 +304,32 @@ func (self *Storage) getName(name string) *oldNewStruct {
 		return n
 	}
 	id := self.Backend.GetBlockIdByName(name)
-	n = &oldNewStruct{old_value: id, new_value: id}
+	n = &oldNewStruct{oldValue: id, newValue: id}
 	self.names[name] = n
 	return n
 }
 
 func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
-	mlog.Printf2("storage/storage", "flushBlockName %s=%x", k, v.new_value)
-	self.Backend.SetNameToBlockId(k, v.new_value)
-	if v.new_value != "" {
-		b := self.getBlockById(v.new_value)
+	mlog.Printf2("storage/storage", "flushBlockName %s=%x", k, v.newValue)
+	self.Backend.SetNameToBlockId(k, v.newValue)
+	if v.newValue != "" {
+		b := self.getBlockById(v.newValue)
 		b.addRefCount(1)
-		// the new_value retains its +1 storage refcount as
+		// the newValue retains its +1 storage refcount as
 		// otherwise bookkeeping gets ugly in
 		// e.g. setNameToBlockId.
 	}
-	if v.old_value != "" {
-		b := self.getBlockById(v.old_value)
+	if v.oldValue != "" {
+		b := self.getBlockById(v.oldValue)
 		b.addRefCount(-1)
 	}
-	v.old_value = v.new_value
+	v.oldValue = v.newValue
 }
 
 func (self *Storage) flushBlockNames() int {
 	ops := 0
 	for k, v := range self.names {
-		if v.old_value != v.new_value {
+		if v.oldValue != v.newValue {
 			self.flushBlockName(k, v)
 			ops++
 		}

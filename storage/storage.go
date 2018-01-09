@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan  9 11:26:02 2018 mstenber
- * Edit time:     560 min
+ * Last modified: Tue Jan  9 11:38:58 2018 mstenber
+ * Edit time:     563 min
  *
  */
 
@@ -105,7 +105,7 @@ type Storage struct {
 	// as long as someone keeps a reference to one, it stays
 	// here. Being in dirtyBlocks means it also has extra
 	// reference.
-	blocks, dirtyBlocks, ref0Blocks blockMap
+	blocks, dirtyBlocks blockMap
 
 	// Stuff below here is ~DelayedStorage
 	names map[string]*oldNewStruct
@@ -121,7 +121,6 @@ func (self Storage) Init() *Storage {
 	self.jobChannel = make(chan *jobIn, 100)
 	self.blocks = make(blockMap)
 	self.dirtyBlocks = make(blockMap)
-	self.ref0Blocks = make(blockMap)
 
 	// No need to special case Codec = nil elsewhere with this
 	if self.Codec != nil {
@@ -294,45 +293,6 @@ func (self *Storage) StoreBlock0(id string, data []byte) *StorageBlock {
 }
 
 /// Private
-func (self *Storage) updateBlockDataDependencies(b *Block, add, storage bool, st BlockStatus) {
-	mlog.Printf2("storage/storage", "st.updateBlockDataDependencies %p %v %v %v", b, add, storage, st)
-	defer mlog.Printf2("storage/storage", " st.updateBlockDataDependencies done")
-	// No sub-references
-	if st >= BlockStatus_WANT_NORMAL {
-		return
-	}
-	if self.IterateReferencesCallback == nil {
-		return
-	}
-	if storage {
-		if b.haveStorageRefs == add {
-			return
-		}
-		b.haveStorageRefs = add
-	}
-
-	self.IterateReferencesCallback(b.Id, b.GetData(), func(id string) {
-		b := self.getBlockById(id)
-		if b == nil {
-			log.Panicf("Block %x awol in updateBlockDataDependencies", id)
-		}
-		if storage {
-			if add {
-				b.addStorageRefCount(1)
-			} else {
-				b.addStorageRefCount(-1)
-			}
-
-		} else {
-			if add {
-				b.addRefCount(1)
-			} else {
-				b.addRefCount(-1)
-			}
-
-		}
-	})
-}
 
 func (self *Storage) getName(name string) *oldNewStruct {
 	n, ok := self.names[name]
@@ -412,15 +372,6 @@ func (self *Storage) flush() int {
 			ops += b.flush()
 		}
 	}
-
-	for _, b := range self.ref0Blocks {
-		if b.storageRefCount == 0 {
-			mlog.Printf2("storage/storage", " removing %v", b)
-			self.updateBlockDataDependencies(b, false, true, b.Status)
-			delete(self.blocks, b.Id)
-		}
-	}
-	self.ref0Blocks = make(blockMap)
 
 	mlog.Printf2("storage/storage", " ops:%v", ops)
 	return ops

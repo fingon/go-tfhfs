@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Fri Jan  5 22:39:39 2018 mstenber
- * Edit time:     9 min
+ * Last modified: Tue Jan  9 12:51:44 2018 mstenber
+ * Edit time:     11 min
  *
  */
 
@@ -28,6 +28,10 @@ func NewStorageBlock(b *Block) *StorageBlock {
 	// however, as the objects are passed to clients, see below..
 	b.addStorageRefCount(1)
 	return &StorageBlock{block: b}
+}
+
+func (self *StorageBlock) Open() {
+	self.block.storage.ReferStorageBlockId(self.block.Id)
 }
 
 func (self *StorageBlock) Close() {

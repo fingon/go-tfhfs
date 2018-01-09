@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Tue Jan  9 11:23:31 2018 mstenber
- * Edit time:     182 min
+ * Last modified: Tue Jan  9 12:25:17 2018 mstenber
+ * Edit time:     202 min
  *
  */
 
@@ -50,7 +50,7 @@ type Block struct {
 	storageRefCount int32
 
 	// TBD: would flags be better?
-	haveStorageRefs bool
+	haveDiskRefs, haveStorageRefs bool
 }
 
 func (self *Block) GetData() []byte {
@@ -108,8 +108,9 @@ func (self *Block) flush() int {
 				// old type = WEAK
 			} else {
 				mlog.Printf2("storage/block", " status changed")
-				self.storage.updateBlockDataDependencies(self, true, false, self.Status)
-				self.storage.updateBlockDataDependencies(self, false, false, self.Stored.Status)
+				self.shouldHaveDiskDependencies(true)
+				// Remove old disk dependencies
+				self.updateDependencies(false, false, &self.Stored.Status)
 			}
 			ops++
 		}
@@ -118,7 +119,7 @@ func (self *Block) flush() int {
 	haveRefs := self.RefCount != 0
 	if hadRefs != haveRefs {
 		mlog.Printf2("storage/block", " dependencies changed")
-		self.storage.updateBlockDataDependencies(self, haveRefs, false, self.Status)
+		self.shouldHaveDiskDependencies(haveRefs)
 	}
 	self.Stored = nil
 	self.addStorageRefCount(-1)
@@ -127,11 +128,18 @@ func (self *Block) flush() int {
 }
 
 func (self *Block) addRefCount(count int32) {
+	if count == 0 {
+		return
+	}
 	mlog.Printf2("storage/block", "%v.addRefCount %v", self, count)
 	self.markDirty()
 	self.RefCount += count
 	if self.RefCount < 0 {
 		log.Panicf("RefCount below 0 for %x", self.Id)
+	}
+	if self.RefCount == 0 {
+		// Ensure we have at least in-memory references to dependencies
+		self.shouldHaveStorageDependencies(true)
 	}
 }
 
@@ -142,11 +150,14 @@ func (self *Block) addStorageRefCount(v int32) {
 	if nv < 0 {
 		log.Panic("Negative reference count", nv)
 	} else if nv == 0 {
-		self.storage.ref0Blocks[self.Id] = self
-	} else {
-		self.storage.updateBlockDataDependencies(self, true, true, self.Status)
-	}
+		// Get rid of storage dependencies if any as well
+		self.shouldHaveStorageDependencies(false)
+		delete(self.storage.blocks, self.Id)
+	} else if self.RefCount == 0 {
+		// Ensure we have at least in-memory references to dependencies
+		self.shouldHaveStorageDependencies(true)
 
+	}
 }
 
 func (self *Block) markDirty() {
@@ -168,6 +179,62 @@ func (self *Block) setStatus(st BlockStatus) {
 
 }
 
+func (self *Block) updateDependencies(add, storage bool, stp *BlockStatus) {
+	st := self.Status
+	if stp != nil {
+		st = *stp
+	}
+	// No sub-references
+	if st >= BlockStatus_WANT_NORMAL {
+		return
+	}
+	if self.storage.IterateReferencesCallback == nil {
+		return
+	}
+	if storage {
+		if self.haveStorageRefs == add {
+			return
+		}
+		self.haveStorageRefs = add
+	} else if stp == nil {
+		if self.haveDiskRefs == add {
+			return
+		}
+		self.haveDiskRefs = add
+	}
+	mlog.Printf2("storage/storage", "%v.updateDependencies %v %v %v", self, add, storage, st)
+
+	self.storage.IterateReferencesCallback(self.Id, self.GetData(), func(id string) {
+		b := self.storage.getBlockById(id)
+		if b == nil {
+			log.Panicf("Block %x awol in updateBlockDataDependencies", id)
+		}
+		if storage {
+			if add {
+				b.addStorageRefCount(1)
+			} else {
+				b.addStorageRefCount(-1)
+			}
+
+		} else {
+			if add {
+				b.addRefCount(1)
+			} else {
+				b.addRefCount(-1)
+			}
+
+		}
+	})
+}
+
+func (self *Block) shouldHaveStorageDependencies(value bool) {
+	self.updateDependencies(value, true, nil)
+}
+
+func (self *Block) shouldHaveDiskDependencies(value bool) {
+	self.updateDependencies(value, false, nil)
+}
+
 // getBlockById returns Block (if any) that matches id.
 func (self *Storage) getBlockById(id string) *Block {
 	mlog.Printf2("storage/block", "st.getBlockById %x", id)
@@ -179,6 +246,7 @@ func (self *Storage) getBlockById(id string) *Block {
 			return nil
 		}
 		b.storage = self
+		b.haveDiskRefs = true
 		self.blocks[id] = b
 	}
 	return b

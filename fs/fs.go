@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Mon Jan  8 15:36:45 2018 mstenber
- * Edit time:     305 min
+ * Last modified: Tue Jan  9 12:18:31 2018 mstenber
+ * Edit time:     312 min
  *
  */
 
@@ -74,11 +74,16 @@ func (self *Fs) Close() {
 
 // ibtree.IBTreeBackend API
 func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
-	v, _ := self.nodeDataCache.Get(id)
+	var v interface{}
+	if self.nodeDataCache != nil {
+		v, _ = self.nodeDataCache.Get(id)
+	}
 	if v == nil {
 		nd := self.loadNode(id)
 		if nd != nil {
-			self.nodeDataCache.Set(id, nd)
+			if self.nodeDataCache != nil {
+				self.nodeDataCache.Set(id, nd)
+			}
 		} else {
 			log.Panicf("Unable to find node %x", id)
 		}
@@ -145,14 +150,16 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 	return
 }
 
-func NewFs(st *storage.Storage, rootName string) *Fs {
+func NewFs(st *storage.Storage, rootName string, cacheSize int) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
-	fs.nodeDataCache = gcache.New(10000).
-		ARC().
-		//	LoaderFunc(func(k interface{}) (interface{}, error) {
-		//		return fs.loadNode(k.(ibtree.BlockId)), nil
-		//}).
-		Build()
+	if cacheSize > 0 {
+		fs.nodeDataCache = gcache.New(cacheSize).
+			ARC().
+			//	LoaderFunc(func(k interface{}) (interface{}, error) {
+			//		return fs.loadNode(k.(ibtree.BlockId)), nil
+			//}).
+			Build()
+	}
 	fs.Ops.fs = fs
 	fs.closing = make(chan chan struct{})
 	fs.flushInterval = 1 * time.Second
@@ -214,7 +221,10 @@ func (self *Fs) hasExternalReferences(id string) bool {
 }
 
 func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.BlockReferenceCallback) {
-	v, _ := self.nodeDataCache.GetIFPresent(ibtree.BlockId(id))
+	var v interface{}
+	if self.nodeDataCache != nil {
+		v, _ = self.nodeDataCache.GetIFPresent(ibtree.BlockId(id))
+	}
 	var nd *ibtree.IBNodeData
 	if v != nil {
 		nd = v.(*ibtree.IBNodeData)
@@ -246,7 +256,7 @@ func (self *Fs) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *storage.Storag
 	h := sha256.Sum256(b)
 	bid := h[:]
 	id := string(bid)
-	if nd != nil {
+	if nd != nil && self.nodeDataCache != nil {
 		self.nodeDataCache.Set(ibtree.BlockId(id), nd)
 	}
 	return self.storage.ReferOrStoreBlock0(id, b)

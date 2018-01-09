@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  9 00:49:56 2018 mstenber
- * Edit time:     181 min
+ * Last modified: Tue Jan  9 12:15:00 2018 mstenber
+ * Edit time:     182 min
  *
  */
 
@@ -323,7 +323,7 @@ func TestFs(t *testing.T) {
 				rootName := "toor"
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
-				fs := NewFs(st, rootName)
+				fs := NewFs(st, rootName, 0)
 				if gen != nil {
 					fs.generator = gen
 
@@ -335,7 +335,7 @@ func TestFs(t *testing.T) {
 				check(t, fs)
 
 				mlog.Printf2("fs/rawfs_test", "omstart from storage")
-				fs2 := NewFs(st, rootName)
+				fs2 := NewFs(st, rootName, 0)
 				check(t, fs2)
 			})
 	}
@@ -360,7 +360,7 @@ func TestFsParallel(t *testing.T) {
 				rootName := "toor"
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
-				fs := NewFs(st, rootName)
+				fs := NewFs(st, rootName, 0)
 
 				randomReaderWriter := func(path string, u *FSUser) {
 					f, err := u.OpenFile(path, uint32(os.O_CREATE|os.O_TRUNC|os.O_WRONLY), 0777)

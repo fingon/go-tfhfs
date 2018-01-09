@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Fri Jan  5 14:48:57 2018 mstenber
- * Edit time:     43 min
+ * Last modified: Tue Jan  9 10:54:06 2018 mstenber
+ * Edit time:     45 min
  *
  */
 
@@ -31,10 +31,12 @@ func main() {
 	}
 	password := flag.String("password", "siikret", "Password")
 	salt := flag.String("salt", "salt", "Salt")
+	rootName := flag.String("rootname", "root", "Name of the root reference")
 	backendp := flag.String("backend", "badger",
 		fmt.Sprintf("Backend to use (possible: %v)", factory.List()))
 	cpuprofile := flag.String("cpuprofile", "", "CPU profile file")
 	memprofile := flag.String("memprofile", "", "Memory profile file")
+	cachesize := flag.Int("cachesize", 10000, "Number of btree nodes to cache (~few k each)")
 
 	flag.Parse()
 
@@ -55,7 +57,7 @@ func main() {
 	backend := factory.New(*backendp, storedir)
 
 	st := fs.NewCryptoStorage(*password, *salt, backend)
-	myfs := fs.NewFs(st, "xxx")
+	myfs := fs.NewFs(st, *rootName, *cachesize)
 	opts := &fuse.MountOptions{}
 	if mlog.IsEnabled() {
 		opts.Debug = true

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Tue Jan  9 00:22:20 2018 mstenber
- * Edit time:     32 min
+ * Last modified: Tue Jan  9 12:14:51 2018 mstenber
+ * Edit time:     34 min
  *
  */
 
@@ -41,7 +41,7 @@ func TestFsTransaction(t *testing.T) {
 	rootName := "toor"
 	backend := factory.New("inmemory", "")
 	st := storage.Storage{Backend: backend}.Init()
-	fs := NewFs(st, rootName)
+	fs := NewFs(st, rootName, 0)
 
 	st.IterateReferencesCallback = nil
 
@@ -90,7 +90,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 	n := 100000
 	backend := factory.New(bename, dir)
 	st := NewCryptoStorage("assword", "alt", backend)
-	fs := NewFs(st, "toor")
+	fs := NewFs(st, "toor", 0)
 
 	tr := fs.GetTransaction()
 	for i := 0; i < n; i++ {

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan  9 10:48:31 2018 mstenber
- * Edit time:     553 min
+ * Last modified: Tue Jan  9 11:26:02 2018 mstenber
+ * Edit time:     560 min
  *
  */
 
@@ -294,8 +294,8 @@ func (self *Storage) StoreBlock0(id string, data []byte) *StorageBlock {
 }
 
 /// Private
-func (self *Storage) updateBlockDataDependencies(b *Block, add bool, st BlockStatus) {
-	mlog.Printf2("storage/storage", "st.updateBlockDataDependencies %p %v %v", b, add, st)
+func (self *Storage) updateBlockDataDependencies(b *Block, add, storage bool, st BlockStatus) {
+	mlog.Printf2("storage/storage", "st.updateBlockDataDependencies %p %v %v %v", b, add, storage, st)
 	defer mlog.Printf2("storage/storage", " st.updateBlockDataDependencies done")
 	// No sub-references
 	if st >= BlockStatus_WANT_NORMAL {
@@ -304,15 +304,32 @@ func (self *Storage) updateBlockDataDependencies(b *Block, add bool, st BlockSta
 	if self.IterateReferencesCallback == nil {
 		return
 	}
+	if storage {
+		if b.haveStorageRefs == add {
+			return
+		}
+		b.haveStorageRefs = add
+	}
+
 	self.IterateReferencesCallback(b.Id, b.GetData(), func(id string) {
 		b := self.getBlockById(id)
 		if b == nil {
 			log.Panicf("Block %x awol in updateBlockDataDependencies", id)
 		}
-		if add {
-			b.addRefCount(1)
+		if storage {
+			if add {
+				b.addStorageRefCount(1)
+			} else {
+				b.addStorageRefCount(-1)
+			}
+
 		} else {
-			b.addRefCount(-1)
+			if add {
+				b.addRefCount(1)
+			} else {
+				b.addRefCount(-1)
+			}
+
 		}
 	})
 }
@@ -396,15 +413,14 @@ func (self *Storage) flush() int {
 		}
 	}
 
-	if len(self.ref0Blocks) > 0 {
-		for _, b := range self.ref0Blocks {
-			if b.storageRefCount == 0 {
-				mlog.Printf2("storage/storage", " removing %v", b)
-				delete(self.blocks, b.Id)
-			}
+	for _, b := range self.ref0Blocks {
+		if b.storageRefCount == 0 {
+			mlog.Printf2("storage/storage", " removing %v", b)
+			self.updateBlockDataDependencies(b, false, true, b.Status)
+			delete(self.blocks, b.Id)
 		}
-		self.ref0Blocks = make(blockMap)
 	}
+	self.ref0Blocks = make(blockMap)
 
 	mlog.Printf2("storage/storage", " ops:%v", ops)
 	return ops

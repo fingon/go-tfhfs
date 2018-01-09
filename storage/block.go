@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Sat Jan  6 02:21:18 2018 mstenber
- * Edit time:     178 min
+ * Last modified: Tue Jan  9 11:23:31 2018 mstenber
+ * Edit time:     182 min
  *
  */
 
@@ -48,6 +48,9 @@ type Block struct {
 
 	// In-memory reference count (from within Storage)
 	storageRefCount int32
+
+	// TBD: would flags be better?
+	haveStorageRefs bool
 }
 
 func (self *Block) GetData() []byte {
@@ -105,8 +108,8 @@ func (self *Block) flush() int {
 				// old type = WEAK
 			} else {
 				mlog.Printf2("storage/block", " status changed")
-				self.storage.updateBlockDataDependencies(self, true, self.Status)
-				self.storage.updateBlockDataDependencies(self, false, self.Stored.Status)
+				self.storage.updateBlockDataDependencies(self, true, false, self.Status)
+				self.storage.updateBlockDataDependencies(self, false, false, self.Stored.Status)
 			}
 			ops++
 		}
@@ -115,7 +118,7 @@ func (self *Block) flush() int {
 	haveRefs := self.RefCount != 0
 	if hadRefs != haveRefs {
 		mlog.Printf2("storage/block", " dependencies changed")
-		self.storage.updateBlockDataDependencies(self, haveRefs, self.Status)
+		self.storage.updateBlockDataDependencies(self, haveRefs, false, self.Status)
 	}
 	self.Stored = nil
 	self.addStorageRefCount(-1)
@@ -138,10 +141,12 @@ func (self *Block) addStorageRefCount(v int32) {
 	nv := self.storageRefCount
 	if nv < 0 {
 		log.Panic("Negative reference count", nv)
-	}
-	if nv == 0 {
+	} else if nv == 0 {
 		self.storage.ref0Blocks[self.Id] = self
+	} else {
+		self.storage.updateBlockDataDependencies(self, true, true, self.Status)
 	}
+
 }
 
 func (self *Block) markDirty() {

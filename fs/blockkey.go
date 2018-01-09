@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 00:34:54 2017 mstenber
- * Last modified: Tue Jan  9 00:19:24 2018 mstenber
- * Edit time:     15 min
+ * Last modified: Tue Jan  9 13:15:48 2018 mstenber
+ * Edit time:     17 min
  *
  */
 
@@ -13,6 +13,7 @@ package fs
 
 import (
 	"encoding/binary"
+	"fmt"
 	"hash/fnv"
 	"log"
 
@@ -20,6 +21,11 @@ import (
 )
 
 type blockKey string
+
+func (self blockKey) String() string {
+	return fmt.Sprintf("bkey{ino:%v,subtype:%v,subtypedata:%x}", self.Ino(), self.SubType(), self.SubTypeData())
+
+}
 
 func (self blockKey) SubType() BlockSubType {
 	if len(self) <= blockSubTypeOffset {

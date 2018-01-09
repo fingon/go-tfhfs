@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Mon Jan  8 17:30:19 2018 mstenber
- * Edit time:     305 min
+ * Last modified: Tue Jan  9 13:16:25 2018 mstenber
+ * Edit time:     306 min
  *
  */
 
@@ -141,7 +141,8 @@ func (self *inode) GetChildByName(name string) *inode {
 	defer tr.Close()
 	v := tr.t.Get(ibtree.IBKey(k))
 	if v == nil {
-		mlog.Printf2("fs/inode", " child key %x not in tree", k)
+		mlog.Printf2("fs/inode", " child %v not in tree", k)
+		tr.root.node.PrintToMLogAll()
 		return nil
 	}
 	ino := binary.BigEndian.Uint64([]byte(*v))

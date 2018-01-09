@@ -4,14 +4,15 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Mon Jan  8 22:52:40 2018 mstenber
- * Edit time:     81 min
+ * Last modified: Tue Jan  9 14:32:15 2018 mstenber
+ * Edit time:     124 min
  *
  */
 
 package fs
 
 import (
+	"crypto/sha256"
 	"log"
 
 	"github.com/fingon/go-tfhfs/ibtree"
@@ -25,25 +26,45 @@ type fsTreeRoot struct {
 }
 
 type fsTransaction struct {
-	fs           *Fs
-	originalRoot *fsTreeRoot
-	root         fsTreeRoot
-	t            *ibtree.IBTransaction
-	blocks       []*storage.StorageBlock
-	closed       bool
+	fs *Fs
+
+	// root is the root we based this transaction on
+	root   *fsTreeRoot
+	t      *ibtree.IBTransaction
+	blocks []*storage.StorageBlock
+	closed bool
 }
 
 func newFsTransaction(fs *Fs) *fsTransaction {
-	originalRoot := fs.root.Get()
-	root := *originalRoot
-	// +1 ref when transaction starts (old root copy we got)
+	root := fs.root.Get()
+	// +1 ref when transaction starts
 	if root.block != nil {
-		bid := root.block.Id()
-		mlog.Printf2("fs/fstransaction", "newFsTransaction - root id:%x", bid)
-		fs.storage.ReferStorageBlockId(bid)
+		mlog.Printf2("fs/fstransaction", "newFsTransaction - root:%v", root.block)
+		root.block.Open()
 	}
-	return &fsTransaction{fs: fs, originalRoot: originalRoot, root: root,
+	return &fsTransaction{fs: fs, root: root,
 		t: ibtree.NewTransaction(root.node)}
+}
+
+// ibtree.IBTreeSaver API
+func (self *fsTransaction) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
+	if self.fs.nodeDataCache == nil {
+		// In unit tests, ensure we're not saving garbage
+		nd.CheckNodeStructure()
+
+	}
+
+	bb := make([]byte, nd.Msgsize()+1)
+	bb[0] = byte(BDT_NODE)
+	b, err := nd.MarshalMsg(bb[1:1])
+	if err != nil {
+		log.Panic(err)
+	}
+	b = bb[0 : 1+len(b)]
+	mlog.Printf2("fs/fstransaction", "SaveNode %d bytes", len(b))
+	bl := self.getStorageBlock(b, nd)
+	bid := ibtree.BlockId(bl.Id())
+	return bid
 }
 
 // CommitUntilSucceeds repeats commit until it the transaction goes
@@ -66,19 +87,21 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 	if self.closed {
 		log.Panicf("Trying to commit closed transaction")
 	}
-	node, bid := self.t.Commit()
-	if node == self.originalRoot.node {
+	node, bid := self.t.CommitTo(self)
+	if node == self.root.node {
 		mlog.Printf2("fs/fstransaction", " no changes for fst.Commit")
 		return true
 	}
-	// +1 ref for new root (that we are about to store)
+	// +1 ref for new root (that we are about to store); if it
+	// winds up as new fs.root, the reference is kept there.
 	block := self.fs.storage.GetBlockById(string(bid))
+
 	if block == nil {
 		log.Panicf("immediate commit + get = nil for %x", string(bid))
 	}
 	root := &fsTreeRoot{node, block}
-	if !self.fs.root.SetIfEqualTo(root, self.originalRoot) {
-		// block not stored anywhere
+	if !self.fs.root.SetIfEqualTo(root, self.root) {
+		// -1 ref at end of scope as block did not make it to the fs.root
 		defer block.Close()
 
 		if !retryUntilSucceeds {
@@ -92,7 +115,8 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 
 		mlog.Printf2("fs/fstransaction", " root has changed under us; doing delta")
 		tr := newFsTransaction(self.fs)
-		node.IterateDelta(self.originalRoot.node,
+		defer tr.Close()
+		node.IterateDelta(self.root.node,
 			func(oldC, newC *ibtree.IBNodeDataChild) {
 				if newC == nil {
 					// Delete
@@ -112,44 +136,60 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 				}
 			})
 		mlog.Printf2("fs/fstransaction", " delta done")
-		tr.commit(true, true)
-		return true
+		return tr.commit(true, true)
 	}
+
 	// In thory there is a race here; in practise I doubt it very
 	// much it matters (as we next update will anyway have us
 	// sticking in the updated version of the tree, as it was
 	// correctly updated)
 	self.fs.storage.SetNameToBlockId(self.fs.rootName, string(bid))
-	if self.originalRoot.block != nil {
-		// -1 ref for old root
-		self.originalRoot.block.Close()
+
+	mlog.Printf2("fs/fstransaction", " after successful commit, tree rooted at %x:", string(bid))
+	node.PrintToMLogAll()
+
+	// Ensure root metadata is still there
+	if self.fs.nodeDataCache == nil {
+		k := ibtree.IBKey(NewblockKey(uint64(1), BST_META, ""))
+		tr := self.fs.GetTransaction()
+		defer tr.Close()
+		v := tr.t.Get(k)
+		if v == nil {
+			mlog.Panicf("root metadata is gone")
+		}
 	}
+
 	return true
 }
 
 func (self *fsTransaction) Close() {
 	// mlog.Printf2("fs/fstransaction", "fst.Close")
 	if self.closed {
-		mlog.Printf2("fs/fstransaction", " duplicate but it is ok")
 		return
 	}
 	self.closed = true
-	// -1 ref when transaction expires (old root)
-	if self.root.block == nil {
-		mlog.Printf2("fs/fstransaction", " no root")
-		return
-	}
+
+	// Remove all temporary blocks acquired during the transaction
 	for _, v := range self.blocks {
 		v.Close()
 	}
-	self.fs.storage.ReleaseStorageBlockId(self.root.block.Id())
-	self.root.block = nil
+
+	// -1 ref when transaction expires (old root)
+	if self.root.block != nil {
+		self.root.block.Close()
+	}
 }
 
-// getStorageBlock is convenience wrapper over the getStorageBlock in Fs.
+// getStorageBlock block ids for given bytes/data.
 // This one expires the blocks when the transaction is gone.
 func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *storage.StorageBlock {
-	bl := self.fs.getStorageBlock(b, nd)
+	h := sha256.Sum256(b)
+	bid := h[:]
+	id := string(bid)
+	if nd != nil && self.fs.nodeDataCache != nil {
+		self.fs.nodeDataCache.Set(ibtree.BlockId(id), nd)
+	}
+	bl := self.fs.storage.ReferOrStoreBlock0(id, b)
 	if bl != nil {
 		if self.blocks == nil {
 			self.blocks = make([]*storage.StorageBlock, 0)

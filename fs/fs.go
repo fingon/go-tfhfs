@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  9 12:18:31 2018 mstenber
- * Edit time:     312 min
+ * Last modified: Tue Jan  9 19:03:41 2018 mstenber
+ * Edit time:     316 min
  *
  */
 
@@ -29,7 +29,6 @@ import (
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
-	"github.com/minio/sha256-simd"
 )
 
 const iterations = 1234
@@ -39,26 +38,20 @@ const blockSubTypeOffset = inodeDataLength
 type Fs struct {
 	// These have their own locking or are used in single-threaded way
 	inodeTracker
-	Ops           fsOps
-	closing       chan chan struct{}
-	flushInterval time.Duration
-	server        *fuse.Server
-	tree          *ibtree.IBTree
-	storage       *storage.Storage
-	rootName      string
-	root          fsTreeRootAtomicPointer
-	lastBlock     StorageBlockAtomicPointer
-
+	Ops                  fsOps
+	closing              chan chan struct{}
+	flushInterval        time.Duration
+	server               *fuse.Server
+	tree                 *ibtree.IBTree
+	storage              *storage.Storage
+	rootName             string
+	root                 fsTreeRootAtomicPointer
 	nodeDataCache        gcache.Cache
 	transactionRetryLock util.MutexLocked
 }
 
 func (self *Fs) Close() {
 
-	lb := self.lastBlock.Get()
-	if lb != nil {
-		lb.Close()
-	}
 	mlog.Printf2("fs/fs", "fs.Close")
 
 	// this will kill the underlying goroutine and ensure it has flushed
@@ -101,26 +94,8 @@ func (self *Fs) Flush() {
 
 // ibtree.IBTreeBackend API
 func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
-	bb := make([]byte, nd.Msgsize()+1)
-	bb[0] = byte(BDT_NODE)
-	b, err := nd.MarshalMsg(bb[1:1])
-	if err != nil {
-		log.Panic(err)
-	}
-	b = bb[0 : 1+len(b)]
-	mlog.Printf2("fs/fs", "SaveNode %d bytes", len(b))
-	bl := self.getStorageBlock(b, nd)
-	bid := ibtree.BlockId(bl.Id())
-	for {
-		old := self.lastBlock.Get()
-		if self.lastBlock.SetIfEqualTo(bl, old) {
-			if old != nil {
-				old.Close()
-			}
-			break
-		}
-	}
-	return bid
+	log.Panicf("should be always used via fsTransaction.SaveNode")
+	return ibtree.BlockId("")
 }
 
 func (self *Fs) GetTransaction() *fsTransaction {
@@ -164,7 +139,7 @@ func NewFs(st *storage.Storage, rootName string, cacheSize int) *Fs {
 	fs.closing = make(chan chan struct{})
 	fs.flushInterval = 1 * time.Second
 	fs.inodeTracker.Init(fs)
-	fs.tree = ibtree.IBTree{}.Init(fs)
+	fs.tree = ibtree.IBTree{NodeMaximumSize: 4096}.Init(fs)
 	st.IterateReferencesCallback = func(id string, data []byte, cb storage.BlockReferenceCallback) {
 		fs.iterateReferencesCallback(id, data, cb)
 	}
@@ -248,18 +223,6 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 			cb(c.Value)
 		}
 	}
-}
-
-func (self *Fs) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *storage.StorageBlock {
-	mlog.Printf2("fs/fs", "fs.getStorageBlock %d", len(b))
-	// self.lock.AssertLocked() // should not be necessary
-	h := sha256.Sum256(b)
-	bid := h[:]
-	id := string(bid)
-	if nd != nil && self.nodeDataCache != nil {
-		self.nodeDataCache.Set(ibtree.BlockId(id), nd)
-	}
-	return self.storage.ReferOrStoreBlock0(id, b)
 }
 
 func (self *Fs) loadNodeFromBytes(bd []byte) *ibtree.IBNodeData {

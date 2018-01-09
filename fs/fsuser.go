@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Mon Jan  8 23:20:35 2018 mstenber
- * Edit time:     170 min
+ * Last modified: Tue Jan  9 09:33:17 2018 mstenber
+ * Edit time:     159 min
  *
  */
 
@@ -344,9 +344,10 @@ func (self *fsFile) Close() {
 
 func (self *fsFile) Seek(ofs int64, whence int) (ret int64, err error) {
 	var fi os.FileInfo
-	mlog.Printf2("fs/fsuser", "Seek %v %v", ofs, whence)
+	mlog.Printf2("fs/fsuser", "%v.Seek %v %v", self, ofs, whence)
 	fi, err = self.u.Stat(self.path)
 	if err != nil {
+		mlog.Printf2("fs/fsuser", " Seek encountered stat failure: %s", err)
 		return
 	}
 	ret = ofs
@@ -370,7 +371,7 @@ func (self *fsFile) Seek(ofs int64, whence int) (ret int64, err error) {
 	//	return
 	//}
 	self.pos = ret
-	mlog.Printf2("fs/fsuser", " pos now %v", self.pos)
+	mlog.Printf2("fs/fsuser", " after Seek: pos now %v", self.pos)
 	return
 }
 

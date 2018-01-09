@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  9 12:15:00 2018 mstenber
- * Edit time:     182 min
+ * Last modified: Tue Jan  9 13:10:31 2018 mstenber
+ * Edit time:     185 min
  *
  */
 
@@ -364,7 +364,9 @@ func TestFsParallel(t *testing.T) {
 
 				randomReaderWriter := func(path string, u *FSUser) {
 					f, err := u.OpenFile(path, uint32(os.O_CREATE|os.O_TRUNC|os.O_WRONLY), 0777)
-					assert.Nil(t, err)
+					if err != nil {
+						log.Panic("OpenFile:", err)
+					}
 					content := []byte{}
 					for i := 0; i < iter; i++ {
 						awlen := rand.Int() % ((i + 1) * nw)
@@ -377,7 +379,7 @@ func TestFsParallel(t *testing.T) {
 							nlen = len(content)
 						}
 						ncontent := make([]byte, nlen)
-						mlog.Printf("%v Writing @%v %d bytes of %v", path, ofs, len(b), s)
+						mlog.Printf2("fs/rawfs_test", "%v Writing @%v %d bytes of %v", path, ofs, len(b), s)
 						if ofs <= len(content) {
 							copy(ncontent, content[:ofs])
 						} else {
@@ -387,26 +389,34 @@ func TestFsParallel(t *testing.T) {
 						if len(content) > eofs {
 							copy(ncontent[eofs:], content[eofs:])
 						}
-						mlog.Printf(" eofs:%v", eofs)
+						mlog.Printf2("fs/rawfs_test", " eofs:%v", eofs)
 						_, err := f.Seek(int64(ofs), 0)
-						assert.Nil(t, err)
+						if err != nil {
+							log.Panic("seek:", err)
+						}
 
 						w, err := f.Write(b)
-						assert.Nil(t, err)
+						if err != nil {
+							log.Panic("write:", err)
+						}
 						assert.Equal(t, w, len(b))
 
 						_, err = f.Seek(0, 0)
-						assert.Nil(t, err)
+						if err != nil {
+							log.Panic("seek2:", err)
+						}
 
-						mlog.Printf("%v Reading %d bytes, ensuring they are same", path, nlen)
+						mlog.Printf2("fs/rawfs_test", "%v Reading %d bytes, ensuring they are same", path, nlen)
 
 						rcontent := make([]byte, nlen)
 						r, err := f.Read(rcontent)
-						assert.Nil(t, err)
+						if err != nil {
+							log.Panic("read:", err)
+						}
 						assert.Equal(t, r, nlen)
 
-						// mlog.Printf("exp: %x", ncontent)
-						// mlog.Printf("got: %x", rcontent)
+						// mlog.Printf2("fs/rawfs_test", "exp: %x", ncontent)
+						// mlog.Printf2("fs/rawfs_test", "got: %x", rcontent)
 						assert.Equal(t, ncontent, rcontent, "exp<>read mismatch")
 						if !bytes.Equal(ncontent, rcontent) {
 							log.Panic(".. snif")

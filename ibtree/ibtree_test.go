@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Mon Jan  8 17:01:28 2018 mstenber
- * Edit time:     255 min
+ * Last modified: Tue Jan  9 13:51:16 2018 mstenber
+ * Edit time:     256 min
  *
  */
 
@@ -64,6 +64,7 @@ func (self *DummyBackend) SaveNode(nd *IBNodeData) BlockId {
 	h := sha256.Sum256(b)
 	bid := BlockId(h[:])
 	self.h2nd[bid] = b
+	nd.CheckNodeStructure()
 	return bid
 }
 

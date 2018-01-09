@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Fri Jan  5 00:10:25 2018 mstenber
- * Edit time:     14 min
+ * Last modified: Tue Jan  9 12:46:02 2018 mstenber
+ * Edit time:     15 min
  *
  */
 
@@ -41,8 +41,13 @@ func (self *IBTransaction) Delete(key IBKey) {
 	mlog.Printf2("ibtree/ibtransaction", "tr.Delete %x", key)
 	self.stack.node().Delete(key, &self.stack)
 }
+
 func (self *IBTransaction) Commit() (*IBNode, BlockId) {
 	return self.stack.node().Commit()
+}
+
+func (self *IBTransaction) CommitTo(backend IBTreeSaver) (*IBNode, BlockId) {
+	return self.stack.node().CommitTo(backend)
 }
 
 func (self *IBTransaction) DeleteRange(key1, key2 IBKey) {

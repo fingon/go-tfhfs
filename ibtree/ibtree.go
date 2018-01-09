@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Fri Jan  5 23:17:03 2018 mstenber
- * Edit time:     705 min
+ * Last modified: Tue Jan  9 15:06:45 2018 mstenber
+ * Edit time:     721 min
  *
  */
 
@@ -22,7 +22,6 @@ package ibtree
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/fingon/go-tfhfs/mlog"
@@ -32,12 +31,19 @@ const hashSize = 32
 
 type BlockId string
 
-type IBTreeBackend interface {
-	// LoadNode loads node based on backend id.
-	LoadNode(id BlockId) *IBNodeData
-
+type IBTreeSaver interface {
 	// SaveNode persists the node, and returns the backend id for it.
 	SaveNode(nd *IBNodeData) BlockId
+}
+
+type IBTreeLoader interface {
+	// LoadNode loads node based on backend id.
+	LoadNode(id BlockId) *IBNodeData
+}
+
+type IBTreeBackend interface {
+	IBTreeLoader
+	IBTreeSaver
 }
 
 // IBTree represents static configuration that can be used over
@@ -102,20 +108,25 @@ type IBNode struct {
 }
 
 func (self *IBNodeData) String() string {
-	return fmt.Sprintf("IBNode{%p}", self)
+	return fmt.Sprintf("ibnd{%p}", self)
 }
+
+func (self *IBNode) String() string {
+	return fmt.Sprintf("ibn{%p}", self)
+}
+
 func (self *IBNode) Delete(key IBKey, st *IBStack) *IBNode {
 	self.search(key, st)
 	c := st.child()
 	if c.Key != key {
-		log.Panic("ibp.Delete: Key missing ", key)
+		mlog.Panicf("ibp.Delete: Key missing: %x", key)
 	}
 	st.rewriteAtIndex(true, nil)
 	return st.commit()
 }
 
-// Commit pushes dirty IBNode to disk, returning the new root.
-func (self *IBNode) Commit() (*IBNode, BlockId) {
+// CommitTo pushes dirty IBNode to the specified backend, returning the new root.
+func (self *IBNode) CommitTo(backend IBTreeSaver) (*IBNode, BlockId) {
 	// Iterate through the tree, updating the nodes as we go.
 
 	if self.blockId != nil {
@@ -125,11 +136,12 @@ func (self *IBNode) Commit() (*IBNode, BlockId) {
 
 	cl := self.Children
 	if !self.Leafy {
-		// Need to copy children
+		// Need to copy children if not leafy; leafy children
+		// are data-only, and therefore can be copied as is
 		cl = make([]*IBNodeDataChild, len(self.Children))
 		for i, c := range self.Children {
 			if c.childNode != nil {
-				_, bid := c.childNode.Commit()
+				_, bid := c.childNode.CommitTo(backend)
 				c = &IBNodeDataChild{Key: c.Key, Value: string(bid)}
 			}
 			cl[i] = c
@@ -139,15 +151,20 @@ func (self *IBNode) Commit() (*IBNode, BlockId) {
 	n := self.copy()
 	n.Children = cl
 
-	bid := self.tree.backend.SaveNode(&n.IBNodeData)
+	bid := backend.SaveNode(&n.IBNodeData)
 	n.blockId = &bid
 	mlog.Printf2("ibtree/ibtree", "in.Commit, new bid %x..", bid[:10])
 	return n, bid
 }
 
+// Commit pushes dirty IBNode to default backend, returning the new root.
+func (self *IBNode) Commit() (*IBNode, BlockId) {
+	return self.CommitTo(self.tree.backend)
+}
+
 func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	if key1 > key2 {
-		log.Panic("ibt.DeleteRange: first key more than second key", key1, key2)
+		mlog.Panicf("ibt.DeleteRange: first key more than second key: %x > %x", key1, key2)
 	}
 	mlog.Printf2("ibtree/ibtree", "DeleteRange [%v..%v]", key1, key2)
 	st2.top = 0
@@ -244,10 +261,10 @@ func (self *IBNode) search(key IBKey, st *IBStack) {
 	if st.nodes[0] == nil {
 		st.nodes[0] = self
 	} else if self != st.nodes[0] {
-		log.Panic("historic/wrong self:", self, " != ", st.nodes[0])
+		mlog.Panicf("historic/wrong self:%v != %v", self, st.nodes[0])
 	}
 	if st.top > 0 {
-		log.Panic("leftover stack")
+		mlog.Panicf("leftover stack")
 	}
 	st.search(key)
 }
@@ -272,7 +289,7 @@ func (self *IBNode) childNode(idx int) *IBNode {
 	bid := BlockId(c.Value)
 	nd := self.tree.backend.LoadNode(bid)
 	if nd == nil {
-		log.Panicf("childNode - backend LoadNode for %x failed", bid)
+		mlog.Panicf("childNode - backend LoadNode for %x failed", bid)
 	}
 	return &IBNode{tree: self.tree, blockId: &bid, IBNodeData: *nd}
 }
@@ -323,19 +340,24 @@ func (self *IBNode) iterateLeafFirst(fun func(n *IBNode)) {
 	fun(self)
 }
 
-func (self *IBNode) checkTreeStructure() {
-	self.iterateLeafFirst(func(n *IBNode) {
-		for i, c := range n.Children {
-			if i > 0 {
-				k0 := n.Children[i-1].Key
-				if k0 >= c.Key {
-					defer mlog.SetPattern(".")()
-					self.PrintToMLogDirty()
-					log.Panic("tree broke: ", k0, " >= ", c.Key)
-				}
+// CheckNodeStructure allows sanity checking a node's content (should not be really used except for debugging)
+func (self *IBNodeData) CheckNodeStructure() {
+	for i, c := range self.Children {
+		if c.Key == "" {
+			mlog.Panicf("tree broke: empty key at [%d] of %v", i, self)
+		}
+		if i > 0 {
+			k0 := self.Children[i-1].Key
+			if k0 >= c.Key {
+				mlog.Panicf("tree broke: '%x'[%d] >= '%x'[%d]", k0, i-1, c.Key, i)
 			}
 		}
+	}
+}
 
+func (self *IBNode) checkTreeStructure() {
+	self.iterateLeafFirst(func(n *IBNode) {
+		n.CheckNodeStructure()
 	})
 }
 

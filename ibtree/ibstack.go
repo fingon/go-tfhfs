@@ -4,13 +4,14 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Wed Dec 27 17:19:12 2017 mstenber
- * Last modified: Mon Jan  8 12:00:49 2018 mstenber
- * Edit time:     146 min
+ * Last modified: Tue Jan  9 15:05:55 2018 mstenber
+ * Edit time:     154 min
  *
  */
 package ibtree
 
 import (
+	"fmt"
 	"log"
 	"sort"
 
@@ -101,13 +102,18 @@ func (self *IBStack) rewriteNodeChildren(children []*IBNodeDataChild) {
 	if n.Leafy && n.Msgsize() <= n.tree.smallSize {
 		self.smallCount++
 	}
+	// This could be skipped in an emergency but for now it is cheap way to ensure tree stays sane
+	n.CheckNodeStructure()
 }
 
-func (self *IBStack) rewriteNodeChildrenWithCopyOf(children []*IBNodeDataChild) {
-	ochildren := children
-	children = make([]*IBNodeDataChild, len(ochildren))
+func (self *IBStack) rewriteNodeChildrenWithCopyOf(ochildren []*IBNodeDataChild) {
+	children := make([]*IBNodeDataChild, len(ochildren))
 	copy(children, ochildren)
 	self.rewriteNodeChildren(children)
+}
+
+func (self *IBNodeDataChild) String() string {
+	return fmt.Sprintf("ibnc<%x,%x,%v>", self.Key, self.Value, self.childNode)
 }
 
 func (self *IBStack) child() *IBNodeDataChild {
@@ -151,14 +157,15 @@ func (self *IBStack) popNode() *IBNode {
 
 func (self *IBStack) pop() {
 	n := self.popNode()
-	key := IBKey("")
 	if len(n.Children) > 0 {
-		key = n.Children[0].Key
+		key := n.Children[0].Key
+		c := &IBNodeDataChild{Key: key,
+			Value:     n.tree.placeholderValue,
+			childNode: n}
+		self.rewriteAtIndex(true, c)
+	} else {
+		self.rewriteAtIndex(true, nil)
 	}
-	c := &IBNodeDataChild{Key: key,
-		Value:     n.tree.placeholderValue,
-		childNode: n}
-	self.rewriteAtIndex(true, c)
 }
 
 func (self *IBStack) push(index int, node *IBNode) {

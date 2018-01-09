@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:53:36 2017 mstenber
- * Last modified: Fri Jan  5 23:20:41 2018 mstenber
- * Edit time:     62 min
+ * Last modified: Tue Jan  9 15:12:04 2018 mstenber
+ * Edit time:     63 min
  *
  */
 
@@ -57,6 +57,7 @@ func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
 
 		// Best cast first - they seem to be same exactly;
 		// direct omit and no need to recurse
+		mlog.Printf2("ibtree/delta", " c0 %v c %v", c0, c)
 		if n.Leafy == n0.Leafy && c != nil && c0 != nil && *c == *c0 {
 			mlog.Printf2("ibtree/delta", " same -> next")
 			st0.nextIndex()

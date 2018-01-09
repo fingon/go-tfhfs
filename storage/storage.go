@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Sat Jan  6 02:22:39 2018 mstenber
- * Edit time:     542 min
+ * Last modified: Tue Jan  9 10:48:31 2018 mstenber
+ * Edit time:     553 min
  *
  */
 
@@ -190,7 +190,7 @@ func (self *Storage) run() {
 			}
 			b.addStorageRefCount(job.count)
 		case jobSetNameToBlockId:
-			self.getName(job.name).new_value = job.id
+			self.setNameToBlockId(job.name, job.id)
 		default:
 			log.Panicf("Unknown job type: %d", job.jobType)
 		}
@@ -220,6 +220,17 @@ func (self *Storage) GetBlockIdByName(name string) string {
 	}
 	jr := <-out
 	return jr.id
+}
+
+func (self *Storage) setNameToBlockId(name, bid string) {
+	if bid != "" {
+		self.getBlockById(bid).addStorageRefCount(1)
+	}
+	n := self.getName(name)
+	if n.new_value != "" {
+		self.getBlockById(n.new_value).addStorageRefCount(-1)
+	}
+	n.new_value = bid
 }
 
 func (self *Storage) storeBlockInternal(jobType jobType, id string, data []byte, count int32) *StorageBlock {
@@ -323,6 +334,9 @@ func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
 	if v.new_value != "" {
 		b := self.getBlockById(v.new_value)
 		b.addRefCount(1)
+		// the new_value retains its +1 storage refcount as
+		// otherwise bookkeeping gets ugly in
+		// e.g. setNameToBlockId.
 	}
 	if v.old_value != "" {
 		b := self.getBlockById(v.old_value)

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 13:41:33 2017 mstenber
- * Last modified: Tue Jan  9 09:27:12 2018 mstenber
- * Edit time:     92 min
+ * Last modified: Tue Jan  9 14:33:28 2018 mstenber
+ * Edit time:     100 min
  *
  */
 
@@ -159,6 +159,12 @@ func Printf(format string, args ...interface{}) {
 	Printf2(file, format, args...)
 }
 
+// Panicf provides goroutine id if any, and falls back to log.Panicf.
+func Panicf(format string, args ...interface{}) {
+	format = fmt.Sprintf("%8d %s", gid.GetGoroutineID(), format)
+	logger.Panicf(format, args...)
+}
+
 var dumpGids = true
 
 // Printf2 is the premier choice instead of Printf. It is supplied
@@ -202,7 +208,6 @@ func Printf2(file string, format string, args ...interface{}) {
 			format = fmt.Sprint(strings.Repeat(".", depth), format)
 		}
 
-		// Bake in goroutine id
 		if dumpGids {
 			format = fmt.Sprintf("%8d %s", gid.GetGoroutineID(), format)
 		}

@@ -4,16 +4,17 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Tue Jan  9 14:32:15 2018 mstenber
- * Edit time:     124 min
+ * Last modified: Wed Jan 10 00:19:17 2018 mstenber
+ * Edit time:     136 min
  *
  */
 
 package fs
 
 import (
-	"crypto/sha256"
 	"log"
+
+	"github.com/minio/sha256-simd"
 
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
@@ -116,6 +117,20 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 		mlog.Printf2("fs/fstransaction", " root has changed under us; doing delta")
 		tr := newFsTransaction(self.fs)
 		defer tr.Close()
+		setIfNewer := func(newC *ibtree.IBNodeDataChild) {
+			bk := blockKey(newC.Key)
+			if bk.SubType() == BST_META {
+				ourMeta := decodeInodeMeta(newC.Value)
+				op := tr.t.Get(ibtree.IBKey(newC.Key))
+				if op != nil {
+					theirMeta := decodeInodeMeta(*op)
+					if theirMeta.StAtimeNs > ourMeta.StAtimeNs {
+						return
+					}
+				}
+			}
+			tr.t.Set(newC.Key, newC.Value)
+		}
 		node.IterateDelta(self.root.node,
 			func(oldC, newC *ibtree.IBNodeDataChild) {
 				if newC == nil {
@@ -128,11 +143,11 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 				} else if oldC == nil {
 					// Insert
 					mlog.Printf2("fs/fstransaction", " insert %x", newC.Key)
-					tr.t.Set(newC.Key, newC.Value)
+					setIfNewer(newC)
 				} else {
 					// Update
 					mlog.Printf2("fs/fstransaction", " update %x", newC.Key)
-					tr.t.Set(newC.Key, newC.Value)
+					setIfNewer(newC)
 				}
 			})
 		mlog.Printf2("fs/fstransaction", " delta done")

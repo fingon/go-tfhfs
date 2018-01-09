@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Jan  9 13:16:25 2018 mstenber
- * Edit time:     306 min
+ * Last modified: Wed Jan 10 00:19:37 2018 mstenber
+ * Edit time:     307 min
  *
  */
 
@@ -284,6 +284,17 @@ func (self *inode) RemoveChildByName(name string) {
 	}
 }
 
+func decodeInodeMeta(v string) *InodeMeta {
+	var m InodeMeta
+	_, err := m.UnmarshalMsg([]byte(v))
+	if err != nil {
+		log.Panic(err)
+	}
+	mlog.Printf2("fs/inode", " = %v", &m)
+	return &m
+
+}
+
 func (self *inode) getMeta() *InodeMeta {
 	mlog.Printf2("fs/inode", "inode.Meta #%d", self.ino)
 	k := NewblockKey(self.ino, BST_META, "")
@@ -294,13 +305,7 @@ func (self *inode) getMeta() *InodeMeta {
 		mlog.Printf2("fs/inode", " not found")
 		return nil
 	}
-	var m InodeMeta
-	_, err := m.UnmarshalMsg([]byte(*v))
-	if err != nil {
-		log.Panic(err)
-	}
-	mlog.Printf2("fs/inode", " = %v", &m)
-	return &m
+	return decodeInodeMeta(*v)
 }
 
 func (self *inode) Meta() *InodeMeta {

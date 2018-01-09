@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Tue Jan  9 14:26:32 2018 mstenber
- * Edit time:     356 min
+ * Last modified: Wed Jan 10 00:12:14 2018 mstenber
+ * Edit time:     361 min
  *
  */
 
@@ -355,7 +355,8 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 	}
 
 	// We're done; the rest is just persisting things to disk which we pretend is instant (cough).
-	changed := self.inode.SetMetaInTransaction(meta, tr)
+	meta.setTimesNow(true, true, true)
+	self.inode.SetMetaInTransaction(meta, tr)
 
 	self.inode.metaWriteLock.ClearOwner()
 	locked.ClearOwner()
@@ -367,18 +368,18 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		defer unlock()
 		defer tr.Close()
 
-		if changed {
-			tr.CommitUntilSucceeds()
-			mlog.Printf2("fs/fh", " updated metadata: %v", meta)
-		} else {
-			mlog.Printf2("fs/fh", " metadata not changed")
-		}
-		unlockmeta()
-
-		// Here all that is left is persisting data to disk, if need be
-
+		// If file data is part of meta, we have to commit it
+		// before metadata is unlocked; if not, last write
+		// will implicitly use shared metadata _anyway_ if
+		// there is conflicting one (and conflict resolution
+		// will pick the later one).
 		if done {
+			tr.CommitUntilSucceeds()
+			unlockmeta()
 			return
+		} else {
+			unlockmeta()
+			tr.CommitUntilSucceeds()
 		}
 
 		// It wasn't small file. Perform write inside transaction, but

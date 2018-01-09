@@ -202,7 +202,7 @@ func (self *Block) updateDependencies(add, storage bool, stp *BlockStatus) {
 		}
 		self.haveDiskRefs = add
 	}
-	mlog.Printf2("storage/storage", "%v.updateDependencies %v %v %v", self, add, storage, st)
+	mlog.Printf2("storage/block", "%v.updateDependencies %v %v %v", self, add, storage, st)
 
 	self.storage.IterateReferencesCallback(self.Id, self.GetData(), func(id string) {
 		b := self.storage.getBlockById(id)

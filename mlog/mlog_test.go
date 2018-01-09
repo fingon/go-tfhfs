@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 14:31:18 2017 mstenber
- * Last modified: Sun Jan  7 16:05:21 2018 mstenber
- * Edit time:     26 min
+ * Last modified: Tue Jan  9 09:26:12 2018 mstenber
+ * Edit time:     28 min
  *
  */
 
@@ -23,6 +23,7 @@ import (
 )
 
 func TestMlog(t *testing.T) {
+	dumpGids = false
 	add := func(pattern string, outputted bool) {
 		t.Run(pattern, func(t *testing.T) {
 			log.Printf("pattern:%s outputted:%v", pattern, outputted)
@@ -44,6 +45,7 @@ func TestMlog(t *testing.T) {
 }
 
 func TestMLogRecursion(t *testing.T) {
+	dumpGids = false
 	var b bytes.Buffer
 	logger := log.New(&b, "", 0)
 	reset()

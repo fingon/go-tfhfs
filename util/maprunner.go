@@ -4,14 +4,19 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 16:45:31 2018 mstenber
- * Last modified: Sun Jan  7 17:50:38 2018 mstenber
- * Edit time:     22 min
+ * Last modified: Wed Jan 10 10:54:22 2018 mstenber
+ * Edit time:     37 min
  *
  */
 
 package util
 
-import "log"
+import (
+	"log"
+	"sync"
+
+	"github.com/fingon/go-tfhfs/mlog"
+)
 
 type MapRunnerCallback func()
 
@@ -24,14 +29,18 @@ type MapRunner struct {
 	blockedPerTarget map[interface{}]*MapRunnerCallbackList
 	lock             MutexLocked
 	closing, closed  bool
-	died             chan struct{}
+	died             sync.Cond
+	Ran, Queued      int
 }
 
 // Close runs to completion current (and subsequently queued items)
 // until we can close cleanly.
 func (self *MapRunner) Close() {
+	defer self.lock.Locked()()
+	if self.busy == nil {
+		return
+	}
 	check := func() bool {
-		defer self.lock.Locked()
 		self.closing = true
 		if len(self.busy) == 0 {
 			return true
@@ -40,18 +49,20 @@ func (self *MapRunner) Close() {
 		return false
 	}
 	for !check() {
-		<-self.died
+		self.died.Wait()
 	}
 }
 
 func (self *MapRunner) Run(key interface{}, cb MapRunnerCallback) {
 	defer self.lock.Locked()()
 	if self.busy == nil {
-		self.died = make(chan struct{})
+		self.died.L = &self.lock
 		self.busy = make(map[interface{}]bool)
 		self.blockedPerTarget = make(map[interface{}]*MapRunnerCallbackList)
 	}
 	if self.busy[key] {
+		mlog.Printf("mr.Run queued")
+		self.Queued++
 		l := self.blockedPerTarget[key]
 		if l == nil {
 			l = &MapRunnerCallbackList{}
@@ -60,10 +71,12 @@ func (self *MapRunner) Run(key interface{}, cb MapRunnerCallback) {
 		l.PushBack(cb)
 		return
 	}
+	self.Ran++
 	if self.closed {
 		log.Panicf("Attempt to .Run() on closed MapRunner")
 	}
 	// It's not busy, we can just start goroutine and mark it busy
+	mlog.Printf("mr.Run immediate")
 	self.busy[key] = true
 	go func() {
 		self.run(key, cb)
@@ -81,13 +94,15 @@ func (self *MapRunner) checkMore(key interface{}) MapRunnerCallback {
 	defer self.lock.Locked()()
 	l, ok := self.blockedPerTarget[key]
 	if !ok || l.Front == nil {
+		mlog.Printf("checkMore: nothing in queue")
 		if self.closing {
-			self.died <- struct{}{}
+			self.died.Signal()
 		}
 		delete(self.busy, key)
 		delete(self.blockedPerTarget, key)
 		return nil
 	}
+	mlog.Printf("checkMore: popped from queue")
 	cb := l.Front.Value
 	l.Remove(l.Front)
 	return cb

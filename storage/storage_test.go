@@ -138,13 +138,13 @@ func ProdStorageDeps(t *testing.T, be storage.Backend) {
 		IterateReferencesCallback: func(id string, data []byte, cb storage.BlockReferenceCallback) {
 			s := string(data)
 			if string(data) != k2v[id] {
-				mlog.Printf("data mismatch: %s <> %s", s, k2v[id])
+				mlog.Printf2("storage/storage_test", "data mismatch: %s <> %s", s, k2v[id])
 				broken = true
 			}
-			mlog.Printf("id:%v data:%v", id, s)
+			mlog.Printf2("storage/storage_test", "id:%v data:%v", id, s)
 			for _, subid := range strings.Split(s, " ") {
 				if subid != "" {
-					mlog.Printf(" %v", subid)
+					mlog.Printf2("storage/storage_test", " %v", subid)
 					cb(subid)
 				}
 			}

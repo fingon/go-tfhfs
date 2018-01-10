@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Wed Jan 10 12:46:46 2018 mstenber
- * Edit time:     218 min
+ * Last modified: Wed Jan 10 13:43:04 2018 mstenber
+ * Edit time:     228 min
  *
  */
 
@@ -117,18 +117,12 @@ func (self *Block) flush() int {
 		self.Backend = self.storage.Backend
 		ops++
 	} else {
-		if self.Stored.Status != self.Status {
-			// self.Stored.status != self.status
-			if self.Status == BlockStatus_MISSING {
-				// old type = NORMAL
-			} else if self.Status == BlockStatus_WANT_WEAK {
-				// old type = WEAK
-			} else {
-				mlog.Printf2("storage/block", " status changed")
-				self.shouldHaveDiskDependencies(true)
-				// Remove old disk dependencies
-				self.updateDependencies(false, false, &self.Stored.Status)
-			}
+		if self.Stored.Status != self.Status && self.haveDiskRefs {
+			mlog.Printf2("storage/block", " status changed")
+			// Add dependencies with current status
+			self.updateDependencies(true, false, &self.Status)
+			// Remove old disk dependencies if they existed
+			self.updateDependencies(false, false, &self.Stored.Status)
 			ops++
 		}
 		ops += self.storage.Backend.UpdateBlock(self)

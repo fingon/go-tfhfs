@@ -6,13 +6,14 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Tue Jan  2 15:24:47 2018 mstenber
-# Last modified: Wed Jan 10 17:02:59 2018 mstenber
-# Edit time:     37 min
+# Last modified: Wed Jan 10 22:12:17 2018 mstenber
+# Edit time:     47 min
 #
 
 STORAGEDIR=/tmp/sanity-tfhfs-storage
 MOUNTDIR=/tmp/x
 MLOG=.
+ARGS=${ARGS:-}
 
 out () {
     echo $*
@@ -24,23 +25,23 @@ mount2 () {
     if [ $# == 1 ]; then
         if [ "$1" = "d" ]; then
             # debug
-            MLOG=$MLOG ./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
+            MLOG=$MLOG ./tfhfs `echo $ARGS` $MOUNTDIR $STORAGEDIR >& ,log2 &
             # profile
             return
         fi
         if [ "$1" = "p" ]; then
             # profiling
-            ./tfhfs -memprofile mem.prof -cpuprofile cpu.prof $MOUNTDIR $STORAGEDIR >& ,log2 &
+            ./tfhfs `echo $ARGS` -memprofile mem.prof -cpuprofile cpu.prof $MOUNTDIR $STORAGEDIR >& ,log2 &
             return
         fi
         if [ "$1" = "r" ]; then
             # race detector
-            go run -race ./tfhfs.go $MOUNTDIR $STORAGEDIR >& ,log2 &
+            go run `echo $ARGS` -race ./tfhfs.go $MOUNTDIR $STORAGEDIR >& ,log2 &
             return
         fi
     fi
     # fast
-    ./tfhfs $MOUNTDIR $STORAGEDIR >& ,log2 &
+    ./tfhfs `echo $ARGS` $MOUNTDIR $STORAGEDIR >& ,log2 &
 }
 
 waitmount () {
@@ -53,7 +54,7 @@ rm -rf $MOUNTDIR
 mkdir -p $MOUNTDIR
 rm -rf $STORAGEDIR
 mkdir -p $STORAGEDIR
-MLOG=$MLOG ./tfhfs $MOUNTDIR $STORAGEDIR >& ,log &
+MLOG=$MLOG ./tfhfs `echo $ARGS`  $MOUNTDIR $STORAGEDIR >& ,log &
 waitmount
 ORIGDIR=`pwd`
 cd $MOUNTDIR

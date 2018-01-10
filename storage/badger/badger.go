@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Wed Jan 10 11:28:25 2018 mstenber
- * Edit time:     143 min
+ * Last modified: Wed Jan 10 16:55:37 2018 mstenber
+ * Edit time:     145 min
  *
  */
 
@@ -53,6 +53,7 @@ func (self *badgerBackend) Init(config storage.BackendConfiguration) {
 }
 
 func (self *badgerBackend) Close() {
+	mlog.Printf2("storage/badger/badger", "bad.Close")
 	self.db.Close()
 }
 

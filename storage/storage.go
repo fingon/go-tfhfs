@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan 10 13:57:00 2018 mstenber
- * Edit time:     594 min
+ * Last modified: Wed Jan 10 17:32:48 2018 mstenber
+ * Edit time:     603 min
  *
  */
 
@@ -100,9 +100,22 @@ type jobIn struct {
 type blockMap map[string]*Block
 
 type Storage struct {
-	Backend                   Backend
+	// Backend specifies the backend to use.
+	Backend Backend
+
+	// IterateReferencesCallback is used to find block references
+	// inside block data.
 	IterateReferencesCallback BlockIterateReferencesCallback
-	Codec                     codec.Codec
+
+	// QueueLength specifies how long channel queue is there for
+	// storage operations. Zero means unbuffered (which is fancy
+	// for debugging but crap performance-wise).
+	QueueLength int
+
+	// Codec (if set) specifies the codec used to encode the data
+	// before it is stored in backend, or to decode it when
+	// fetching it from backend
+	Codec codec.Codec
 
 	// blocks is Block object herd; they are reference counted, so
 	// as long as someone keeps a reference to one, it stays
@@ -121,7 +134,7 @@ type Storage struct {
 // Init sets up the default values to be usable
 func (self Storage) Init() *Storage {
 	self.names = make(map[string]*oldNewStruct)
-	self.jobChannel = make(chan *jobIn, 100)
+	self.jobChannel = make(chan *jobIn, self.QueueLength)
 	self.blocks = make(blockMap)
 	self.dirtyBlocks = make(blockMap)
 
@@ -147,6 +160,7 @@ func (self *Storage) Close() {
 	<-out
 
 	if self.Backend != nil {
+		mlog.Printf2("storage/storage", "Storage also closing Backend")
 		self.Backend.Close()
 	}
 }
@@ -180,6 +194,10 @@ func (self *Storage) run() {
 			b := &Block{Id: job.id,
 				storage: self,
 			}
+			//nd := make([]byte, len(job.data))
+			//mlog.Printf2("storage/storage", "allocated size:%d", len(job.data))
+			//copy(nd, job.data)
+			//b.Data.Set(&nd)
 			b.Data.Set(&job.data)
 			self.blocks[job.id] = b
 			b.setStatus(job.status)
@@ -196,7 +214,7 @@ func (self *Storage) run() {
 			if b == nil {
 				log.Panicf("block id %x disappeared", job.id)
 			}
-			b.externalStorageRefCount += job.count
+			b.addExternalStorageRefCount(job.count)
 			b.addStorageRefCount(job.count)
 		case jobSetNameToBlockId:
 			self.setNameToBlockId(job.name, job.id)

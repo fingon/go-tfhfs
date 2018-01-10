@@ -4,20 +4,26 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Wed Jan 10 13:56:20 2018 mstenber
- * Edit time:     12 min
+ * Last modified: Wed Jan 10 16:47:50 2018 mstenber
+ * Edit time:     21 min
  *
  */
 
 package storage
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+
+	"github.com/fingon/go-tfhfs/mlog"
+)
 
 // StorageBlock is the public read-only view of a block to the outside
 // world. All provided methods are synchronous, and actually cause
 // changes to be propagated to Storage (eventually) if need be.
 type StorageBlock struct {
-	block *Block
+	block  *Block
+	closed bool
 }
 
 func NewStorageBlock(b *Block) *StorageBlock {
@@ -27,12 +33,20 @@ func NewStorageBlock(b *Block) *StorageBlock {
 	// These are created only in main goroutine so this is fine;
 	// however, as the objects are passed to clients, see below..
 	b.addStorageRefCount(1)
-	b.externalStorageRefCount++
-	return &StorageBlock{block: b}
+	b.addExternalStorageRefCount(1)
+	self := &StorageBlock{block: b}
+	mlog.Printf2("storage/storageblock", "NewStorageBlock:%v", self)
+	return self
 }
 
-func (self *StorageBlock) Open() {
+func (self *StorageBlock) Open() *StorageBlock {
+	if self.closed {
+		log.Panic("use after close of ", self)
+	}
+	sb := &StorageBlock{block: self.block}
+	mlog.Printf2("storage/storageblock", "%v.Open => %v", self, sb)
 	self.block.storage.ReferStorageBlockId(self.block.Id)
+	return sb
 }
 
 func (self *StorageBlock) Close() {
@@ -42,25 +56,43 @@ func (self *StorageBlock) Close() {
 	//
 	// self.block.addStorageRefCount(-1)
 
+	mlog.Printf2("storage/storageblock", "%v.Close", self)
+	if self.closed {
+		log.Panic("double close of StorageBlock")
+	}
+	self.closed = true
 	self.block.storage.ReleaseStorageBlockId(self.block.Id)
 }
 
 func (self *StorageBlock) Id() string {
+	if self.closed {
+		log.Panic("use after close of ", self)
+	}
 	return self.block.Id
 }
 
 func (self *StorageBlock) Data() []byte {
+	if self.closed {
+		log.Panic("use after close  of ", self)
+	}
 	return self.block.GetData()
 }
 
 func (self *StorageBlock) Status() BlockStatus {
+	if self.closed {
+		log.Panic("use after close  of ", self)
+	}
 	return self.block.Status
 }
 
 func (self *StorageBlock) SetStatus(status BlockStatus) {
+	if self.closed {
+		log.Panic("use after close  of ", self)
+	}
 	self.block.setStatus(status)
 }
 
 func (self *StorageBlock) String() string {
-	return fmt.Sprintf("SB{%v}", self.block)
+	return fmt.Sprintf("SB@%p{%v}", self, self.block)
+	// return fmt.Sprintf("SB{%v}", self.block)
 }

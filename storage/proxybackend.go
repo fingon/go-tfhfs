@@ -4,12 +4,14 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sat Jan  6 00:08:05 2018 mstenber
- * Last modified: Wed Jan 10 11:29:19 2018 mstenber
+ * Last modified: Wed Jan 10 16:56:15 2018 mstenber
  * Edit time:     6 min
  *
  */
 
 package storage
+
+import "github.com/fingon/go-tfhfs/mlog"
 
 type proxyBackend struct {
 	BackendConfiguration
@@ -31,6 +33,7 @@ func (self *proxyBackend) Init(config BackendConfiguration) {
 }
 
 func (self *proxyBackend) Close() {
+	mlog.Printf2("storage/proxybackend", "proxying backend Close()")
 	self.Backend.Close()
 }
 

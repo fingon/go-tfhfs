@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Wed Jan 10 13:10:03 2018 mstenber
- * Edit time:     226 min
+ * Last modified: Wed Jan 10 16:40:16 2018 mstenber
+ * Edit time:     227 min
  *
  */
 
@@ -121,7 +121,7 @@ func ProdStorageOne(t *testing.T, s *storage.Storage) {
 	// assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
 	// assert.Equal(t, s.blocks.Get().Len(), 2)
 	b.Close()
-	b.Close()
+	b2.Close()
 	b3.Close()
 	// assert.Equal(t, int(b.storageRefCount), 0)
 	// assert.Equal(t, int(b3.storageRefCount), 0)

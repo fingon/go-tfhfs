@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Wed Jan 10 13:58:12 2018 mstenber
- * Edit time:     230 min
+ * Last modified: Wed Jan 10 16:16:51 2018 mstenber
+ * Edit time:     233 min
  *
  */
 
@@ -180,6 +180,14 @@ func (self *Block) addStorageRefCount(v int32) {
 		// Ensure we have at least in-memory references to dependencies
 		self.shouldHaveStorageDependencies(true)
 
+	}
+}
+
+func (self *Block) addExternalStorageRefCount(v int32) {
+	mlog.Printf2("storage/block", "%v.addExternalStorageRefCount %v", self, v)
+	self.externalStorageRefCount += v
+	if self.externalStorageRefCount < 0 {
+		log.Panic("Negative reference count", self.externalStorageRefCount)
 	}
 }
 

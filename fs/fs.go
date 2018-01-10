@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan 10 12:02:44 2018 mstenber
- * Edit time:     316 min
+ * Last modified: Wed Jan 10 13:51:41 2018 mstenber
+ * Edit time:     318 min
  *
  */
 
@@ -48,6 +48,9 @@ type Fs struct {
 	root                 fsTreeRootAtomicPointer
 	nodeDataCache        gcache.Cache
 	transactionRetryLock util.MutexLocked
+
+	transactions     map[*fsTransaction]bool
+	transactionsLock util.MutexLocked
 }
 
 func (self *Fs) Close() {
@@ -87,6 +90,10 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 func (self *Fs) Flush() {
 	mlog.Printf2("fs/fs", "fs.Flush started")
 	self.storage.Flush()
+	defer self.transactionsLock.Locked()()
+	if len(self.transactions) > 0 {
+		mlog.Printf(" # of transactions active:%d", len(self.transactions))
+	}
 	mlog.Printf2("fs/fs", " .. done with fs.Flush")
 }
 
@@ -125,6 +132,7 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 
 func NewFs(st *storage.Storage, rootName string, cacheSize int) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
+	fs.transactions = make(map[*fsTransaction]bool)
 	if cacheSize > 0 {
 		fs.nodeDataCache = gcache.New(cacheSize).
 			ARC().

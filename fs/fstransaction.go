@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Wed Jan 10 01:14:25 2018 mstenber
- * Edit time:     144 min
+ * Last modified: Wed Jan 10 13:49:08 2018 mstenber
+ * Edit time:     150 min
  *
  */
 
@@ -45,8 +45,12 @@ func newFsTransaction(fs *Fs) *fsTransaction {
 		mlog.Printf2("fs/fstransaction", "newFsTransaction - root:%v", root.block)
 		root.block.Open()
 	}
-	return &fsTransaction{fs: fs, root: root,
+	tr := &fsTransaction{fs: fs, root: root,
 		t: ibtree.NewTransaction(root.node)}
+	mlog.Printf("newTransaction %p", tr)
+	defer fs.transactionsLock.Locked()()
+	fs.transactions[tr] = true
+	return tr
 }
 
 // ibtree.IBTreeSaver API
@@ -197,6 +201,9 @@ func (self *fsTransaction) Close() {
 	if self.root.block != nil {
 		self.root.block.Close()
 	}
+
+	defer self.fs.transactionsLock.Locked()()
+	delete(self.fs.transactions, self)
 }
 
 // getStorageBlock block ids for given bytes/data.
@@ -209,13 +216,14 @@ func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *sto
 		self.fs.nodeDataCache.Set(ibtree.BlockId(id), nd)
 	}
 	bl := self.fs.storage.ReferOrStoreBlock0(id, b)
-	if bl != nil {
-		defer self.blockLock.Locked()()
-		if self.blocks == nil {
-			self.blocks = make(map[string]*storage.StorageBlock)
-		}
-		self.blocks[bl.Id()] = bl
+	if bl == nil {
+		return nil
 	}
+	defer self.blockLock.Locked()()
+	if self.blocks == nil {
+		self.blocks = make(map[string]*storage.StorageBlock)
+	}
+	self.blocks[bl.Id()] = bl
 	return bl
 }
 

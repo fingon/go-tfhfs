@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Tue Jan  9 12:51:44 2018 mstenber
- * Edit time:     11 min
+ * Last modified: Wed Jan 10 13:56:20 2018 mstenber
+ * Edit time:     12 min
  *
  */
 
@@ -27,6 +27,7 @@ func NewStorageBlock(b *Block) *StorageBlock {
 	// These are created only in main goroutine so this is fine;
 	// however, as the objects are passed to clients, see below..
 	b.addStorageRefCount(1)
+	b.externalStorageRefCount++
 	return &StorageBlock{block: b}
 }
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Wed Jan 10 13:43:04 2018 mstenber
- * Edit time:     228 min
+ * Last modified: Wed Jan 10 13:58:12 2018 mstenber
+ * Edit time:     230 min
  *
  */
 
@@ -46,8 +46,13 @@ type Block struct {
 	// Storage this is stored on, if any
 	storage *Storage
 
-	// In-memory reference count (from within Storage)
+	// In-memory reference count
 	storageRefCount int32
+
+	// In-memory reference count (subset of storageCount that have
+	// come due to serving API (new StorageBlocks) or via
+	// subsequent Open/Close calls of StorageBlocks)
+	externalStorageRefCount int32
 
 	// TBD: would flags be better?
 	haveDiskRefs, haveStorageRefs bool
@@ -88,7 +93,7 @@ func (self *Block) String() string {
 		id = id[:idLenInString]
 	}
 
-	return fmt.Sprintf("Bl@%p{Id:%x, rc:%v/src:%v}", self, id, self.RefCount, self.storageRefCount)
+	return fmt.Sprintf("Bl@%p{Id:%x, rc:%v/src:%v/erc:%v}", self, id, self.RefCount, self.storageRefCount, self.externalStorageRefCount)
 }
 
 func (self *Block) flush() int {
@@ -268,6 +273,7 @@ func (self *Storage) getBlockById(id string) *Block {
 		}
 		b.storage = self
 		b.storageRefCount = 0
+		b.externalStorageRefCount = 0
 		b.haveDiskRefs = true
 		b.haveStorageRefs = false
 		b.Stored = nil

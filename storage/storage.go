@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan 10 12:42:07 2018 mstenber
- * Edit time:     588 min
+ * Last modified: Wed Jan 10 13:57:00 2018 mstenber
+ * Edit time:     594 min
  *
  */
 
@@ -196,6 +196,7 @@ func (self *Storage) run() {
 			if b == nil {
 				log.Panicf("block id %x disappeared", job.id)
 			}
+			b.externalStorageRefCount += job.count
 			b.addStorageRefCount(job.count)
 		case jobSetNameToBlockId:
 			self.setNameToBlockId(job.name, job.id)

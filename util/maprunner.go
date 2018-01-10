@@ -61,7 +61,7 @@ func (self *MapRunner) Run(key interface{}, cb MapRunnerCallback) {
 		self.blockedPerTarget = make(map[interface{}]*MapRunnerCallbackList)
 	}
 	if self.busy[key] {
-		mlog.Printf("mr.Run queued")
+		mlog.Printf2("util/maprunner", "mr.Run queued")
 		self.Queued++
 		l := self.blockedPerTarget[key]
 		if l == nil {
@@ -76,7 +76,7 @@ func (self *MapRunner) Run(key interface{}, cb MapRunnerCallback) {
 		log.Panicf("Attempt to .Run() on closed MapRunner")
 	}
 	// It's not busy, we can just start goroutine and mark it busy
-	mlog.Printf("mr.Run immediate")
+	mlog.Printf2("util/maprunner", "mr.Run immediate")
 	self.busy[key] = true
 	go func() {
 		self.run(key, cb)
@@ -94,7 +94,7 @@ func (self *MapRunner) checkMore(key interface{}) MapRunnerCallback {
 	defer self.lock.Locked()()
 	l, ok := self.blockedPerTarget[key]
 	if !ok || l.Front == nil {
-		mlog.Printf("checkMore: nothing in queue")
+		mlog.Printf2("util/maprunner", "checkMore: nothing in queue")
 		if self.closing {
 			self.died.Signal()
 		}
@@ -102,7 +102,7 @@ func (self *MapRunner) checkMore(key interface{}) MapRunnerCallback {
 		delete(self.blockedPerTarget, key)
 		return nil
 	}
-	mlog.Printf("checkMore: popped from queue")
+	mlog.Printf2("util/maprunner", "checkMore: popped from queue")
 	cb := l.Front.Value
 	l.Remove(l.Front)
 	return cb

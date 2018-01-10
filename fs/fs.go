@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan  9 19:03:41 2018 mstenber
+ * Last modified: Wed Jan 10 12:02:44 2018 mstenber
  * Edit time:     316 min
  *
  */
@@ -57,11 +57,9 @@ func (self *Fs) Close() {
 	// this will kill the underlying goroutine and ensure it has flushed
 	self.closing <- make(chan struct{})
 
-	// then we can close backend
+	// then we can close storage (which will close backend)
 	self.storage.Close()
 
-	// and finally backend
-	self.storage.Backend.Close()
 	mlog.Printf2("fs/fs", " great success at closing Fs")
 }
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Jan  9 13:10:31 2018 mstenber
- * Edit time:     185 min
+ * Last modified: Wed Jan 10 12:04:59 2018 mstenber
+ * Edit time:     187 min
  *
  */
 
@@ -324,6 +324,7 @@ func TestFs(t *testing.T) {
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
 				fs := NewFs(st, rootName, 0)
+				defer fs.Close()
 				if gen != nil {
 					fs.generator = gen
 
@@ -337,6 +338,7 @@ func TestFs(t *testing.T) {
 				mlog.Printf2("fs/rawfs_test", "omstart from storage")
 				fs2 := NewFs(st, rootName, 0)
 				check(t, fs2)
+				fs2.storage.Backend = nil
 			})
 	}
 	add("seq+1", &DummyGenerator{index: 2, incr: 1})
@@ -361,6 +363,7 @@ func TestFsParallel(t *testing.T) {
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
 				fs := NewFs(st, rootName, 0)
+				defer fs.Close()
 
 				randomReaderWriter := func(path string, u *FSUser) {
 					f, err := u.OpenFile(path, uint32(os.O_CREATE|os.O_TRUNC|os.O_WRONLY), 0777)

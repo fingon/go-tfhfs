@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Wed Jan 10 13:49:08 2018 mstenber
- * Edit time:     150 min
+ * Last modified: Wed Jan 10 17:08:38 2018 mstenber
+ * Edit time:     165 min
  *
  */
 
@@ -31,7 +31,11 @@ type fsTransaction struct {
 	fs *Fs
 
 	// root is the root we based this transaction on
-	root      *fsTreeRoot
+	root *fsTreeRoot
+
+	// rootBlock is our copy of root.block (if any)
+	rootBlock *storage.StorageBlock
+
 	t         *ibtree.IBTransaction
 	blocks    map[string]*storage.StorageBlock
 	blockLock util.MutexLocked
@@ -39,16 +43,18 @@ type fsTransaction struct {
 }
 
 func newFsTransaction(fs *Fs) *fsTransaction {
+	defer fs.transactionsLock.Locked()()
 	root := fs.root.Get()
+	var rootBlock *storage.StorageBlock
 	// +1 ref when transaction starts
 	if root.block != nil {
 		mlog.Printf2("fs/fstransaction", "newFsTransaction - root:%v", root.block)
-		root.block.Open()
+		rootBlock = root.block.Open()
+	} else {
+		mlog.Printf2("fs/fstransaction", "newFsTransaction - no root block")
 	}
-	tr := &fsTransaction{fs: fs, root: root,
+	tr := &fsTransaction{fs: fs, root: root, rootBlock: rootBlock,
 		t: ibtree.NewTransaction(root.node)}
-	mlog.Printf("newTransaction %p", tr)
-	defer fs.transactionsLock.Locked()()
 	fs.transactions[tr] = true
 	return tr
 }
@@ -168,11 +174,12 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 	// correctly updated)
 	self.fs.storage.SetNameToBlockId(self.fs.rootName, string(bid))
 
-	mlog.Printf2("fs/fstransaction", " after successful commit, tree rooted at %x:", string(bid))
-	node.PrintToMLogAll()
-
-	// Ensure root metadata is still there
+	// Paranoia stuff
 	if self.fs.nodeDataCache == nil {
+		mlog.Printf2("fs/fstransaction", " after successful commit, tree rooted at %x:", string(bid))
+		node.PrintToMLogAll()
+
+		// Ensure root metadata is still there
 		k := ibtree.IBKey(NewblockKey(uint64(1), BST_META, ""))
 		tr := self.fs.GetTransaction()
 		defer tr.Close()
@@ -182,14 +189,23 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 		}
 	}
 
+	// We replaced this with our own pointer, after this it will
+	// not be reachable (and self.rootBlock is just our own
+	// read-reference to the root which will be taken care of in
+	// the transaction Close).
+	if self.root.block != nil {
+		defer self.fs.transactionsLock.Locked()()
+		self.fs.oldRoots[self.root.block] = true
+	}
+
 	return true
 }
 
 func (self *fsTransaction) Close() {
-	// mlog.Printf2("fs/fstransaction", "fst.Close")
 	if self.closed {
 		return
 	}
+	mlog.Printf2("fs/fstransaction", "fst.Close")
 	self.closed = true
 
 	// Remove all temporary blocks acquired during the transaction
@@ -197,18 +213,21 @@ func (self *fsTransaction) Close() {
 		v.Close()
 	}
 
-	// -1 ref when transaction expires (old root)
-	if self.root.block != nil {
-		self.root.block.Close()
-	}
-
 	defer self.fs.transactionsLock.Locked()()
+
+	// -1 ref when transaction expires (old root)
+	if self.rootBlock != nil {
+		self.fs.oldRoots[self.rootBlock] = true
+	}
 	delete(self.fs.transactions, self)
 }
 
 // getStorageBlock block ids for given bytes/data.
 // This one expires the blocks when the transaction is gone.
 func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *storage.StorageBlock {
+	if self.closed {
+		mlog.Panicf("getStorageBlock in closed transaction")
+	}
 	h := sha256.Sum256(b)
 	bid := h[:]
 	id := string(bid)

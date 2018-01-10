@@ -4,7 +4,7 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Jan 10 13:45:28 2018 mstenber
+# Last modified: Wed Jan 10 17:35:54 2018 mstenber
 # Edit time:     81 min
 #
 #
@@ -16,7 +16,6 @@ GREENPACK_OPTS=-alltuple
 GENERATED=\
 	fs/fstreerootpointer_gen.go \
 	fs/inodemetapointer_gen.go \
-	fs/storageblockpointer_gen.go \
 	storage/blockpointerfuture_gen.go \
 	util/byteslicefuture_gen.go \
 	util/byteslicepointer_gen.go \
@@ -44,14 +43,6 @@ fs/inodemetapointer_gen.go: Makefile xxx/pointer.go
 	( echo "package fs" ; \
 		egrep -A 9999 '^import' xxx/pointer.go | \
 		sed 's/XXXType/(*InodeMeta)/g;s/XXX/InodeMeta/g' | \
-		cat ) > $@.new
-	mv $@.new $@
-
-fs/storageblockpointer_gen.go: Makefile xxx/pointer.go
-	( echo "package fs" ; \
-		echo 'import "github.com/fingon/go-tfhfs/storage"' ; \
-		egrep -A 9999 '^import' xxx/pointer.go | \
-		sed 's/XXXType/(*storage.StorageBlock)/g;s/XXX/StorageBlock/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

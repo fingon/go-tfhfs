@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan 10 13:51:41 2018 mstenber
- * Edit time:     318 min
+ * Last modified: Wed Jan 10 16:59:42 2018 mstenber
+ * Edit time:     330 min
  *
  */
 
@@ -49,7 +49,15 @@ type Fs struct {
 	nodeDataCache        gcache.Cache
 	transactionRetryLock util.MutexLocked
 
-	transactions     map[*fsTransaction]bool
+	// transactions is the map of active transactions
+	transactions map[*fsTransaction]bool
+
+	// roots is the map of potentially active root blocks (we
+	// clear them only at flush time, if there are zero active
+	// transactions)
+	oldRoots map[*storage.StorageBlock]bool
+
+	// transactionsLock protects transactions and roots
 	transactionsLock util.MutexLocked
 }
 
@@ -58,7 +66,9 @@ func (self *Fs) Close() {
 	mlog.Printf2("fs/fs", "fs.Close")
 
 	// this will kill the underlying goroutine and ensure it has flushed
-	self.closing <- make(chan struct{})
+	ch := make(chan struct{})
+	self.closing <- ch
+	<-ch
 
 	// then we can close storage (which will close backend)
 	self.storage.Close()
@@ -89,12 +99,22 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 
 func (self *Fs) Flush() {
 	mlog.Printf2("fs/fs", "fs.Flush started")
-	self.storage.Flush()
-	defer self.transactionsLock.Locked()()
+	self.transactionsLock.Lock()
 	if len(self.transactions) > 0 {
-		mlog.Printf(" # of transactions active:%d", len(self.transactions))
+		mlog.Printf2("fs/fs", " # of transactions active:%d", len(self.transactions))
+	} else {
+		nroots := len(self.oldRoots)
+		if nroots > 0 {
+			for b, _ := range self.oldRoots {
+				b.Close()
+			}
+			self.oldRoots = make(map[*storage.StorageBlock]bool)
+			mlog.Printf2("fs/fs", " cleared %d roots", nroots)
+		}
 	}
-	mlog.Printf2("fs/fs", " .. done with fs.Flush")
+	self.transactionsLock.Unlock()
+	self.storage.Flush()
+	mlog.Printf2("fs/fs", " done with fs.Flush")
 }
 
 // ibtree.IBTreeBackend API
@@ -133,6 +153,7 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 func NewFs(st *storage.Storage, rootName string, cacheSize int) *Fs {
 	fs := &Fs{storage: st, rootName: rootName}
 	fs.transactions = make(map[*fsTransaction]bool)
+	fs.oldRoots = make(map[*storage.StorageBlock]bool)
 	if cacheSize > 0 {
 		fs.nodeDataCache = gcache.New(cacheSize).
 			ARC().
@@ -193,7 +214,7 @@ func NewCryptoStorage(password, salt string, backend storage.Backend) *storage.S
 	c1 := codec.EncryptingCodec{}.Init([]byte(password), []byte(salt), iterations)
 	c2 := &codec.CompressingCodec{}
 	c := codec.CodecChain{}.Init(c1, c2)
-	st := storage.Storage{Codec: c, Backend: backend}.Init()
+	st := storage.Storage{Codec: c, Backend: backend, QueueLength: 100}.Init()
 	return st
 }
 

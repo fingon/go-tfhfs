@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Wed Jan 10 12:04:59 2018 mstenber
- * Edit time:     187 min
+ * Last modified: Wed Jan 10 16:32:34 2018 mstenber
+ * Edit time:     194 min
  *
  */
 
@@ -426,6 +426,14 @@ func TestFsParallel(t *testing.T) {
 						}
 						assert.True(t, len(content) <= len(ncontent))
 						content = ncontent
+
+						if nu == 1 {
+							mlog.Printf2("fs/rawfs_test", "starting fs flush")
+							fs.Flush()
+							mlog.Printf2("fs/rawfs_test", "fs flush done")
+							assert.Equal(t, fs.storage.TransientCount(), 0, "transients left")
+
+						}
 					}
 				}
 
@@ -440,6 +448,8 @@ func TestFsParallel(t *testing.T) {
 					})
 				}
 				wg.Wait()
+				fs.Flush()
+				assert.Equal(t, fs.storage.TransientCount(), 0, "transients left")
 
 			})
 	}

@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sat Jan  6 00:13:13 2018 mstenber
- * Last modified: Sat Jan  6 02:22:13 2018 mstenber
+ * Last modified: Wed Jan 10 11:21:08 2018 mstenber
  * Edit time:     8 min
  *
  */
@@ -19,17 +19,11 @@ import (
 
 type codecBackend struct {
 	proxyBackend
-	codec codec.Codec
-}
-
-func (self codecBackend) Init(backend Backend, codec codec.Codec) *codecBackend {
-	self.backend = backend
-	self.codec = codec
-	return &self
+	Codec codec.Codec
 }
 
 func (self *codecBackend) GetBlockById(id string) *Block {
-	b := self.backend.GetBlockById(id)
+	b := self.Backend.GetBlockById(id)
 	if b != nil {
 		b.Backend = self
 	}
@@ -42,8 +36,8 @@ func (self *codecBackend) GetBlockById(id string) *Block {
 }
 
 func (self *codecBackend) GetBlockData(bl *Block) []byte {
-	data := self.backend.GetBlockData(bl)
-	b, err := self.codec.DecodeBytes(data, []byte(bl.Id))
+	data := self.Backend.GetBlockData(bl)
+	b, err := self.Codec.DecodeBytes(data, []byte(bl.Id))
 	if err != nil {
 		log.Panic("Decoding failed", err)
 	}
@@ -52,11 +46,11 @@ func (self *codecBackend) GetBlockData(bl *Block) []byte {
 
 func (self *codecBackend) StoreBlock(bl *Block) {
 	dp := bl.Data.Get()
-	b, err := self.codec.EncodeBytes(*dp, []byte(bl.Id))
+	b, err := self.Codec.EncodeBytes(*dp, []byte(bl.Id))
 	if err != nil {
 		log.Panic("Encoding failed", err)
 	}
 	bl2 := *bl
 	bl2.Data.Set(&b)
-	self.backend.StoreBlock(&bl2)
+	self.Backend.StoreBlock(&bl2)
 }

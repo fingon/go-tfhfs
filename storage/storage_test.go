@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Sat Jan  6 02:25:44 2018 mstenber
- * Edit time:     194 min
+ * Last modified: Wed Jan 10 11:35:17 2018 mstenber
+ * Edit time:     202 min
  *
  */
 
@@ -14,10 +14,10 @@ package storage_test
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/mlog"
@@ -27,53 +27,53 @@ import (
 )
 
 func ProdBackend(t *testing.T, factory func() storage.Backend) {
-	bs := factory()
-	mlog.Printf2("storage/storage_test", "ProdBackend %v", bs)
+	be := factory()
+	mlog.Printf2("storage/storage_test", "ProdBackend %v", be)
 
 	b1 := &storage.Block{Id: "foo",
 		BlockMetadata: storage.BlockMetadata{RefCount: 123,
 			Status: storage.BlockStatus_NORMAL}}
 	data := []byte("data")
 	b1.Data.Set(&data)
-	bs.SetNameToBlockId("name", "foo")
-	bs.StoreBlock(b1)
+	be.SetNameToBlockId("name", "foo")
+	be.StoreBlock(b1)
 
-	log.Print(" initial set")
-	b2 := bs.GetBlockById("foo")
-	log.Print(" got")
+	mlog.Printf(" initial set")
+	b2 := be.GetBlockById("foo")
+	mlog.Printf(" got")
 	assert.Equal(t, string(b2.GetData()), "data")
-	log.Print(" data ok")
+	mlog.Printf(" data ok")
 	// ^ has to be called before the next one, as .Data isn't
 	// populated by default.
 	//assert.Equal(t, b1, b2)
 	assert.Equal(t, int(b2.RefCount), 123)
 	assert.Equal(t, b2.Status, storage.BlockStatus_NORMAL)
 
-	//bs.UpdateBlockStatus(b1, BlockStatus_MISSING)
+	//be.UpdateBlockStatus(b1, BlockStatus_MISSING)
 	//assert.Equal(t, b2.Status, BlockStatus_MISSING)
 
-	log.Print(" get nok?")
-	bn := bs.GetBlockIdByName("name")
+	mlog.Printf(" get nok?")
+	bn := be.GetBlockIdByName("name")
 	assert.Equal(t, bn, "foo")
 
-	bs.SetNameToBlockId("name", "")
-	log.Print(" second set")
+	be.SetNameToBlockId("name", "")
+	mlog.Printf(" second set")
 
-	bn = bs.GetBlockIdByName("name")
+	bn = be.GetBlockIdByName("name")
 	assert.Equal(t, bn, "")
-	bs.Close()
+	be.Close()
 
 	// Ensure second backend nop key fetch will return nothing
-	bs = factory()
-	b3 := bs.GetBlockById("nokey")
+	be = factory()
+	b3 := be.GetBlockById("nokey")
 	assert.Nil(t, b3)
-	bs.Close()
+	be.Close()
 
 	// Ensure third backend nop name fetch will return nothing
-	bs = factory()
-	bn = bs.GetBlockIdByName("noname")
+	be = factory()
+	bn = be.GetBlockIdByName("noname")
 	assert.Equal(t, bn, "")
-	bs.Close()
+	be.Close()
 
 	ProdStorage(t, factory)
 }
@@ -155,20 +155,21 @@ func ProdStorageDeps(t *testing.T, s *storage.Storage) {
 }
 
 func ProdStorage(t *testing.T, factory func() storage.Backend) {
-	bs := factory()
-	mlog.Printf2("storage/storage_test", "ProdStorage %v", bs)
-	defer bs.Close()
+	be := factory()
+	mlog.Printf2("storage/storage_test", "ProdStorage %v", be)
 
-	s := storage.Storage{Backend: bs}.Init()
+	s := storage.Storage{Backend: be}.Init()
 	ProdStorageOne(t, s)
+	s.Backend = nil
 	s.Close()
 
 	c := codec.CodecChain{}.Init(&codec.CompressingCodec{})
-	s2 := storage.Storage{Backend: bs, Codec: c}.Init()
+	s2 := storage.Storage{Backend: be, Codec: c}.Init()
 	ProdStorageOne(t, s2)
+	s2.Backend = nil
 	s2.Close()
 
-	s3 := storage.Storage{Backend: bs,
+	s3 := storage.Storage{Backend: be,
 		Codec: c,
 		IterateReferencesCallback: func(id string, data []byte, cb storage.BlockReferenceCallback) {
 			for _, subid := range strings.Split(string(data), " ") {
@@ -179,7 +180,6 @@ func ProdStorage(t *testing.T, factory func() storage.Backend) {
 		}}.Init()
 	ProdStorageDeps(t, s3)
 	s3.Close()
-
 }
 
 func TestBackend(t *testing.T) {
@@ -190,7 +190,9 @@ func TestBackend(t *testing.T) {
 			dir, _ := ioutil.TempDir("", k)
 			defer os.RemoveAll(dir)
 			ProdBackend(t, func() storage.Backend {
-				return factory.New(k, dir)
+				config := storage.BackendConfiguration{Directory: dir,
+					DelayPerOp: time.Millisecond}
+				return factory.NewWithConfig(k, config)
 			})
 		})
 	}

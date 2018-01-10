@@ -4,12 +4,27 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 11:14:11 2018 mstenber
- * Last modified: Fri Jan  5 12:34:06 2018 mstenber
- * Edit time:     5 min
+ * Last modified: Wed Jan 10 11:23:15 2018 mstenber
+ * Edit time:     7 min
  *
  */
 
 package storage
+
+import "time"
+
+type BackendConfiguration struct {
+	// How much delay should there per asynchronous operation
+	// (useful only for testing)
+	DelayPerOp time.Duration
+
+	// Directory to be used for storing backend data
+	Directory string
+
+	// ValueUpdateInterval describes how often cached values (e.g.
+	// statfs stuff) are updated.
+	ValueUpdateInterval time.Duration
+}
 
 // Backend is the shadow behind the throne; it actually handles the
 // low-level operations of blocks. It provides an API that returns
@@ -19,6 +34,11 @@ package storage
 // once, and it is again the problem of the implementor to ensure that
 // the results are consistent.
 type Backend interface {
+	// Initialize the backend with the given configuration; this
+	// is typically called only for real storage backends and not
+	// interim ones (e.g. mapRunnerBackend, codecBackend)
+	Init(config BackendConfiguration)
+
 	// Close the backend
 	Close()
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Sat Jan  6 02:23:57 2018 mstenber
- * Edit time:     72 min
+ * Last modified: Wed Jan 10 11:26:57 2018 mstenber
+ * Edit time:     73 min
  *
  */
 
@@ -37,16 +37,22 @@ func NewInMemoryBackend() storage.Backend {
 	return self
 }
 
+func (self *inMemoryBackend) Init(config storage.BackendConfiguration) {
+
+}
+
 func (self *inMemoryBackend) Close() {
 
 }
 
 func (self *inMemoryBackend) DeleteBlock(b *storage.Block) {
+	defer self.lock.Locked()()
 	mlog.Printf2("storage/inmemory/inmemory", "im.DeleteBlock %x", b.Id)
 	delete(self.id2Block, b.Id)
 }
 
 func (self *inMemoryBackend) GetBlockData(bl *storage.Block) []byte {
+	defer self.lock.Locked()()
 	b, ok := self.id2Block[bl.Id]
 	if !ok {
 		log.Fatal("Non-existent block id in GetBlockData")

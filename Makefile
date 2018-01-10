@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Jan 10 09:33:29 2018 mstenber
-# Edit time:     75 min
+# Last modified: Wed Jan 10 10:02:30 2018 mstenber
+# Edit time:     79 min
 #
 #
 
@@ -17,6 +17,8 @@ GENERATED=\
 	fs/fstreerootpointer_gen.go \
 	fs/inodemetapointer_gen.go \
 	fs/storageblockpointer_gen.go \
+	storage/blockpointerfuture_gen.go \
+	util/byteslicefuture_gen.go \
 	util/byteslicepointer_gen.go \
 	util/maprunnercallbacklist_gen.go
 
@@ -50,6 +52,22 @@ fs/storageblockpointer_gen.go: Makefile xxx/pointer.go
 		echo 'import "github.com/fingon/go-tfhfs/storage"' ; \
 		egrep -A 9999 '^import' xxx/pointer.go | \
 		sed 's/XXXType/(*storage.StorageBlock)/g;s/XXX/StorageBlock/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+storage/blockpointerfuture_gen.go: Makefile xxx/future.go
+	( echo "package storage" ; \
+		egrep -A 9999 '^import' xxx/future.go | \
+		sed 's/YYYType/*Block/g;s/YYY/BlockPointer/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+
+util/byteslicefuture_gen.go: Makefile xxx/future.go
+	( echo "package util" ; \
+		egrep -A 9999 '^import' xxx/future.go | \
+		egrep -v '/util"' | \
+		sed 's/util\.//g;s/YYYType/[]byte/g;s/YYY/ByteSlice/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

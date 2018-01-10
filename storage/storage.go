@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan 10 01:03:41 2018 mstenber
- * Edit time:     573 min
+ * Last modified: Wed Jan 10 11:43:58 2018 mstenber
+ * Edit time:     578 min
  *
  */
 
@@ -127,9 +127,9 @@ func (self Storage) Init() *Storage {
 
 	// No need to special case Codec = nil elsewhere with this
 	if self.Codec != nil {
-		self.Backend = codecBackend{}.Init(self.Backend, self.Codec)
+		self.Backend = codecBackend{Codec: self.Codec}.SetBackend(self.Backend)
 	}
-	// self.Backend = fanoutBackend{}.Init(self.Backend)
+	self.Backend = mapRunnerBackend{}.SetBackend(self.Backend)
 	go func() {
 		self.run()
 	}()
@@ -138,11 +138,17 @@ func (self Storage) Init() *Storage {
 
 func (self *Storage) Close() {
 	// Implicitly also flush; storage that persists randomly seems bad
-	self.Flush()
+	if self.Backend != nil {
+		self.Flush()
+	}
 
 	out := make(chan *jobOut)
 	self.jobChannel <- &jobIn{jobType: jobQuit, out: out}
 	<-out
+
+	if self.Backend != nil {
+		self.Backend.Close()
+	}
 }
 
 func (self *Storage) run() {

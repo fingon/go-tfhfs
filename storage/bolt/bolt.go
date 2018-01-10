@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 22:49:15 2018 mstenber
- * Last modified: Sat Jan  6 02:23:05 2018 mstenber
- * Edit time:     27 min
+ * Last modified: Wed Jan 10 11:32:34 2018 mstenber
+ * Edit time:     29 min
  *
  */
 
@@ -39,9 +39,14 @@ type boltBackend struct {
 var _ storage.Backend = &boltBackend{}
 
 // Init makes the instance actually useful
-func NewBoltBackend(dir string) storage.Backend {
+func NewBoltBackend() storage.Backend {
 	self := &boltBackend{}
-	(&self.DirectoryBackendBase).Init(dir)
+	return self
+}
+
+func (self *boltBackend) Init(config storage.BackendConfiguration) {
+	dir := config.Directory
+	(&self.DirectoryBackendBase).Init(config)
 	db, err := bbolt.Open(fmt.Sprintf("%s/bbolt.db", dir), 0600, nil)
 	if err != nil {
 		log.Fatal("bbolt.Open", err)
@@ -65,7 +70,6 @@ func NewBoltBackend(dir string) storage.Backend {
 	if err != nil {
 		log.Panic(err)
 	}
-	return self
 }
 
 func (self *boltBackend) Close() {

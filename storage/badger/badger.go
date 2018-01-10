@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Sat Jan  6 02:23:31 2018 mstenber
- * Edit time:     142 min
+ * Last modified: Wed Jan 10 11:28:25 2018 mstenber
+ * Edit time:     143 min
  *
  */
 
@@ -33,9 +33,15 @@ var _ storage.Backend = &badgerBackend{}
 
 // Init makes the instance actually useful
 
-func NewBadgerBackend(dir string) storage.Backend {
+func NewBadgerBackend() storage.Backend {
 	self := &badgerBackend{}
-	(&self.DirectoryBackendBase).Init(dir)
+	return self
+
+}
+
+func (self *badgerBackend) Init(config storage.BackendConfiguration) {
+	dir := config.Directory
+	(&self.DirectoryBackendBase).Init(config)
 	opts := badger.DefaultOptions
 	opts.Dir = dir
 	opts.ValueDir = dir
@@ -44,8 +50,6 @@ func NewBadgerBackend(dir string) storage.Backend {
 		log.Panic("badger.Open", err)
 	}
 	self.db = db
-	return self
-
 }
 
 func (self *badgerBackend) Close() {

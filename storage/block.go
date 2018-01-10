@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Tue Jan  9 12:25:17 2018 mstenber
- * Edit time:     202 min
+ * Last modified: Wed Jan 10 11:02:58 2018 mstenber
+ * Edit time:     211 min
  *
  */
 
@@ -51,6 +51,16 @@ type Block struct {
 
 	// TBD: would flags be better?
 	haveDiskRefs, haveStorageRefs bool
+}
+
+func (self *Block) copy() *Block {
+	nb := *self
+	// Beyond this, the rest is ~immutable
+	if self.Stored != nil {
+		nst := *self.Stored
+		nb.Stored = &nst
+	}
+	return &nb
 }
 
 func (self *Block) GetData() []byte {
@@ -120,8 +130,15 @@ func (self *Block) flush() int {
 	if hadRefs != haveRefs {
 		mlog.Printf2("storage/block", " dependencies changed")
 		self.shouldHaveDiskDependencies(haveRefs)
+		if haveRefs {
+			// By default if we have dependencies on disk, there
+			// is no need to have them also in storage (= RAM
+			// bloat)
+			self.shouldHaveStorageDependencies(false)
+		}
 	}
 	self.Stored = nil
+
 	self.addStorageRefCount(-1)
 	delete(self.storage.dirtyBlocks, self.Id)
 	return ops

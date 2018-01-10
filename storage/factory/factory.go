@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:22:52 2018 mstenber
- * Last modified: Fri Jan  5 16:29:49 2018 mstenber
- * Edit time:     9 min
+ * Last modified: Wed Jan 10 11:34:07 2018 mstenber
+ * Edit time:     11 min
  *
  */
 
@@ -19,20 +19,20 @@ import (
 	"github.com/fingon/go-tfhfs/storage/inmemory"
 )
 
-type factoryCallback func(dir string) storage.Backend
+type factoryCallback func() storage.Backend
 
 var backendFactories = map[string]factoryCallback{
-	"inmemory": func(dir string) storage.Backend {
+	"inmemory": func() storage.Backend {
 		return inmemory.NewInMemoryBackend()
 	},
-	"badger": func(dir string) storage.Backend {
-		return badger.NewBadgerBackend(dir)
+	"badger": func() storage.Backend {
+		return badger.NewBadgerBackend()
 	},
-	"bolt": func(dir string) storage.Backend {
-		return bolt.NewBoltBackend(dir)
+	"bolt": func() storage.Backend {
+		return bolt.NewBoltBackend()
 	},
-	"file": func(dir string) storage.Backend {
-		return file.NewFileBackend(dir)
+	"file": func() storage.Backend {
+		return file.NewFileBackend()
 	}}
 
 func List() []string {
@@ -44,5 +44,13 @@ func List() []string {
 }
 
 func New(name, dir string) storage.Backend {
-	return backendFactories[name](dir)
+	var config storage.BackendConfiguration
+	config.Directory = dir
+	return NewWithConfig(name, config)
+}
+
+func NewWithConfig(name string, config storage.BackendConfiguration) storage.Backend {
+	be := backendFactories[name]()
+	be.Init(config)
+	return be
 }

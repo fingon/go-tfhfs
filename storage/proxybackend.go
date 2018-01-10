@@ -4,39 +4,46 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sat Jan  6 00:08:05 2018 mstenber
- * Last modified: Sat Jan  6 01:45:35 2018 mstenber
- * Edit time:     4 min
+ * Last modified: Wed Jan 10 11:29:19 2018 mstenber
+ * Edit time:     6 min
  *
  */
 
 package storage
 
 type proxyBackend struct {
-	backend Backend
+	BackendConfiguration
+	Backend Backend
 }
 
 var _ Backend = &proxyBackend{}
 
-// Init makes the instance actually useful
-func (self proxyBackend) Init(backend Backend) *proxyBackend {
-	self.backend = backend
+// Semi-init with only backend setting
+func (self proxyBackend) SetBackend(backend Backend) *proxyBackend {
+	self.Backend = backend
 	return &self
 }
 
+// Init makes the instance actually useful
+func (self *proxyBackend) Init(config BackendConfiguration) {
+	self.BackendConfiguration = config
+	self.Backend.Init(config)
+}
+
 func (self *proxyBackend) Close() {
-	self.backend.Close()
+	self.Backend.Close()
 }
 
 func (self *proxyBackend) DeleteBlock(b *Block) {
-	self.backend.DeleteBlock(b)
+	self.Backend.DeleteBlock(b)
 }
 
 func (self *proxyBackend) GetBlockData(b *Block) []byte {
-	return self.backend.GetBlockData(b)
+	return self.Backend.GetBlockData(b)
 }
 
 func (self *proxyBackend) GetBlockById(id string) *Block {
-	bl := self.backend.GetBlockById(id)
+	bl := self.Backend.GetBlockById(id)
 	if bl != nil {
 		bl.Backend = self
 	}
@@ -44,25 +51,25 @@ func (self *proxyBackend) GetBlockById(id string) *Block {
 }
 
 func (self *proxyBackend) GetBlockIdByName(name string) string {
-	return self.backend.GetBlockIdByName(name)
+	return self.Backend.GetBlockIdByName(name)
 }
 
 func (self *proxyBackend) GetBytesAvailable() uint64 {
-	return self.backend.GetBytesAvailable()
+	return self.Backend.GetBytesAvailable()
 }
 
 func (self *proxyBackend) GetBytesUsed() uint64 {
-	return self.backend.GetBytesUsed()
+	return self.Backend.GetBytesUsed()
 }
 
 func (self *proxyBackend) SetNameToBlockId(name, block_id string) {
-	self.backend.SetNameToBlockId(name, block_id)
+	self.Backend.SetNameToBlockId(name, block_id)
 }
 
 func (self *proxyBackend) StoreBlock(b *Block) {
-	self.backend.StoreBlock(b)
+	self.Backend.StoreBlock(b)
 }
 
 func (self *proxyBackend) UpdateBlock(b *Block) int {
-	return self.backend.UpdateBlock(b)
+	return self.Backend.UpdateBlock(b)
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:55:15 2018 mstenber
- * Last modified: Fri Jan  5 12:01:43 2018 mstenber
- * Edit time:     36 min
+ * Last modified: Wed Jan 10 11:18:31 2018 mstenber
+ * Edit time:     40 min
  *
  */
 
@@ -37,25 +37,21 @@ func (self *delayedUInt64Value) Value() uint64 {
 	defer self.valueMutex.Unlock()
 	if self.status == 0 {
 		// Unset values are bit bogus, so let's not do those
-		v := self.callback()
-		self.update(v)
+		value := self.callback()
+		self.update(value)
 		return self.value
 	}
 	if self.status == 1 || self.valueTime.Add(self.interval).After(time.Now()) {
 		return self.value
 	}
 	self.status = 1
-	fun := func() {
-		// Calculate value without mutex
-		value := self.callback()
 
-		self.valueMutex.Lock()
-		defer self.valueMutex.Unlock()
+	// Calculate value without mutex
+	value := self.callback()
 
-		self.update(value)
-	}
-	go fun()
-	// Return old value for now; next call will get updated one
+	self.update(value)
+
+	// Return new value
 	return self.value
 
 }
@@ -67,26 +63,21 @@ func (self *delayedUInt64Value) update(value uint64) {
 }
 
 type DirectoryBackendBase struct {
-	Dir string
-
-	// ValueUpdateInterval describes how often cached values (e.g.
-	// statfs stuff) are updated _in background_.
-	ValueUpdateInterval time.Duration
+	BackendConfiguration
 
 	available, used delayedUInt64Value
 }
 
-func (self *DirectoryBackendBase) Init(dir string) *DirectoryBackendBase {
-	self.Dir = dir
-	minimumInterval := 5 * time.Second
+func (self *DirectoryBackendBase) Init(config BackendConfiguration) {
+	self.BackendConfiguration = config
+	minimumInterval := time.Second
 	if self.ValueUpdateInterval < minimumInterval {
 		self.ValueUpdateInterval = minimumInterval
 	}
 	self.available = delayedUInt64Value{interval: self.ValueUpdateInterval,
-		callback: func() uint64 { return calculateAvailable(dir) }}
+		callback: func() uint64 { return calculateAvailable(self.Directory) }}
 	self.used = delayedUInt64Value{interval: self.ValueUpdateInterval,
-		callback: func() uint64 { return calculateUsed(dir) }}
-	return self
+		callback: func() uint64 { return calculateUsed(self.Directory) }}
 }
 
 func calculateAvailable(dir string) uint64 {

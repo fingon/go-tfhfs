@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 17:05:40 2018 mstenber
- * Last modified: Sun Jan  7 17:14:20 2018 mstenber
+ * Last modified: Wed Jan 10 09:33:02 2018 mstenber
  * Edit time:     7 min
  *
  */
@@ -20,33 +20,30 @@ import (
 func Test(t *testing.T) {
 	t.Parallel()
 
-	l := XXXList{}
-	s1 := "s1"
-	s2 := "s2"
-	s3 := "s3"
-	p1 := XXXType(&s1)
-	p2 := XXXType(&s2)
-	p3 := XXXType(&s3)
+	l := YYYList{}
+	v1 := YYYType(7)
+	v2 := YYYType(13)
+	v3 := YYYType(42)
 
 	fun := func(fr bool) {
 		if fr {
-			l.PushFront(p1)
-			l.PushFront(p2)
-			l.PushFront(p3)
+			l.PushFront(v1)
+			l.PushFront(v2)
+			l.PushFront(v3)
 		} else {
-			l.PushBack(p3)
-			l.PushBack(p2)
-			l.PushBack(p1)
+			l.PushBack(v3)
+			l.PushBack(v2)
+			l.PushBack(v1)
 		}
 
-		assert.Equal(t, l.Front.Value, p3)
-		assert.Equal(t, l.Front.Next.Value, p2)
-		assert.Equal(t, l.Front.Next.Next.Value, p1)
+		assert.Equal(t, l.Front.Value, v3)
+		assert.Equal(t, l.Front.Next.Value, v2)
+		assert.Equal(t, l.Front.Next.Next.Value, v1)
 		assert.Nil(t, l.Front.Next.Next.Next)
 
-		assert.Equal(t, l.Back.Value, p1)
-		assert.Equal(t, l.Back.Prev.Value, p2)
-		assert.Equal(t, l.Back.Prev.Prev.Value, p3)
+		assert.Equal(t, l.Back.Value, v1)
+		assert.Equal(t, l.Back.Prev.Value, v2)
+		assert.Equal(t, l.Back.Prev.Prev.Value, v3)
 		assert.Nil(t, l.Back.Prev.Prev.Prev)
 	}
 	empty := func() {

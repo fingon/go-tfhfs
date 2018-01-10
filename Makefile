@@ -4,7 +4,7 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Mon Jan  8 15:31:17 2018 mstenber
+# Last modified: Wed Jan 10 09:33:29 2018 mstenber
 # Edit time:     75 min
 #
 #
@@ -64,7 +64,7 @@ util/byteslicepointer_gen.go: Makefile xxx/pointer.go
 util/maprunnercallbacklist_gen.go: Makefile xxx/list.go
 	( echo "package util" ; \
 		egrep -A 9999 '^import' xxx/list.go | \
-		sed 's/XXXType/MapRunnerCallback/g;s/XXX/MapRunnerCallback/g' | \
+		sed 's/YYYType/MapRunnerCallback/g;s/YYY/MapRunnerCallback/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

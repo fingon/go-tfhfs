@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 16:53:09 2018 mstenber
- * Last modified: Sun Jan  7 17:32:24 2018 mstenber
- * Edit time:     20 min
+ * Last modified: Wed Jan 10 09:31:35 2018 mstenber
+ * Edit time:     21 min
  *
  */
 
@@ -13,19 +13,19 @@ package xxx
 
 import "fmt"
 
-// XXXList provides doubly linked list which does not have inefficient
+// YYYList provides doubly linked list which does not have inefficient
 // operations, is typesafe, and does minimum amount of extra
 // allocations needed. This is accomplished by sticking the freed
 // items to a freelist instead of freeing them directly. The list is
 // obviously not threadsafe.
-type XXXList struct {
-	Back, Front *XXXListElement
-	freeList    *XXXListElement
+type YYYList struct {
+	Back, Front *YYYListElement
+	freeList    *YYYListElement
 }
 
-func (self *XXXList) getElement(v XXXType) (e *XXXListElement) {
+func (self *YYYList) getElement(v YYYType) (e *YYYListElement) {
 	if self.freeList == nil {
-		return &XXXListElement{Value: v}
+		return &YYYListElement{Value: v}
 	}
 	e = self.freeList
 	self.freeList = e.Next
@@ -34,7 +34,7 @@ func (self *XXXList) getElement(v XXXType) (e *XXXListElement) {
 	return e
 }
 
-func (self *XXXList) PushBack(v XXXType) {
+func (self *YYYList) PushBack(v YYYType) {
 	e := self.getElement(v)
 	e.Prev = self.Back
 	if self.Back != nil {
@@ -46,7 +46,7 @@ func (self *XXXList) PushBack(v XXXType) {
 	self.Back = e
 }
 
-func (self *XXXList) PushFront(v XXXType) {
+func (self *YYYList) PushFront(v YYYType) {
 	e := self.getElement(v)
 	e.Next = self.Front
 	if self.Front != nil {
@@ -58,7 +58,7 @@ func (self *XXXList) PushFront(v XXXType) {
 	self.Front = e
 }
 
-func (self *XXXList) Remove(e *XXXListElement) {
+func (self *YYYList) Remove(e *YYYListElement) {
 	if e.Prev != nil {
 		e.Prev.Next = e.Next
 	} else {
@@ -74,8 +74,8 @@ func (self *XXXList) Remove(e *XXXListElement) {
 	self.freeList = e
 }
 
-func (self *XXXList) String() string {
-	llen := func(l *XXXListElement) int {
+func (self *YYYList) String() string {
+	llen := func(l *YYYListElement) int {
 		len := 0
 		for ; l != nil; l = l.Next {
 			len++
@@ -83,11 +83,11 @@ func (self *XXXList) String() string {
 		return len
 	}
 
-	return fmt.Sprintf("XXXList<%d entries/%d free>", llen(self.Front), llen(self.freeList))
+	return fmt.Sprintf("YYYList<%d entries/%d free>", llen(self.Front), llen(self.freeList))
 
 }
 
-type XXXListElement struct {
-	Prev, Next *XXXListElement
-	Value      XXXType
+type YYYListElement struct {
+	Prev, Next *YYYListElement
+	Value      YYYType
 }

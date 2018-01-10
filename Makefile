@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Jan 10 10:02:30 2018 mstenber
-# Edit time:     79 min
+# Last modified: Wed Jan 10 13:45:28 2018 mstenber
+# Edit time:     81 min
 #
 #
 
@@ -31,7 +31,7 @@ bench: .done.buildable
 
 get: .done.getprebuild
 
-generate: .done.generated
+generate: .done.buildable .done.generated
 
 fs/fstreerootpointer_gen.go: Makefile xxx/pointer.go
 	( echo "package fs" ; \
@@ -135,7 +135,7 @@ update-deps:
 .done.generated: $(GENERATED)
 	touch $@
 
-.done.test: .done.buildable $(wildcard */*.go)
+.done.test: .done.buildable .done.generated $(wildcard */*.go)
 	go test ./...
 	touch $@
 

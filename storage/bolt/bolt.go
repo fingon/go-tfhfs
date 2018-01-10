@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 22:49:15 2018 mstenber
- * Last modified: Wed Jan 10 11:32:34 2018 mstenber
- * Edit time:     29 min
+ * Last modified: Wed Jan 10 13:11:41 2018 mstenber
+ * Edit time:     30 min
  *
  */
 
@@ -90,6 +90,11 @@ func (self *boltBackend) GetBlockData(b *storage.Block) (v []byte) {
 	bid := []byte(b.Id)
 	self.db.View(func(tx *bbolt.Tx) error {
 		v = tx.Bucket(dataKey).Get(bid)
+		if v != nil {
+			nv := make([]byte, len(v))
+			copy(nv, v)
+			v = nv
+		}
 		return nil
 	})
 	return

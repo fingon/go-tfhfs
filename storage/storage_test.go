@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Wed Jan 10 11:35:17 2018 mstenber
- * Edit time:     202 min
+ * Last modified: Wed Jan 10 13:10:03 2018 mstenber
+ * Edit time:     226 min
  *
  */
 
@@ -38,11 +38,11 @@ func ProdBackend(t *testing.T, factory func() storage.Backend) {
 	be.SetNameToBlockId("name", "foo")
 	be.StoreBlock(b1)
 
-	mlog.Printf(" initial set")
+	mlog.Printf2("storage/storage_test", " initial set")
 	b2 := be.GetBlockById("foo")
-	mlog.Printf(" got")
+	mlog.Printf2("storage/storage_test", " got")
 	assert.Equal(t, string(b2.GetData()), "data")
-	mlog.Printf(" data ok")
+	mlog.Printf2("storage/storage_test", " data ok")
 	// ^ has to be called before the next one, as .Data isn't
 	// populated by default.
 	//assert.Equal(t, b1, b2)
@@ -52,12 +52,12 @@ func ProdBackend(t *testing.T, factory func() storage.Backend) {
 	//be.UpdateBlockStatus(b1, BlockStatus_MISSING)
 	//assert.Equal(t, b2.Status, BlockStatus_MISSING)
 
-	mlog.Printf(" get nok?")
+	mlog.Printf2("storage/storage_test", " get nok?")
 	bn := be.GetBlockIdByName("name")
 	assert.Equal(t, bn, "foo")
 
 	be.SetNameToBlockId("name", "")
-	mlog.Printf(" second set")
+	mlog.Printf2("storage/storage_test", " second set")
 
 	bn = be.GetBlockIdByName("name")
 	assert.Equal(t, bn, "")
@@ -80,12 +80,13 @@ func ProdBackend(t *testing.T, factory func() storage.Backend) {
 
 func ProdStorageOne(t *testing.T, s *storage.Storage) {
 	mlog.Printf2("storage/storage_test", "ProdStorageOne")
+	assert.Equal(t, s.TransientCount(), 0)
 	v := []byte("v")
-	b := s.ReferOrStoreBlock("key", v)
+	b := s.ReferOrStoreBlock("key", v) // +1 key ref, sref
 	// assert.Equal(t, int(b.storageRefCount), 2)
 	assert.True(t, b != nil)
 	// assert.Equal(t, int(b.RefCount), 1)
-	b2 := s.ReferOrStoreBlock("key", v)
+	b2 := s.ReferOrStoreBlock("key", v) // +1 key ref, sref
 	assert.Equal(t, b, b2)
 	// assert.Equal(t, int(b.storageRefCount), 3)
 	// assert.Equal(t, int(b.RefCount), 2)
@@ -95,7 +96,7 @@ func ProdStorageOne(t *testing.T, s *storage.Storage) {
 	// assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
 	// assert.Equal(t, int(b.storageRefCount), 2) // two references kept below
 
-	b3 := s.ReferOrStoreBlock("key2", v)
+	b3 := s.ReferOrStoreBlock("key2", v) // +1 key2 ref, sref
 	// assert.Equal(t, s.blocks.Get().Len(), 2)
 	// assert.Equal(t, s.dirtyBlocks.Get().Len(), 1)
 	// assert.Equal(t, int(b3.storageRefCount), 2)
@@ -108,10 +109,10 @@ func ProdStorageOne(t *testing.T, s *storage.Storage) {
 	// assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
 	// assert.Equal(t, int(b3.storageRefCount), 1)
 	// assert.Equal(t, int(b3.RefCount), 1)
-	s.ReleaseBlockId("key2")
+	s.ReleaseBlockId("key2") // -1 key2 ref
 
-	s.ReleaseBlockId("key")
-	s.ReleaseBlockId("key")
+	s.ReleaseBlockId("key") // -1 key ref
+	s.ReleaseBlockId("key") // -1 key ref
 	s.Flush()
 	// assert.Equal(t, s.blocks.Get().Len(), 2)
 
@@ -126,10 +127,31 @@ func ProdStorageOne(t *testing.T, s *storage.Storage) {
 	// assert.Equal(t, int(b3.storageRefCount), 0)
 	// assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
 	// assert.Equal(t, s.blocks.Get().Len(), 0)
+	s.Flush()
+	assert.Equal(t, s.TransientCount(), 0)
 }
 
-func ProdStorageDeps(t *testing.T, s *storage.Storage) {
+func ProdStorageDeps(t *testing.T, be storage.Backend) {
+	k2v := make(map[string]string)
+	broken := false
+	s := storage.Storage{Backend: be,
+		IterateReferencesCallback: func(id string, data []byte, cb storage.BlockReferenceCallback) {
+			s := string(data)
+			if string(data) != k2v[id] {
+				mlog.Printf("data mismatch: %s <> %s", s, k2v[id])
+				broken = true
+			}
+			mlog.Printf("id:%v data:%v", id, s)
+			for _, subid := range strings.Split(s, " ") {
+				if subid != "" {
+					mlog.Printf(" %v", subid)
+					cb(subid)
+				}
+			}
+		}}.Init()
+	defer s.Close()
 	mlog.Printf2("storage/storage_test", "ProdStorageDeps")
+	assert.Equal(t, s.TransientCount(), 0)
 	world := []struct {
 		key, value string
 	}{
@@ -139,19 +161,42 @@ func ProdStorageDeps(t *testing.T, s *storage.Storage) {
 		{"sub2", " "},
 		{"sub", "sub1 sub2"},
 	}
+
 	for _, v := range world {
-		s.ReferOrStoreBlock(v.key, []byte(v.value)).Close()
+		k2v[v.key] = v.value
+		nv := make([]byte, len(v.value))
+		copy(nv, []byte(v.value))
+		s.ReferOrStoreBlock(v.key, nv).Close()
 	}
-	s.SetNameToBlockId("name", "sub")
+	name := "subname"
+	s.SetNameToBlockId(name, "sub")
 	for _, v := range world {
 		s.ReleaseBlockId(v.key)
 	}
 	s.Flush()
-	n := s.GetBlockIdByName("name")
+	n := s.GetBlockIdByName(name)
 	assert.Equal(t, n, "sub")
+
 	b := s.GetBlockById("sub12")
 	assert.True(t, b != nil)
 	b.Close()
+
+	assert.Equal(t, s.TransientCount(), 0)
+	s.SetNameToBlockId(name, "sub1")
+	s.Flush()
+
+	// should be gone due to ref disappearing
+	assert.Nil(t, s.GetBlockById("sub"))
+
+	// children of sub should be still ok
+	b = s.GetBlockById("sub12")
+	assert.True(t, b != nil)
+	b.Close()
+
+	// transient count still should be 0
+	assert.Equal(t, s.TransientCount(), 0)
+
+	assert.True(t, !broken)
 }
 
 func ProdStorage(t *testing.T, factory func() storage.Backend) {
@@ -169,17 +214,7 @@ func ProdStorage(t *testing.T, factory func() storage.Backend) {
 	s2.Backend = nil
 	s2.Close()
 
-	s3 := storage.Storage{Backend: be,
-		Codec: c,
-		IterateReferencesCallback: func(id string, data []byte, cb storage.BlockReferenceCallback) {
-			for _, subid := range strings.Split(string(data), " ") {
-				if subid != "" {
-					cb(subid)
-				}
-			}
-		}}.Init()
-	ProdStorageDeps(t, s3)
-	s3.Close()
+	ProdStorageDeps(t, be)
 }
 
 func TestBackend(t *testing.T) {

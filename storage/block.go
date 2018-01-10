@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Wed Jan 10 11:02:58 2018 mstenber
- * Edit time:     211 min
+ * Last modified: Wed Jan 10 12:46:46 2018 mstenber
+ * Edit time:     218 min
  *
  */
 
@@ -80,8 +80,15 @@ func (self *Block) GetData() []byte {
 	return *self.Data.Get()
 }
 
+const idLenInString = 4
+
 func (self *Block) String() string {
-	return fmt.Sprintf("Bl@%p{Id:%x, rc:%v/src:%v}", self, self.Id[:4], self.RefCount, self.storageRefCount)
+	id := self.Id
+	if len(id) > idLenInString {
+		id = id[:idLenInString]
+	}
+
+	return fmt.Sprintf("Bl@%p{Id:%x, rc:%v/src:%v}", self, id, self.RefCount, self.storageRefCount)
 }
 
 func (self *Block) flush() int {
@@ -138,9 +145,9 @@ func (self *Block) flush() int {
 		}
 	}
 	self.Stored = nil
+	delete(self.storage.dirtyBlocks, self.Id)
 
 	self.addStorageRefCount(-1)
-	delete(self.storage.dirtyBlocks, self.Id)
 	return ops
 }
 
@@ -180,6 +187,9 @@ func (self *Block) addStorageRefCount(v int32) {
 func (self *Block) markDirty() {
 	if self.Stored != nil {
 		mlog.Printf2("storage/block", "%v.markDirty (already)", self)
+		if self.storage.dirtyBlocks[self.Id] != self {
+			mlog.Panicf("markDirty - Stored set but not in dirtyBlocks list")
+		}
 		return
 	}
 	mlog.Printf2("storage/block", "%v.markDirty (fresh)", self)
@@ -263,7 +273,10 @@ func (self *Storage) getBlockById(id string) *Block {
 			return nil
 		}
 		b.storage = self
+		b.storageRefCount = 0
 		b.haveDiskRefs = true
+		b.haveStorageRefs = false
+		b.Stored = nil
 		self.blocks[id] = b
 	}
 	return b

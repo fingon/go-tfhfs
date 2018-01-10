@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan 10 11:43:58 2018 mstenber
- * Edit time:     578 min
+ * Last modified: Wed Jan 10 12:42:07 2018 mstenber
+ * Edit time:     588 min
  *
  */
 
@@ -321,9 +321,8 @@ func (self *Storage) flushBlockName(k string, v *oldNewStruct) {
 	if v.newValue != "" {
 		b := self.getBlockById(v.newValue)
 		b.addRefCount(1)
-		// the newValue retains its +1 storage refcount as
-		// otherwise bookkeeping gets ugly in
-		// e.g. setNameToBlockId.
+		b.addStorageRefCount(-1)
+		v.gotStorageRef = false
 	}
 	if v.oldValue != "" {
 		b := self.getBlockById(v.oldValue)
@@ -343,13 +342,26 @@ func (self *Storage) flushBlockNames() int {
 	return ops
 }
 
+func (self *Storage) TransientCount() int {
+	mlog.Printf2("storage/storage", "TransientCount")
+	transient := 0
+	for _, b := range self.blocks {
+		if b.RefCount == 0 {
+			mlog.Printf2("storage/storage", " %v", b)
+			transient++
+		}
+	}
+	return transient
+}
+
 func (self *Storage) flush() int {
 	mlog.Printf2("storage/storage", "st.Flush")
 	mlog.Printf2("storage/storage", " reads since last flush: %d - %d k", self.reads, self.reads/1024)
 	mlog.Printf2("storage/storage", " writes since last flush: %d - %d k", self.writes, self.writebytes/1024)
-	mlog.Printf2("storage/storage", " blocks:%d (%d dirty)",
+	mlog.Printf2("storage/storage", " blocks:%d (%d dirty, %d transient)",
 		len(self.blocks),
-		len(self.dirtyBlocks))
+		len(self.dirtyBlocks),
+		self.TransientCount())
 	self.reads = 0
 	self.readbytes = 0
 	self.writes = 0

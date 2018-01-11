@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Wed Jan 10 00:46:13 2018 mstenber
- * Edit time:     734 min
+ * Last modified: Thu Jan 11 08:12:58 2018 mstenber
+ * Edit time:     737 min
  *
  */
 
@@ -25,7 +25,6 @@ import (
 	"strings"
 
 	"github.com/fingon/go-tfhfs/mlog"
-	"github.com/fingon/go-tfhfs/util"
 )
 
 const hashSize = 32
@@ -164,16 +163,22 @@ func (self *IBNode) CommitTo(backend IBTreeSaver) (*IBNode, BlockId) {
 			if cc == 1 {
 				handleOne(onlyi)
 			} else {
-				wg := &util.SimpleWaitGroup{}
+				//wg := &util.SimpleWaitGroup{}
 				for i, c := range self.Children {
 					if c.childNode != nil {
 						i := i
-						wg.Go(func() {
-							handleOne(i)
-						})
+						//wg.Go(func() {
+						handleOne(i)
+						//})
 					}
 				}
-				wg.Wait()
+				//wg.Wait()
+				// ^ while on paper this is nice idea,
+				// in practise it is not significant
+				// speedup and the goroutines will
+				// hang around consuming plenty of
+				// space for a long while
+				// afterwards. so skip for now..
 			}
 		}
 	}

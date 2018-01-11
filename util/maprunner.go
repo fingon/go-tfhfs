@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 16:45:31 2018 mstenber
- * Last modified: Wed Jan 10 10:54:22 2018 mstenber
- * Edit time:     37 min
+ * Last modified: Thu Jan 11 08:15:34 2018 mstenber
+ * Edit time:     41 min
  *
  */
 
@@ -53,7 +53,7 @@ func (self *MapRunner) Close() {
 	}
 }
 
-func (self *MapRunner) Run(key interface{}, cb MapRunnerCallback) {
+func (self *MapRunner) Go(key interface{}, cb MapRunnerCallback) {
 	defer self.lock.Locked()()
 	if self.busy == nil {
 		self.died.L = &self.lock

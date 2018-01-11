@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan 10 16:59:42 2018 mstenber
- * Edit time:     330 min
+ * Last modified: Thu Jan 11 08:20:10 2018 mstenber
+ * Edit time:     333 min
  *
  */
 
@@ -48,6 +48,7 @@ type Fs struct {
 	root                 fsTreeRootAtomicPointer
 	nodeDataCache        gcache.Cache
 	transactionRetryLock util.MutexLocked
+	writeLimiter         util.ParallelLimiter
 
 	// transactions is the map of active transactions
 	transactions map[*fsTransaction]bool
@@ -166,6 +167,7 @@ func NewFs(st *storage.Storage, rootName string, cacheSize int) *Fs {
 	fs.closing = make(chan chan struct{})
 	fs.flushInterval = 1 * time.Second
 	fs.inodeTracker.Init(fs)
+	fs.writeLimiter.LimitPerCPU = 3 // somewhat IO bound
 	fs.tree = ibtree.IBTree{NodeMaximumSize: 4096}.Init(fs)
 	st.IterateReferencesCallback = func(id string, data []byte, cb storage.BlockReferenceCallback) {
 		fs.iterateReferencesCallback(id, data, cb)
@@ -194,7 +196,7 @@ func NewFs(st *storage.Storage, rootName string, cacheSize int) *Fs {
 			root.SetMetaInTransaction(&meta, tr)
 		})
 	}
-	go func() {
+	go func() { // ok, singleton per fs
 		for {
 			select {
 			case done := <-fs.closing:

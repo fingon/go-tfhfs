@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Wed Jan 10 13:26:37 2018 mstenber
- * Edit time:     367 min
+ * Last modified: Thu Jan 11 07:48:18 2018 mstenber
+ * Edit time:     372 min
  *
  */
 
@@ -362,7 +362,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 	self.inode.metaWriteLock.ClearOwner()
 	locked.ClearOwner()
 
-	go func() {
+	self.Fs().writeLimiter.Go(func() {
 		mlog.Printf2("fs/fh", "%v.Write-2", self)
 		self.inode.metaWriteLock.UpdateOwner()
 		locked.UpdateOwner()
@@ -393,7 +393,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 		self.writeInTransaction(meta, tr, buf, odata, obuf, wbuf, bofs, offset, end)
 		tr.CommitUntilSucceeds()
 		mlog.Printf2("fs/fh", " updated data block %v", e)
-	}()
+	})
 
 	return
 }

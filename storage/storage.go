@@ -4,17 +4,14 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan 10 17:32:48 2018 mstenber
- * Edit time:     603 min
+ * Last modified: Thu Jan 11 08:34:10 2018 mstenber
+ * Edit time:     609 min
  *
  */
 
 package storage
 
 import (
-	"fmt"
-	"log"
-
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/mlog"
 )
@@ -28,73 +25,6 @@ type BlockIterateReferencesCallback func(string, []byte, BlockReferenceCallback)
 type oldNewStruct struct {
 	oldValue, newValue string
 	gotStorageRef      bool
-}
-
-type jobOut struct {
-	sb *StorageBlock
-	id string
-}
-
-type jobType int
-
-const (
-	jobFlush jobType = iota
-	jobGetBlockById
-	jobGetBlockIdByName
-	jobSetNameToBlockId
-	jobReferOrStoreBlock            // ReferOrStoreBlock, ReferOrStoreBlock0
-	jobUpdateBlockIdRefCount        // ReferBlockId, ReleaseBlockId
-	jobUpdateBlockIdStorageRefCount // ReleaseStorageBlockId
-	jobStoreBlock                   // StoreBlock, StoreBlock0
-	jobQuit
-)
-
-func (self jobType) String() string {
-	switch self {
-	case jobFlush:
-		return "jobFlush"
-	case jobGetBlockById:
-		return "jobGetBlockById"
-	case jobGetBlockIdByName:
-		return "jobGetBlockIdByName"
-	case jobSetNameToBlockId:
-		return "jobSetNameToBlockId"
-	case jobReferOrStoreBlock:
-		return "jobReferOrStoreBlock"
-	case jobUpdateBlockIdRefCount:
-		return "jobUpdateBlockIdRefCount"
-	case jobUpdateBlockIdStorageRefCount:
-		return "jobUpdateBlockIdStorageRefCount"
-	case jobStoreBlock:
-		return "jobStoreBlock"
-	case jobQuit:
-		return "jobQuit"
-	default:
-		return fmt.Sprintf("%d", int(self))
-	}
-}
-
-type jobIn struct {
-	// see job* above
-	jobType jobType
-
-	sb *StorageBlock
-
-	// in jobReferOrStoreBlock, jobUpdateBlockIdRefCount, jobStoreBlock
-	count int32
-
-	// block id
-	id string
-
-	// block name
-	name string
-
-	// block data
-	data []byte
-
-	status BlockStatus
-
-	out chan *jobOut
 }
 
 type blockMap map[string]*Block
@@ -165,88 +95,16 @@ func (self *Storage) Close() {
 	}
 }
 
-func (self *Storage) run() {
-	for job := range self.jobChannel {
-		mlog.Printf2("storage/storage", "st.run job %v", job.jobType)
-		switch job.jobType {
-		case jobQuit:
-			job.out <- nil
-			return
-		case jobFlush:
-			self.flush()
-			job.out <- nil
-		case jobGetBlockById:
-			b := self.getBlockById(job.id)
-			job.out <- &jobOut{sb: NewStorageBlock(b)}
-		case jobGetBlockIdByName:
-			job.out <- &jobOut{id: self.getName(job.name).newValue}
-		case jobReferOrStoreBlock:
-			b := self.getBlockById(job.id)
-			if b != nil {
-				b.addRefCount(job.count)
-				job.out <- &jobOut{sb: NewStorageBlock(b)}
-				continue
-			}
-			job.status = BlockStatus_NORMAL
-			mlog.Printf2("storage/storage", "fallthrough to storing block")
-			fallthrough
-		case jobStoreBlock:
-			b := &Block{Id: job.id,
-				storage: self,
-			}
-			//nd := make([]byte, len(job.data))
-			//mlog.Printf2("storage/storage", "allocated size:%d", len(job.data))
-			//copy(nd, job.data)
-			//b.Data.Set(&nd)
-			b.Data.Set(&job.data)
-			self.blocks[job.id] = b
-			b.setStatus(job.status)
-			b.addRefCount(job.count)
-			job.out <- &jobOut{sb: NewStorageBlock(b)}
-		case jobUpdateBlockIdRefCount:
-			b := self.getBlockById(job.id)
-			if b == nil {
-				log.Panicf("block id %x disappeared", job.id)
-			}
-			b.addRefCount(job.count)
-		case jobUpdateBlockIdStorageRefCount:
-			b := self.getBlockById(job.id)
-			if b == nil {
-				log.Panicf("block id %x disappeared", job.id)
-			}
-			b.addExternalStorageRefCount(job.count)
-			b.addStorageRefCount(job.count)
-		case jobSetNameToBlockId:
-			self.setNameToBlockId(job.name, job.id)
-		default:
-			log.Panicf("Unknown job type: %d", job.jobType)
+func (self *Storage) TransientCount() int {
+	// mlog.Printf2("storage/storage", "TransientCount")
+	transient := 0
+	for _, b := range self.blocks {
+		if b.RefCount == 0 {
+			// mlog.Printf2("storage/storage", " %v", b)
+			transient++
 		}
-		mlog.Printf2("storage/storage", " st.run job done")
 	}
-}
-
-func (self *Storage) Flush() {
-	out := make(chan *jobOut)
-	self.jobChannel <- &jobIn{jobType: jobFlush, out: out}
-	<-out
-}
-
-func (self *Storage) GetBlockById(id string) *StorageBlock {
-	out := make(chan *jobOut)
-	self.jobChannel <- &jobIn{jobType: jobGetBlockById, out: out,
-		id: id,
-	}
-	jr := <-out
-	return jr.sb
-}
-
-func (self *Storage) GetBlockIdByName(name string) string {
-	out := make(chan *jobOut)
-	self.jobChannel <- &jobIn{jobType: jobGetBlockIdByName, out: out,
-		name: name,
-	}
-	jr := <-out
-	return jr.id
+	return transient
 }
 
 func (self *Storage) setNameToBlockId(name, bid string) {
@@ -260,68 +118,6 @@ func (self *Storage) setNameToBlockId(name, bid string) {
 	n.newValue = bid
 	n.gotStorageRef = true
 }
-
-func (self *Storage) storeBlockInternal(jobType jobType, id string, data []byte, count int32) *StorageBlock {
-	if data == nil {
-		mlog.Printf2("storage/storage", "no data given")
-	}
-	out := make(chan *jobOut)
-	self.jobChannel <- &jobIn{jobType: jobType, out: out,
-		id: id, data: data, count: count, status: BlockStatus_NORMAL,
-	}
-	jr := <-out
-	return jr.sb
-}
-
-func (self *Storage) ReferOrStoreBlock(id string, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobReferOrStoreBlock, id, data, 1)
-}
-
-func (self *Storage) ReferOrStoreBlock0(id string, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobReferOrStoreBlock, id, data, 0)
-}
-
-func (self *Storage) ReferBlockId(id string) {
-	self.jobChannel <- &jobIn{jobType: jobUpdateBlockIdRefCount,
-		id: id, count: 1,
-	}
-}
-
-func (self *Storage) ReferStorageBlockId(id string) {
-	mlog.Printf2("storage/storage", "ReferStorageBlockId %x", id)
-	self.jobChannel <- &jobIn{jobType: jobUpdateBlockIdStorageRefCount,
-		id: id, count: 1,
-	}
-}
-
-func (self *Storage) ReleaseBlockId(id string) {
-	self.jobChannel <- &jobIn{jobType: jobUpdateBlockIdRefCount,
-		id: id, count: -1,
-	}
-}
-
-func (self *Storage) ReleaseStorageBlockId(id string) {
-	mlog.Printf2("storage/storage", "ReleaseStorageBlockId %x", id)
-	self.jobChannel <- &jobIn{jobType: jobUpdateBlockIdStorageRefCount,
-		id: id, count: -1,
-	}
-}
-
-func (self *Storage) SetNameToBlockId(name, block_id string) {
-	self.jobChannel <- &jobIn{jobType: jobSetNameToBlockId,
-		id: block_id, name: name,
-	}
-}
-
-func (self *Storage) StoreBlock(id string, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobStoreBlock, id, data, 1)
-}
-
-func (self *Storage) StoreBlock0(id string, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobStoreBlock, id, data, 0)
-}
-
-/// Private
 
 func (self *Storage) getName(name string) *oldNewStruct {
 	n, ok := self.names[name]
@@ -359,18 +155,6 @@ func (self *Storage) flushBlockNames() int {
 		}
 	}
 	return ops
-}
-
-func (self *Storage) TransientCount() int {
-	mlog.Printf2("storage/storage", "TransientCount")
-	transient := 0
-	for _, b := range self.blocks {
-		if b.RefCount == 0 {
-			mlog.Printf2("storage/storage", " %v", b)
-			transient++
-		}
-	}
-	return transient
 }
 
 func (self *Storage) flush() int {

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 10 09:22:12 2018 mstenber
- * Last modified: Wed Jan 10 11:21:54 2018 mstenber
- * Edit time:     20 min
+ * Last modified: Thu Jan 11 08:30:04 2018 mstenber
+ * Edit time:     28 min
  *
  */
 
@@ -20,9 +20,14 @@ import (
 type mapRunnerBackend struct {
 	proxyBackend
 	mr util.MapRunner
+	pl util.ParallelLimiter
 }
 
 var _ Backend = &mapRunnerBackend{}
+
+func (self *mapRunnerBackend) Init(config BackendConfiguration) {
+	(&self.proxyBackend).Init(config)
+}
 
 func (self *mapRunnerBackend) Close() {
 	self.mr.Close()
@@ -32,7 +37,9 @@ func (self *mapRunnerBackend) Close() {
 
 func (self *mapRunnerBackend) runWithBlock(b *Block, cb func()) {
 	b.addStorageRefCount(1)
-	self.mr.Run(b.Id, cb)
+	self.pl.Go(func() {
+		self.mr.Go(b.Id, cb)
+	})
 	b.addStorageRefCount(-1)
 }
 
@@ -53,12 +60,14 @@ func (self *mapRunnerBackend) GetBlockData(b *Block) []byte {
 
 func (self *mapRunnerBackend) GetBlockById(id string) *Block {
 	var fut BlockPointerFuture
-	self.mr.Run(id, func() {
-		bl := self.Backend.GetBlockById(id)
-		if bl != nil {
-			bl.Backend = self
-		}
-		fut.Set(bl)
+	self.pl.Go(func() {
+		self.mr.Go(id, func() {
+			bl := self.Backend.GetBlockById(id)
+			if bl != nil {
+				bl.Backend = self
+			}
+			fut.Set(bl)
+		})
 	})
 	return fut.Get()
 }

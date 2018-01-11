@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Wed Jan 10 16:32:34 2018 mstenber
- * Edit time:     194 min
+ * Last modified: Thu Jan 11 13:16:29 2018 mstenber
+ * Edit time:     206 min
  *
  */
 
@@ -171,6 +171,44 @@ func ProdFs(t *testing.T, fs *Fs) {
 
 	err = root.Remove("/asdf")
 	assert.True(t, err != nil)
+
+	f, err := root.OpenFile("/private/rootfile", uint32(os.O_CREATE|os.O_TRUNC|os.O_WRONLY), 0666)
+	assert.Nil(t, err)
+	_, err = f.Write([]byte("data"))
+	assert.Nil(t, err)
+	f.Close()
+
+	err = root.Link("/private/rootfile", "/public/rootfilelink")
+	assert.Nil(t, err)
+
+	fi, err = root.Stat("/public/rootfilelink")
+	assert.Nil(t, err)
+	assert.False(t, fi.IsDir())
+
+	err = root.Symlink("rootfilelink", "/public/rootfilesymlink")
+	assert.Nil(t, err)
+
+	fi, err = root.Stat("/public/rootfilesymlink")
+	assert.Nil(t, err)
+	assert.False(t, fi.IsDir())
+
+	s, err := root.Readlink("/public/rootfilesymlink")
+	assert.Equal(t, s, "rootfilelink")
+
+	err = root.Rename("/public/rootfilesymlink", "/rootfilesymlink2")
+	assert.Nil(t, err)
+
+	s, err = root.Readlink("/rootfilesymlink2")
+	assert.Equal(t, s, "rootfilelink")
+
+	err = root.Chown("/private/rootfile", 13, 7)
+	assert.Nil(t, err)
+
+	err = root.Chtimes("/private/rootfile", time.Now(), time.Now())
+	assert.Nil(t, err)
+
+	err = root.Chmod("/private/rootfile", os.FileMode(0))
+	assert.Nil(t, err)
 
 	u1 := NewFSUser(fs)
 	u1.Uid = 13

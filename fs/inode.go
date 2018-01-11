@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Wed Jan 10 00:19:37 2018 mstenber
- * Edit time:     307 min
+ * Last modified: Thu Jan 11 12:14:45 2018 mstenber
+ * Edit time:     309 min
  *
  */
 
@@ -425,15 +425,17 @@ func (self *inodeTracker) getInode(ino uint64) *inode {
 }
 
 func (self *inodeTracker) GetInode(ino uint64) *inode {
-	defer self.inodeLock.Locked()()
+	self.inodeLock.Lock()
 	mlog.Printf2("fs/inode", "GetInode %v", ino)
 	inode := self.getInode(ino)
 	if inode.Meta() == nil {
 		mlog.Printf2("fs/inode", " no meta")
+		self.inodeLock.Unlock()
 		inode.Release()
 		return nil
 	}
 	mlog.Printf2("fs/inode", " valid")
+	self.inodeLock.Unlock()
 	return inode
 }
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Mon Jan  8 17:30:36 2018 mstenber
- * Edit time:     284 min
+ * Last modified: Thu Jan 11 13:27:36 2018 mstenber
+ * Edit time:     312 min
  *
  */
 
@@ -145,8 +145,10 @@ func (self *fsOps) GetAttr(input *GetAttrIn, out *AttrOut) (code Status) {
 }
 
 func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
+	mlog.Printf2("fs/ops", "SetAttr")
 	inode := self.fs.GetInode(input.NodeId)
 	if inode == nil {
+		mlog.Printf2("fs/ops", " no such file")
 		return ENOENT
 	}
 	defer inode.Release()
@@ -193,7 +195,8 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		// FATTR_FH?
 		if input.Valid&FATTR_UID != 0 {
 			newmeta.StUid = input.Uid
-			if input.Uid != 0 && newmeta.StUid != meta.StUid {
+			if input.Context.Uid != 0 && newmeta.StUid != meta.StUid {
+				mlog.Printf2("fs/ops", " non-root setting uid")
 				code = EPERM
 				// Non-root setting uid = bad.
 				return
@@ -203,6 +206,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 			newmeta.StGid = input.Gid
 			// Eventually: Check group setting permission for uid
 			if input.Uid != 0 {
+				mlog.Printf2("fs/ops", " non-root setting gid")
 				mode_filter = syscall.S_ISUID | syscall.S_ISGID
 			}
 		}
@@ -224,6 +228,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		if newmeta != meta.InodeMetaData {
 			code = self.access(inode, W_OK, true, &input.Context)
 			if !code.Ok() {
+				mlog.Printf2("fs/ops", " inode not w-ok")
 				code = EPERM
 				return
 			}
@@ -328,6 +333,14 @@ func (self *fsOps) Readlink(input *InHeader) (out []byte, code Status) {
 	}
 	// Eventually check it is actually link?
 	meta := inode.Meta()
+	if meta == nil {
+		code = ENOENT
+		return
+	}
+	if (meta.StMode & S_IFLNK) == 0 {
+		code = EINVAL
+		return
+	}
 	out = meta.Data
 	code = OK
 	return
@@ -483,17 +496,20 @@ func (self *fsOps) RemoveXAttr(input *InHeader, attr string) (code Status) {
 }
 
 func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code Status) {
+	mlog.Printf2("fs/ops", "Rename")
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
 	code = self.access(inode, W_OK|X_OK, true, &input.Context)
 	if !code.Ok() {
+		mlog.Printf2("fs/ops", " no permissions")
 		return
 	}
 
 	child, code := self.lookup(inode, oldName, &input.Context)
 	defer child.Release()
 	if !code.Ok() {
+		mlog.Printf2("fs/ops", " no oldName")
 		return
 	}
 
@@ -501,16 +517,19 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 	defer new_inode.Release()
 	code = self.access(new_inode, W_OK|X_OK, true, &input.Context)
 	if !code.Ok() {
+		mlog.Printf2("fs/ops", " no write permission to newdir")
 		return
 	}
 
 	new_child, code := self.lookup(new_inode, newName, &input.Context)
 	defer new_child.Release()
 	if code.Ok() {
+		mlog.Printf2("fs/ops", " already exists, trying to unlink")
 		ih := input.InHeader
 		ih.NodeId = input.Newdir
 		code = self.unlink(&ih, newName, nil)
 		if !code.Ok() {
+			mlog.Printf2("fs/ops", " unlink failed")
 			return
 		}
 	}
@@ -523,32 +542,49 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 		return
 	}
 
-	code = self.unlink(&input.InHeader, oldName, nil)
-	if !code.Ok() {
-		return
+	if oldName != newName || input.NodeId != input.Newdir {
+		code = self.unlink(&input.InHeader, oldName, nil)
+		if !code.Ok() {
+			return
+		}
 	}
-	return OK
+	return
 }
 
 func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
 
+	mlog.Printf2("fs/ops", "Link")
 	inode := self.fs.GetInode(input.NodeId)
+	if inode == nil {
+		mlog.Printf2("fs/ops", " containing directory not found")
+		return ENOENT
+	}
+
 	defer inode.Release()
 	defer inode.metaWriteLock.Locked()()
 	code = self.access(inode, W_OK|X_OK, true, &input.Context)
 	if !code.Ok() {
+		mlog.Printf2("fs/ops", " no access to containing directory")
 		return
 	}
 
 	child, code := self.lookup(inode, name, &input.Context)
-	defer child.Release()
 	if code.Ok() {
+		mlog.Printf2("fs/ops", " existing child with name")
+		defer child.Release()
 		code = Status(syscall.EEXIST)
 		return
 	}
 
+	child = self.fs.GetInode(input.Oldnodeid)
+	if child == nil {
+		mlog.Printf2("fs/ops", " original child %v not found", input.Oldnodeid)
+		return ENOENT
+	}
+	defer child.Release()
 	defer child.metaWriteLock.Locked()()
 	inode.AddChild(name, child)
+
 	return OK
 
 }
@@ -626,7 +662,7 @@ func (self *fsOps) Symlink(input *InHeader, pointedTo string, linkName string, o
 
 func (self *fsOps) Flush(input *FlushIn) Status {
 	// TBD
-	return OK
+	return ENOSYS
 }
 
 func (self *fsOps) Flock(input *FlockIn, flags int) Status {

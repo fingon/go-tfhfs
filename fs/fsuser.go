@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Tue Jan  9 09:33:17 2018 mstenber
- * Edit time:     159 min
+ * Last modified: Thu Jan 11 13:28:21 2018 mstenber
+ * Edit time:     213 min
  *
  */
 
@@ -17,6 +17,8 @@
 //
 // (parallel testing, arbitrary permission simulation with nonroot
 // user)
+//
+// TBD: do something about
 package fs
 
 import (
@@ -120,10 +122,12 @@ func (self *FSUser) lookup(path string, eo *fuse.EntryOut) (err error) {
 			return
 		}
 		inode = eo.Ino
+		self.ops.Forget(inode, 1)
 	}
 	self.NodeId = inode
 	if inode == oinode {
 		err = s2e(self.ops.Lookup(&self.InHeader, ".", eo))
+		self.ops.Forget(inode, 1)
 	}
 	return
 }
@@ -142,13 +146,14 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 	}
 	del := fuse.NewDirEntryList(make([]byte, 1000), 0)
 
+	// Make sure readdir does not blow up
 	err = s2e(self.ops.ReadDir(&fuse.ReadIn{Fh: oo.Fh,
 		InHeader: self.InHeader}, del))
 	if err != nil {
 		return
 	}
-	// We got _something_. No way to make sure it was fine. Oh well.
-	// Cheat using backdoor API.
+
+	// Make sure readdirplus does not blow up
 	err = s2e(self.ops.ReadDirPlus(&fuse.ReadIn{Fh: oo.Fh,
 		InHeader: self.InHeader}, del))
 	if err != nil {
@@ -203,6 +208,13 @@ func (self *FSUser) Stat(path string) (fi os.FileInfo, err error) {
 	if err != nil {
 		return
 	}
+	var gai fuse.GetAttrIn
+	var ao fuse.AttrOut
+	gai.InHeader = self.InHeader
+	err = s2e(self.ops.GetAttr(&gai, &ao))
+	if err != nil {
+		return
+	}
 	_, basename := filepath.Split(path)
 	fi = &fileInfo{name: basename,
 		size:  int64(eo.Size),
@@ -230,6 +242,147 @@ func (self *FSUser) Remove(path string) (err error) {
 		err = s2e(self.ops.Unlink(&self.InHeader, basename))
 	}
 	return
+}
+
+// Chown is clone of os.Chown
+func (self *FSUser) Chown(path string, uid, gid int) (err error) {
+	defer self.lock.Locked()()
+	mlog.Printf2("fs/fsuser", "%v.Chown %v : %v %v", self, path, uid, gid)
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	var sai fuse.SetAttrIn
+	sai.InHeader = self.InHeader
+	sai.Valid = fuse.FATTR_UID | fuse.FATTR_GID
+	sai.Owner.Uid = uint32(uid)
+	sai.Owner.Gid = uint32(gid)
+
+	var ao fuse.AttrOut
+	err = s2e(self.ops.SetAttr(&sai, &ao))
+	return
+}
+
+// Chmod is clone of os.Chmod
+func (self *FSUser) Chmod(path string, mode os.FileMode) (err error) {
+	defer self.lock.Locked()()
+	mlog.Printf2("fs/fsuser", "%v.Chmod %v : %v", self, path, mode)
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	var sai fuse.SetAttrIn
+	sai.InHeader = self.InHeader
+	sai.Valid = fuse.FATTR_MODE
+	sai.Mode = uint32(mode)
+
+	var ao fuse.AttrOut
+	err = s2e(self.ops.SetAttr(&sai, &ao))
+	return
+}
+
+// Chtimes is clone of os.Chtimes
+func (self *FSUser) Chtimes(path string, atime time.Time, mtime time.Time) (err error) {
+	defer self.lock.Locked()()
+	mlog.Printf2("fs/fsuser", "%v.Chtimes %v : %v %v", self, path, atime, mtime)
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	var sai fuse.SetAttrIn
+	sai.InHeader = self.InHeader
+	sai.Valid = fuse.FATTR_ATIME | fuse.FATTR_MTIME
+	sai.Atime = uint64(atime.Unix())
+	sai.Atimensec = uint32(atime.Nanosecond())
+	sai.Mtime = uint64(mtime.Unix())
+	sai.Mtimensec = uint32(mtime.Nanosecond())
+
+	var ao fuse.AttrOut
+	err = s2e(self.ops.SetAttr(&sai, &ao))
+	return
+
+}
+
+// Link is clone of os.Link
+func (self *FSUser) Link(oldpath, newpath string) (err error) {
+	defer self.lock.Locked()()
+	mlog.Printf2("fs/fsuser", "%v.Link %v => %v", self, oldpath, newpath)
+	var eo fuse.EntryOut
+	err = self.lookup(oldpath, &eo)
+	if err != nil {
+		mlog.Printf2("fs/fsuser", " oldpath %v error %v", oldpath, err)
+		return
+	}
+	var li fuse.LinkIn
+	li.Oldnodeid = self.NodeId
+	mlog.Printf2("fs/fsuser", " Oldnodeid=%v", li.Oldnodeid)
+	dirname, basename := filepath.Split(newpath)
+	err = self.lookup(dirname, &eo)
+	if err != nil {
+		mlog.Printf2("fs/fsuser", " dirname %v error %v", dirname, err)
+		return
+	}
+	li.InHeader = self.InHeader
+	err = s2e(self.ops.Link(&li, basename, &eo))
+	return
+}
+
+// Rename is clone of os.Rename
+func (self *FSUser) Rename(oldpath, newpath string) (err error) {
+	defer self.lock.Locked()()
+	mlog.Printf2("fs/fsuser", "%v.Rename %v => %v", self, oldpath, newpath)
+	var eo fuse.EntryOut
+	olddirname, oldbasename := filepath.Split(oldpath)
+	newdirname, newbasename := filepath.Split(newpath)
+	err = self.lookup(newdirname, &eo)
+	if err != nil {
+		return
+	}
+	var ri fuse.RenameIn
+	ri.Newdir = self.NodeId
+	err = self.lookup(olddirname, &eo)
+	if err != nil {
+		return
+	}
+	ri.InHeader = self.InHeader
+	err = s2e(self.ops.Rename(&ri, oldbasename, newbasename))
+	return
+}
+
+// Symlink is clone of os.Symlink
+func (self *FSUser) Symlink(oldpath, newpath string) (err error) {
+	defer self.lock.Locked()()
+	mlog.Printf2("fs/fsuser", "%v.Symlink %v => %v %v", self, oldpath, newpath)
+	dirname, basename := filepath.Split(newpath)
+	var eo fuse.EntryOut
+	err = self.lookup(dirname, &eo)
+	if err != nil {
+		return
+	}
+	err = s2e(self.ops.Symlink(&self.InHeader, oldpath, basename, &eo))
+	return
+}
+
+// Readlink is clone of os.Readlink
+func (self *FSUser) Readlink(path string) (s string, err error) {
+	defer self.lock.Locked()()
+	mlog.Printf2("fs/fsuser", "%v.Readlink %v", self, path)
+	var eo fuse.EntryOut
+	err = self.lookup(path, &eo)
+	if err != nil {
+		return
+	}
+	out, code := self.ops.Readlink(&self.InHeader)
+	err = s2e(code)
+	if err != nil {
+		return
+	}
+	s = string(out)
+	return
+
 }
 
 func (self *FSUser) GetXAttr(path, attr string) (b []byte, err error) {

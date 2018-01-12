@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Thu Jan 11 13:16:29 2018 mstenber
- * Edit time:     206 min
+ * Last modified: Fri Jan 12 14:10:00 2018 mstenber
+ * Edit time:     207 min
  *
  */
 
@@ -257,7 +257,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 
 	wg.Go(func() {
 		_, err := u2.Stat("/u1/o/.")
-		assert.Nil(t, err)
+		assert.True(t, err != nil)
 	})
 
 	wg.Go(func() {

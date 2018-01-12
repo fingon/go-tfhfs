@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Fri Jan 12 13:49:28 2018 mstenber
- * Edit time:     370 min
+ * Last modified: Fri Jan 12 14:22:37 2018 mstenber
+ * Edit time:     390 min
  *
  */
 
@@ -68,16 +68,16 @@ func (self *fsOps) access(inode *inode, mode uint32, orOwn bool, ctx *Context) S
 		mlog.Printf2("fs/ops", "access: +root")
 		return OK
 	}
+	// other permissions by default
 	perms := meta.StMode & 0x7
 	if ctx.Uid == meta.StUid {
 		if orOwn {
 			mlog.Printf2("fs/ops", "access: +owner")
 			return OK
 		}
-		perms |= (meta.StMode >> 6) & 0x7
-	}
-	if ctx.Gid == meta.StGid {
-		perms |= (meta.StMode >> 3) & 0x7
+		perms = (meta.StMode >> 6) & 0x7
+	} else if ctx.Gid == meta.StGid {
+		perms = (meta.StMode >> 3) & 0x7
 	}
 	if (perms & mode) == mode {
 		mlog.Printf2("fs/ops", "access: - (%v %v)", perms, mode)
@@ -160,6 +160,13 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 	defer inode.Release()
 	defer inode.metaWriteLock.Locked()()
 
+	uid := input.Context.Uid
+	root := uid == 0
+	ownGid := func(gid uint32) bool {
+		// Eventually could check supplementary groups too
+		return gid == input.Context.Gid
+	}
+
 	self.fs.Update(func(tr *fsTransaction) {
 		meta := inode.Meta()
 		newmeta := meta.InodeMetaData
@@ -199,9 +206,9 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		mode_filter := uint32(0)
 
 		// FATTR_FH?
-		if input.Valid&FATTR_UID != 0 && int32(input.Uid) != -1 && input.Uid != meta.StUid {
+		if input.Valid&FATTR_UID != 0 && int32(input.Uid) != -1 {
 			newmeta.StUid = input.Uid
-			if input.Context.Uid != 0 {
+			if !(root || input.Uid == meta.StUid) {
 				mlog.Printf2("fs/ops", " non-root setting uid")
 				code = EPERM
 				// Non-root setting uid = bad.
@@ -210,16 +217,16 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 			// On Linux/Darwin, this is expected behavior
 			mode_filter |= syscall.S_ISUID | syscall.S_ISGID
 		}
-		// Eventually the Context.Gid checks could check
-		// supplementary groups too
-		if input.Valid&FATTR_GID != 0 && int32(input.Gid) != -1 && input.Gid != meta.StGid {
+		if input.Valid&FATTR_GID != 0 && int32(input.Gid) != -1 {
 			newmeta.StGid = input.Gid
-			if input.Context.Uid != 0 && input.Context.Uid != meta.StUid && input.Gid != input.Context.Gid {
+			if !(root || (uid == meta.StUid && ownGid(input.Gid))) {
 				mlog.Printf2("fs/ops", " non-root setting gid")
 				code = EPERM
 				// Non-root setting uid = bad.
 				return
 			}
+			// On Linux/Darwin, this is expected behavior
+			mode_filter |= syscall.S_ISUID | syscall.S_ISGID
 		}
 		if input.Valid&FATTR_SIZE != 0 {
 			newmeta.StSize = input.Size
@@ -228,7 +235,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		oldmode := meta.StMode
 		mode := oldmode
 
-		if input.Context.Uid != 0 && input.Context.Uid != meta.StUid {
+		if !root && uid != meta.StUid {
 			// POSIXy weirdness - ignore setgid bit if we would fail
 			mode_filter |= syscall.S_ISGID
 		}
@@ -238,7 +245,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 			// accept any mode bits, OS knows best?
 			// (with OS X some relatively high bit modes are required,
 			// e.g. 0100xxx seems to be needed at least for cp to work even)
-			if input.Context.Uid != 0 && meta.StUid != input.Context.Uid && mode != oldmode {
+			if !root && meta.StUid != uid && mode != oldmode {
 				code = EPERM
 				mlog.Printf(" non-root setting non-owned mode")
 				return
@@ -420,6 +427,12 @@ func (self *fsOps) unlinkInInode(inode *inode, name string, isdir *bool, ctx *Co
 		return
 	}
 
+	code = self.stickyMutateCheck(inode, child, ctx)
+	if !code.Ok() {
+		mlog.Printf(" stickyMutateCheck failed")
+		return
+	}
+
 	code = self.access(inode, W_OK|X_OK, false, ctx)
 	if !code.Ok() {
 		return
@@ -430,6 +443,33 @@ func (self *fsOps) unlinkInInode(inode *inode, name string, isdir *bool, ctx *Co
 	}
 	inode.RemoveChildByName(name)
 	return OK
+}
+
+// stickyMutateCheck check handles sticky bit handling of directories.
+// If sticky bit is set, users cannot remove non-owned files unless
+// they own the directory as well.
+func (self *fsOps) stickyMutateCheck(inode, child *inode, ctx *Context) Status {
+	meta := inode.Meta()
+	if meta == nil {
+		return ENOENT
+	}
+	// Non-sticky directory = ok
+	if (meta.StMode & syscall.S_ISVTX) == 0 {
+		return OK
+	}
+	// root / own directory = ok
+	if ctx.Uid == 0 || ctx.Uid == meta.StUid {
+		return OK
+	}
+	cmeta := child.Meta()
+	if cmeta == nil {
+		return ENOENT
+	}
+	// Own direntry = ok
+	if ctx.Uid == cmeta.StUid {
+		return OK
+	}
+	return EPERM
 }
 
 func (self *fsOps) unlink(input *InHeader, name string, isdir *bool) (code Status) {
@@ -534,11 +574,23 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 		return
 	}
 
+	code = self.stickyMutateCheck(inode, child, &input.Context)
+	if !code.Ok() {
+		mlog.Printf(" stickyMutateCheck src failed")
+		return
+	}
+
 	new_inode := self.fs.GetInode(input.Newdir)
 	defer new_inode.Release()
 	code = self.access(new_inode, W_OK|X_OK, true, &input.Context)
 	if !code.Ok() {
 		mlog.Printf2("fs/ops", " no write permission to newdir")
+		return
+	}
+
+	code = self.stickyMutateCheck(new_inode, child, &input.Context)
+	if !code.Ok() {
+		mlog.Printf(" stickyMutateCheck dst failed")
 		return
 	}
 

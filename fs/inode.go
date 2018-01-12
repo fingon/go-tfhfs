@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Thu Jan 11 12:14:45 2018 mstenber
- * Edit time:     309 min
+ * Last modified: Fri Jan 12 13:25:28 2018 mstenber
+ * Edit time:     318 min
  *
  */
 
@@ -37,24 +37,34 @@ type inode struct {
 	metaWriteLock util.MutexLocked
 }
 
-func (self *inode) AddChild(name string, child *inode) {
+func (self *inode) AddChild(name string, child *inode) (code fuse.Status) {
 	mlog.Printf2("fs/inode", "inode.AddChild %v = %v", name, child)
-	self.Fs().Update(func(tr *fsTransaction) {
-		k := NewblockKeyDirFilename(self.ino, name)
-		rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
-		tr.t.Set(ibtree.IBKey(k), string(util.Uint64Bytes(child.ino)))
-		tr.t.Set(ibtree.IBKey(rk), "")
-
+	self.Fs().Update2(func(tr *fsTransaction) bool {
 		meta := child.Meta()
+		if meta == nil {
+			code = fuse.ENOENT
+			return false
+		}
 		meta.SetCTimeNow()
 		meta.StNlink++
 		child.SetMetaInTransaction(meta, tr)
 
 		meta = self.Meta()
+		if meta == nil {
+			code = fuse.ENOENT
+			return false
+		}
 		meta.SetMTimeNow()
 		meta.Nchildren++
 		self.SetMetaInTransaction(meta, tr)
+
+		k := NewblockKeyDirFilename(self.ino, name)
+		rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
+		tr.t.Set(ibtree.IBKey(k), string(util.Uint64Bytes(child.ino)))
+		tr.t.Set(ibtree.IBKey(rk), "")
+		return true
 	})
+	return
 }
 
 func (self *inode) Fs() *Fs {
@@ -120,6 +130,11 @@ func (self *inode) FillAttrOut(out *fuse.AttrOut) fuse.Status {
 }
 
 func (self *inode) FillEntryOut(out *fuse.EntryOut) fuse.Status {
+	// sometimes e.g. Link seems to provide nil out
+	// ( TBD is it a bug? feature? )
+	if out == nil {
+		return fuse.OK
+	}
 	// EntryOut
 	out.NodeId = self.ino
 	out.Generation = 0
@@ -252,36 +267,48 @@ func (self *inode) Forget(nlookup uint64) {
 	self.addRefCount(-int64(nlookup))
 }
 
-func (self *inode) RemoveChildByName(name string) {
+func (self *inode) RemoveChildByName(name string) (code fuse.Status) {
 	mlog.Printf2("fs/inode", "inode.RemoveChildByName %v", name)
 	var child *inode
 	child = self.GetChildByName(name)
 	if child == nil {
 		mlog.Printf2("fs/inode", " not found")
+		code = fuse.ENOENT
 		return
 	}
 	defer child.Release()
 	defer child.metaWriteLock.Locked()()
 
-	self.Fs().Update(func(tr *fsTransaction) {
-		k := NewblockKeyDirFilename(self.ino, name)
-		rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
-		tr.t.Delete(ibtree.IBKey(k))
-		tr.t.Delete(ibtree.IBKey(rk))
+	self.Fs().Update2(func(tr *fsTransaction) bool {
 		meta := child.Meta()
+		if meta == nil {
+			code = fuse.ENOENT
+			return false
+		}
 		meta.StNlink--
 		meta.SetCTimeNow()
 		child.SetMetaInTransaction(meta, tr)
 
 		meta = self.Meta()
+		if meta == nil {
+			code = fuse.ENOENT
+			return false
+		}
 		meta.Nchildren--
 		meta.SetMTimeNow()
 		self.SetMetaInTransaction(meta, tr)
+
+		k := NewblockKeyDirFilename(self.ino, name)
+		rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
+		tr.t.Delete(ibtree.IBKey(k))
+		tr.t.Delete(ibtree.IBKey(rk))
+		return true
 	})
 	mlog.Printf2("fs/inode", " Removed %v", child)
 	if self.Fs().server != nil {
 		self.Fs().server.DeleteNotify(self.ino, child.ino, name)
 	}
+	return
 }
 
 func decodeInodeMeta(v string) *InodeMeta {
@@ -532,5 +559,5 @@ func (self *InodeMetaData) SetCTimeNow() {
 }
 
 func (self *InodeMetaData) SetMTimeNow() {
-	self.setTimesNow(true, false, true)
+	self.setTimesNow(true, true, true)
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Fri Jan 12 09:58:28 2018 mstenber
- * Edit time:     314 min
+ * Last modified: Fri Jan 12 13:49:28 2018 mstenber
+ * Edit time:     370 min
  *
  */
 
@@ -84,7 +84,7 @@ func (self *fsOps) access(inode *inode, mode uint32, orOwn bool, ctx *Context) S
 		return OK
 	}
 	mlog.Printf2("fs/ops", "access: - (%v %v)", perms, mode)
-	return EPERM
+	return EACCES
 }
 
 // lookup gets child of a parent.
@@ -199,21 +199,26 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		mode_filter := uint32(0)
 
 		// FATTR_FH?
-		if input.Valid&FATTR_UID != 0 {
+		if input.Valid&FATTR_UID != 0 && int32(input.Uid) != -1 && input.Uid != meta.StUid {
 			newmeta.StUid = input.Uid
-			if input.Context.Uid != 0 && newmeta.StUid != meta.StUid {
+			if input.Context.Uid != 0 {
 				mlog.Printf2("fs/ops", " non-root setting uid")
 				code = EPERM
 				// Non-root setting uid = bad.
 				return
 			}
+			// On Linux/Darwin, this is expected behavior
+			mode_filter |= syscall.S_ISUID | syscall.S_ISGID
 		}
-		if input.Valid&FATTR_GID != 0 {
+		// Eventually the Context.Gid checks could check
+		// supplementary groups too
+		if input.Valid&FATTR_GID != 0 && int32(input.Gid) != -1 && input.Gid != meta.StGid {
 			newmeta.StGid = input.Gid
-			// Eventually: Check group setting permission for uid
-			if input.Uid != 0 {
+			if input.Context.Uid != 0 && input.Context.Uid != meta.StUid && input.Gid != input.Context.Gid {
 				mlog.Printf2("fs/ops", " non-root setting gid")
-				mode_filter = syscall.S_ISUID | syscall.S_ISGID
+				code = EPERM
+				// Non-root setting uid = bad.
+				return
 			}
 		}
 		if input.Valid&FATTR_SIZE != 0 {
@@ -222,14 +227,25 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 
 		oldmode := meta.StMode
 		mode := oldmode
+
+		if input.Context.Uid != 0 && input.Context.Uid != meta.StUid {
+			// POSIXy weirdness - ignore setgid bit if we would fail
+			mode_filter |= syscall.S_ISGID
+		}
+
 		if input.Valid&FATTR_MODE != 0 {
-			mode = input.Mode
+			mode = input.Mode & ^mode_filter
 			// accept any mode bits, OS knows best?
 			// (with OS X some relatively high bit modes are required,
 			// e.g. 0100xxx seems to be needed at least for cp to work even)
+			if input.Context.Uid != 0 && meta.StUid != input.Context.Uid && mode != oldmode {
+				code = EPERM
+				mlog.Printf(" non-root setting non-owned mode")
+				return
+			}
+
 		}
-		mode = mode & ^mode_filter
-		newmeta.StMode = mode
+		newmeta.StMode = mode & ^mode_filter
 
 		if newmeta != meta.InodeMetaData {
 			code = self.access(inode, W_OK, true, &input.Context)
@@ -284,14 +300,13 @@ func (self *fsOps) Open(input *OpenIn, out *OpenOut) (code Status) {
 	defer inode.Release()
 	defer inode.metaWriteLock.Locked()()
 
-	flags := uint32(0)
-	if input.Flags&uint32(os.O_RDONLY|os.O_RDWR) != 0 {
-		flags |= R_OK
+	mode := uint32(R_OK)
+	if input.Flags&uint32(os.O_WRONLY) == uint32(os.O_WRONLY) {
+		mode = W_OK
+	} else if input.Flags&O_ANYWRITE != 0 {
+		mode |= W_OK
 	}
-	if input.Flags&uint32(os.O_WRONLY|os.O_RDWR) != 0 {
-		flags |= W_OK
-	}
-	code = self.access(inode, flags, false, &input.Context)
+	code = self.access(inode, mode, false, &input.Context)
 	if !code.Ok() {
 		return
 	}
@@ -299,7 +314,7 @@ func (self *fsOps) Open(input *OpenIn, out *OpenOut) (code Status) {
 	self.fs.Update(func(tr *fsTransaction) {
 		meta := inode.Meta()
 		// No ATime for now
-		if flags&W_OK != 0 {
+		if mode&W_OK != 0 {
 			meta.SetMTimeNow()
 		}
 
@@ -578,8 +593,7 @@ func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status)
 	if code.Ok() {
 		mlog.Printf2("fs/ops", " existing child with name")
 		defer child.Release()
-		code = Status(syscall.EEXIST)
-		return
+		return Status(syscall.EEXIST)
 	}
 
 	child = self.fs.GetInode(input.Oldnodeid)
@@ -590,7 +604,7 @@ func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status)
 	defer child.Release()
 	defer child.metaWriteLock.Locked()()
 	inode.AddChild(name, child)
-
+	child.FillEntryOut(out)
 	return OK
 
 }
@@ -599,7 +613,7 @@ func (self *fsOps) Access(input *AccessIn) (code Status) {
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
-	return self.access(inode, input.Mask, true, &input.Context)
+	return self.access(inode, input.Mask, false, &input.Context)
 }
 
 func (self *fsOps) Read(input *ReadIn, buf []byte) (ReadResult, Status) {

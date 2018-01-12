@@ -19,4 +19,6 @@
 * report to Apple that their ls implementation crashes with dates far
   enough in future? :p
 
+* ask hanwen about sometimes nil out in Link call - is it bug or feature?
+
 * look at Windows support - dokany / winfsp?

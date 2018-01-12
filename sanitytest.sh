@@ -6,8 +6,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Tue Jan  2 15:24:47 2018 mstenber
-# Last modified: Wed Jan 10 22:12:17 2018 mstenber
-# Edit time:     47 min
+# Last modified: Fri Jan 12 12:19:19 2018 mstenber
+# Edit time:     53 min
 #
 
 STORAGEDIR=/tmp/sanity-tfhfs-storage
@@ -16,7 +16,9 @@ MLOG=.
 ARGS=${ARGS:-}
 
 out () {
+    cd $ORIGDIR
     echo $*
+    sleep 1
     umount $MOUNTDIR
     exit 1
 }
@@ -62,12 +64,14 @@ mkdir dir
 echo foo > foo
 echo bar > bar
 echo baz > baz
+ln -v -s foo symlink || out "symlink broken"
+ln -v foo hardlink || out "hardlink broken"
 [ -d "dir" ] || out "dir not dir"
 [ -f "foo" ] || out "foo not present"
 [ ! -f "nonexistent" ] || out "nonexistent present"
-ls -l $MOUNTDIR
+ls -il $MOUNTDIR
 GOT=`ls -l $MOUNTDIR | wc -l`
-[ $GOT = "5" ] || out "not 5 lines in ls ($GOT)"
+[ $GOT = "7" ] || out "not 7 lines in ls ($GOT)"
 cp /bin/ls $MOUNTDIR || out "ls cp failed"
 cmp -s /bin/ls $MOUNTDIR/ls || out "copied ls differs"
 ls -l $MOUNTDIR/ls

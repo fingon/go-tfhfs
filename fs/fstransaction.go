@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Wed Jan 10 17:08:38 2018 mstenber
- * Edit time:     165 min
+ * Last modified: Fri Jan 12 11:52:00 2018 mstenber
+ * Edit time:     166 min
  *
  */
 
@@ -246,10 +246,10 @@ func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *sto
 	return bl
 }
 
-// Update (repeatedly) calls cb until it manages to update the global
+// Update2 (repeatedly) calls cb until it manages to update the global
 // state with the content of the transaction. Therefore cb should be
-// idempotent.
-func (self *Fs) Update(cb func(tr *fsTransaction)) {
+// idempotent. If cb returns false, the transaction will not be committed.
+func (self *Fs) Update2(cb func(tr *fsTransaction) bool) {
 	mlog.Printf2("fs/fstransaction", "fs.Update")
 	first := true
 	for {
@@ -257,7 +257,9 @@ func (self *Fs) Update(cb func(tr *fsTransaction)) {
 		// take awhile.
 		tr := self.GetTransaction()
 		defer tr.Close()
-		cb(tr)
+		if !cb(tr) {
+			break
+		}
 
 		if tr.TryCommit() {
 			return
@@ -272,4 +274,14 @@ func (self *Fs) Update(cb func(tr *fsTransaction)) {
 		}
 		mlog.Printf2("fs/fstransaction", " retrying fs.Update")
 	}
+}
+
+// Update is the lazy variant in which the transaction supposedly
+// always works. That may not be really the case in real world though,
+// so Update2 should be used.
+func (self *Fs) Update(cb func(tr *fsTransaction)) {
+	self.Update2(func(tr *fsTransaction) bool {
+		cb(tr)
+		return true
+	})
 }

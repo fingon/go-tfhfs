@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Thu Jan 11 08:12:58 2018 mstenber
- * Edit time:     737 min
+ * Last modified: Fri Jan 12 10:20:11 2018 mstenber
+ * Edit time:     740 min
  *
  */
 
@@ -201,7 +201,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	if key1 > key2 {
 		mlog.Panicf("ibt.DeleteRange: first key more than second key: %x > %x", key1, key2)
 	}
-	mlog.Printf2("ibtree/ibtree", "DeleteRange [%v..%v]", key1, key2)
+	mlog.Printf2("ibtree/ibtree", "DeleteRange [%x..%x]", key1, key2)
 	st2.top = 0
 	st := *st2
 	self.searchLesser(key1, &st)
@@ -210,14 +210,14 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	mlog.Printf2("ibtree/ibtree", "c2:%v @%v", st2.child(), st2.indexes)
 	// No matches at all?
 	if st == *st2 {
-		return self
+		return st2.commit()
 	}
 	unique := 0
 	for i := 0; i < st.top && st.indexes[i] == st2.indexes[i]; i++ {
 		unique = i + 1
 	}
 	if st.indexes == st2.indexes {
-		return self
+		return st2.commit()
 	}
 	mlog.Printf2("ibtree/ibtree", "unique:%d", unique)
 	for st2.top > unique {
@@ -283,10 +283,9 @@ func (self *IBNode) Set(key IBKey, value string, st *IBStack) *IBNode {
 		// now at next -> insertion point is where it pointing at
 		st.addChildAt(child)
 	} else {
-		if st.child().Value == value {
-			return self
+		if st.child().Value != value {
+			st.rewriteAtIndex(true, child)
 		}
-		st.rewriteAtIndex(true, child)
 	}
 	return st.commit()
 

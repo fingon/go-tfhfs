@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Jan 10 17:35:54 2018 mstenber
-# Edit time:     81 min
+# Last modified: Fri Jan 12 09:48:25 2018 mstenber
+# Edit time:     86 min
 #
 #
 
@@ -133,3 +133,7 @@ update-deps:
 .done.mlog: Makefile $(wildcard */*.go)
 	find . -type f -name '*.go' | sed 's/^\.\///' | xargs python3 mlog/fix-print2.py
 	touch $@
+
+fstest: tfhfs
+	./sanitytest.sh d
+	cd /tmp/x && sudo prove -f -o -r ~mstenber/git/fstest/tests && umount /tmp/x

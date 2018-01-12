@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Tue Jan  9 10:54:06 2018 mstenber
- * Edit time:     45 min
+ * Last modified: Fri Jan 12 10:07:31 2018 mstenber
+ * Edit time:     46 min
  *
  */
 
@@ -58,7 +58,7 @@ func main() {
 
 	st := fs.NewCryptoStorage(*password, *salt, backend)
 	myfs := fs.NewFs(st, *rootName, *cachesize)
-	opts := &fuse.MountOptions{}
+	opts := &fuse.MountOptions{AllowOther: true}
 	if mlog.IsEnabled() {
 		opts.Debug = true
 	}

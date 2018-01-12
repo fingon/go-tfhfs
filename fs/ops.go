@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Thu Jan 11 13:27:36 2018 mstenber
- * Edit time:     312 min
+ * Last modified: Fri Jan 12 09:58:28 2018 mstenber
+ * Edit time:     314 min
  *
  */
 
@@ -13,7 +13,6 @@ package fs
 
 import (
 	"bytes"
-	"log"
 	"os"
 	"sync"
 	"syscall"
@@ -57,18 +56,22 @@ func (self *fsOps) StatFs(input *InHeader, out *StatfsOut) Status {
 
 func (self *fsOps) access(inode *inode, mode uint32, orOwn bool, ctx *Context) Status {
 	if inode == nil {
+		mlog.Printf2("fs/ops", "access: -does not exist")
 		return ENOENT
 	}
 	meta := inode.Meta()
 	if meta == nil {
+		mlog.Printf2("fs/ops", "access: -meta does not exist")
 		return ENOENT
 	}
 	if ctx.Uid == 0 {
+		mlog.Printf2("fs/ops", "access: +root")
 		return OK
 	}
 	perms := meta.StMode & 0x7
 	if ctx.Uid == meta.StUid {
 		if orOwn {
+			mlog.Printf2("fs/ops", "access: +owner")
 			return OK
 		}
 		perms |= (meta.StMode >> 6) & 0x7
@@ -77,15 +80,18 @@ func (self *fsOps) access(inode *inode, mode uint32, orOwn bool, ctx *Context) S
 		perms |= (meta.StMode >> 3) & 0x7
 	}
 	if (perms & mode) == mode {
+		mlog.Printf2("fs/ops", "access: - (%v %v)", perms, mode)
 		return OK
 	}
+	mlog.Printf2("fs/ops", "access: - (%v %v)", perms, mode)
 	return EPERM
 }
 
 // lookup gets child of a parent.
 func (self *fsOps) lookup(parent *inode, name string, ctx *Context) (child *inode, code Status) {
 	if parent == nil {
-		log.Panicf("invalid lookup() - parent nil")
+		code = ENOENT
+		return
 	}
 	mlog.Printf2("fs/ops", "ops.lookup %v %s", parent.ino, name)
 	code = self.access(parent, X_OK, false, ctx)
@@ -113,7 +119,7 @@ func (self *fsOps) Lookup(input *InHeader, name string, out *EntryOut) (code Sta
 	defer parent.Release()
 
 	if parent == nil {
-		log.Panic("nil parent inode: ", input.NodeId)
+		return ENOENT
 	}
 
 	child, code := self.lookup(parent, name, &input.Context)

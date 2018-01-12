@@ -19,6 +19,13 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
 
 * test harder (?)
 
+  https://stackoverflow.com/questions/21565865/filesystem-test-suites has
+  plenty of resources;
+
+  https://github.com/pjd/pjdfstest seems to be much more comprehensive than
+  fstest (~50% more LoC); however adding fuse support for it might be big
+  task and even default apfs fails some of the cases :p
+
 # Pending later TODO #
 
 * define some way to BlockBackend to index them by Status => can easily get

@@ -1,0 +1,32 @@
+Test Summary Report
+-------------------
+/Users/mstenber/git/pjdfstest/tests/chown/07.t          (Wstat: 0 Tests: 132 Failed: 19)
+  Failed tests:  7, 12, 20, 27, 32, 40, 47, 52, 60, 67, 72
+                80, 87, 92, 100, 107, 112, 120, 127
+/Users/mstenber/git/pjdfstest/tests/ftruncate/12.t      (Wstat: 0 Tests: 3 Failed: 1)
+  Failed test:  2
+/Users/mstenber/git/pjdfstest/tests/link/00.t           (Wstat: 0 Tests: 202 Failed: 6)
+  Failed tests:  147-150, 152, 183
+/Users/mstenber/git/pjdfstest/tests/mkfifo/03.t         (Wstat: 256 Tests: 4 Failed: 1)
+  Failed test:  3
+  Non-zero exit status: 1
+/Users/mstenber/git/pjdfstest/tests/mknod/03.t          (Wstat: 256 Tests: 12 Failed: 7)
+  Failed tests:  3, 5-7, 9-11
+  Non-zero exit status: 1
+/Users/mstenber/git/pjdfstest/tests/rename/09.t         (Wstat: 0 Tests: 2353 Failed: 16)
+  Failed tests:  2269-2272, 2279-2281, 2284, 2289-2292, 2299-2301
+                2304
+/Users/mstenber/git/pjdfstest/tests/rename/10.t         (Wstat: 0 Tests: 2099 Failed: 8)
+  Failed tests:  2056-2058, 2061, 2063-2065, 2068
+/Users/mstenber/git/pjdfstest/tests/rename/21.t         (Wstat: 0 Tests: 16 Failed: 1)
+  Failed test:  5
+/Users/mstenber/git/pjdfstest/tests/symlink/03.t        (Wstat: 256 Tests: 6 Failed: 1)
+  Failed test:  4
+  Non-zero exit status: 1
+/Users/mstenber/git/pjdfstest/tests/truncate/12.t       (Wstat: 0 Tests: 3 Failed: 1)
+  Failed test:  2
+Files=232, Tests=8677, 220 wallclock secs ( 1.89 usr  0.51 sys + 39.67 cusr 48.86 csys = 90.93 CPU)
+Result: FAIL
+  41.64s user 49.41s system 40% cpu 3:42.10 total
+( cd /tmp/y; sudo prove -f -o -r ~/git/pjdfstest/tests; )  41.65s user
+49.42s system 41% cpu 3:42.11 total

@@ -1,11 +1,23 @@
+Test Summary Report
+-------------------
+
+/Users/mstenber/git/fstest/tests/open/17.t    (Wstat: 0 Tests: 3 Failed: 1)
+  Failed test:  2
+^ NXIO not returned for pipes without readers and E_NONBLOCK; noncritical
+
+/Users/mstenber/git/fstest/tests/rename/00.t  (Wstat: 0 Tests: 79 Failed: 4)
+  Failed tests:  49, 53, 57, 61
+Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.54 csys = 34.21 CPU)
+^ rename does not touch ctime for some reason
+
 # Pending early todo #
 
-* figure 
+* figure to describe arch
 
-* test harder
+* fix above 5 testfs failures if I feel like it (rename I do not
+  understand, NXIO would be trivial to return)
 
- fstest: mkdir seems to fail; successful sequence seems to be LOOKUP(name),
- ACCESS(w), MKDIR
+* test harder (?)
 
 # Pending later TODO #
 

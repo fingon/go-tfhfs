@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Fri Jan 12 13:25:28 2018 mstenber
- * Edit time:     318 min
+ * Last modified: Fri Jan 12 17:02:54 2018 mstenber
+ * Edit time:     326 min
  *
  */
 
@@ -267,18 +267,8 @@ func (self *inode) Forget(nlookup uint64) {
 	self.addRefCount(-int64(nlookup))
 }
 
-func (self *inode) RemoveChildByName(name string) (code fuse.Status) {
+func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 	mlog.Printf2("fs/inode", "inode.RemoveChildByName %v", name)
-	var child *inode
-	child = self.GetChildByName(name)
-	if child == nil {
-		mlog.Printf2("fs/inode", " not found")
-		code = fuse.ENOENT
-		return
-	}
-	defer child.Release()
-	defer child.metaWriteLock.Locked()()
-
 	self.Fs().Update2(func(tr *fsTransaction) bool {
 		meta := child.Meta()
 		if meta == nil {
@@ -335,6 +325,8 @@ func (self *inode) getMeta() *InodeMeta {
 	return decodeInodeMeta(*v)
 }
 
+// Meta returns a copy of current inode metadata. If the inode in
+// question has disappeared from disk, nil may be returned.
 func (self *inode) Meta() *InodeMeta {
 	m := self.meta.Get()
 	if m == nil {

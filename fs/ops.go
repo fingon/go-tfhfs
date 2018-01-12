@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Fri Jan 12 14:22:37 2018 mstenber
- * Edit time:     390 min
+ * Last modified: Fri Jan 12 16:57:27 2018 mstenber
+ * Edit time:     454 min
  *
  */
 
@@ -219,7 +219,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		}
 		if input.Valid&FATTR_GID != 0 && int32(input.Gid) != -1 {
 			newmeta.StGid = input.Gid
-			if !(root || (uid == meta.StUid && ownGid(input.Gid))) {
+			if !(root || input.Gid == meta.StGid || (uid == meta.StUid && ownGid(input.Gid))) {
 				mlog.Printf2("fs/ops", " non-root setting gid")
 				code = EPERM
 				// Non-root setting uid = bad.
@@ -235,12 +235,12 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		oldmode := meta.StMode
 		mode := oldmode
 
-		if !root && uid != meta.StUid {
-			// POSIXy weirdness - ignore setgid bit if we would fail
-			mode_filter |= syscall.S_ISGID
-		}
-
 		if input.Valid&FATTR_MODE != 0 {
+			if !root && !ownGid(meta.StGid) {
+				// Cannot set sgid bit on non-own group file
+				mode_filter |= syscall.S_ISGID
+			}
+
 			mode = input.Mode & ^mode_filter
 			// accept any mode bits, OS knows best?
 			// (with OS X some relatively high bit modes are required,
@@ -255,10 +255,15 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		newmeta.StMode = mode & ^mode_filter
 
 		if newmeta != meta.InodeMetaData {
-			code = self.access(inode, W_OK, true, &input.Context)
+			isTruncate := input.Valid&FATTR_SIZE != 0
+			code = self.access(inode, W_OK, !isTruncate, &input.Context)
 			if !code.Ok() {
-				mlog.Printf2("fs/ops", " inode not w-ok")
-				code = EPERM
+				if isTruncate {
+					// Truncate says EACCES
+					code = EACCES
+				} else {
+					code = EPERM
+				}
 				return
 			}
 			if input.Valid&FATTR_SIZE != 0 {
@@ -420,12 +425,9 @@ func (self *fsOps) Mkdir(input *MkdirIn, name string, out *EntryOut) (code Statu
 	return OK
 }
 
-func (self *fsOps) unlinkInInode(inode *inode, name string, isdir *bool, ctx *Context) (code Status) {
-	child, code := self.lookup(inode, name, ctx)
-	defer child.Release()
-	if !code.Ok() {
-		return
-	}
+func (self *fsOps) unlinkInodeInInode(inode, child *inode, name string, isdir *bool, ctx *Context) (code Status) {
+	inode.metaWriteLock.AssertLocked()
+	child.metaWriteLock.AssertLocked()
 
 	code = self.stickyMutateCheck(inode, child, ctx)
 	if !code.Ok() {
@@ -437,12 +439,30 @@ func (self *fsOps) unlinkInInode(inode *inode, name string, isdir *bool, ctx *Co
 	if !code.Ok() {
 		return
 	}
+	meta := child.Meta()
+	if meta == nil {
+		return ENOENT
+	}
+	if isdir != nil && *isdir && meta.Nchildren > 0 {
+		return Status(syscall.ENOTEMPTY)
+	}
 	if isdir != nil && *isdir != child.IsDir() {
 		code = EPERM
 		return
 	}
-	inode.RemoveChildByName(name)
+	inode.RemoveChild(child, name)
 	return OK
+}
+
+func (self *fsOps) unlinkInInode(inode *inode, name string, isdir *bool, ctx *Context) (code Status) {
+	inode.metaWriteLock.AssertLocked()
+	child, code := self.lookup(inode, name, ctx)
+	defer child.Release()
+	if !code.Ok() {
+		return
+	}
+	defer child.metaWriteLock.Locked()()
+	return self.unlinkInodeInInode(inode, child, name, isdir, ctx)
 }
 
 // stickyMutateCheck check handles sticky bit handling of directories.
@@ -488,6 +508,9 @@ func (self *fsOps) Unlink(input *InHeader, name string) (code Status) {
 func (self *fsOps) Rmdir(input *InHeader, name string) (code Status) {
 	mlog.Printf2("fs/ops", "ops.Rmdir %s", name)
 	b := true
+	if name == ".." {
+		return Status(syscall.ENOTEMPTY)
+	}
 	return self.unlink(input, name, &b)
 }
 
@@ -558,6 +581,14 @@ func (self *fsOps) RemoveXAttr(input *InHeader, attr string) (code Status) {
 
 func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code Status) {
 	mlog.Printf2("fs/ops", "Rename")
+
+	if input.NodeId == input.Newdir && oldName == newName {
+		return OK
+	}
+
+	// TBD: In theory this may trip on its own cleverness if lock
+	// order fails somehow.
+
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
@@ -594,38 +625,61 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 		return
 	}
 
-	new_child, code := self.lookup(new_inode, newName, &input.Context)
-	defer new_child.Release()
-	if code.Ok() {
-		mlog.Printf2("fs/ops", " already exists, trying to unlink")
-		ih := input.InHeader
-		ih.NodeId = input.Newdir
-		code = self.unlink(&ih, newName, nil)
-		if !code.Ok() {
-			mlog.Printf2("fs/ops", " unlink failed")
-			return
-		}
+	// Scary bit starts here; take locks in id order (of directories)
+	if input.NodeId < input.Newdir {
+		defer inode.metaWriteLock.Locked()()
+		defer new_inode.metaWriteLock.Locked()()
+	} else if input.NodeId > input.Newdir {
+		defer new_inode.metaWriteLock.Locked()()
+		defer inode.metaWriteLock.Locked()()
+	} else {
+		defer inode.metaWriteLock.Locked()()
 	}
 
-	linkin := LinkIn{InHeader: input.InHeader,
-		Oldnodeid: child.ino}
-	linkin.NodeId = new_inode.ino
-	code = self.Link(&linkin, newName, nil)
+	defer child.metaWriteLock.Locked()()
+	// First add new link
+	code = self.linkInInode(new_inode, child, newName, true, &input.Context)
 	if !code.Ok() {
 		return
 	}
 
-	if oldName != newName || input.NodeId != input.Newdir {
-		code = self.unlink(&input.InHeader, oldName, nil)
-		if !code.Ok() {
-			return
-		}
+	// Then remove old link
+	code = self.unlinkInodeInInode(inode, child, oldName, nil, &input.Context)
+	if !code.Ok() {
+		// Attempt to undo the newly added link
+		self.unlinkInodeInInode(new_inode, child, newName, nil, &input.Context)
 	}
 	return
 }
 
-func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
+func (self *fsOps) linkInInode(inode, child *inode, name string, override bool, ctx *Context) (code Status) {
+	inode.metaWriteLock.AssertLocked()
+	code = self.access(inode, W_OK|X_OK, true, ctx)
+	if !code.Ok() {
+		mlog.Printf2("fs/ops", " no access to containing directory")
+		return
+	}
 
+	echild, code := self.lookup(inode, name, ctx)
+	if code.Ok() {
+		mlog.Printf2("fs/ops", " existing child with name")
+		defer echild.Release()
+		if !override {
+			return Status(syscall.EEXIST)
+		}
+		id := echild.IsDir()
+		defer echild.metaWriteLock.Locked()()
+		code = self.unlinkInodeInInode(inode, echild, name, &id, ctx)
+		if !code.Ok() {
+			return
+		}
+	}
+
+	inode.AddChild(name, child)
+	return OK
+}
+
+func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status) {
 	mlog.Printf2("fs/ops", "Link")
 	inode := self.fs.GetInode(input.NodeId)
 	if inode == nil {
@@ -635,30 +689,19 @@ func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status)
 
 	defer inode.Release()
 	defer inode.metaWriteLock.Locked()()
-	code = self.access(inode, W_OK|X_OK, true, &input.Context)
-	if !code.Ok() {
-		mlog.Printf2("fs/ops", " no access to containing directory")
-		return
-	}
 
-	child, code := self.lookup(inode, name, &input.Context)
-	if code.Ok() {
-		mlog.Printf2("fs/ops", " existing child with name")
-		defer child.Release()
-		return Status(syscall.EEXIST)
-	}
-
-	child = self.fs.GetInode(input.Oldnodeid)
+	child := self.fs.GetInode(input.Oldnodeid)
 	if child == nil {
 		mlog.Printf2("fs/ops", " original child %v not found", input.Oldnodeid)
 		return ENOENT
 	}
 	defer child.Release()
 	defer child.metaWriteLock.Locked()()
-	inode.AddChild(name, child)
-	child.FillEntryOut(out)
-	return OK
-
+	code = self.linkInInode(inode, child, name, false, &input.Context)
+	if code.Ok() {
+		child.FillEntryOut(out)
+	}
+	return
 }
 
 func (self *fsOps) Access(input *AccessIn) (code Status) {

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 11:14:11 2018 mstenber
- * Last modified: Wed Jan 10 11:23:15 2018 mstenber
- * Edit time:     7 min
+ * Last modified: Mon Jan 15 18:38:44 2018 mstenber
+ * Edit time:     10 min
  *
  */
 
@@ -26,6 +26,35 @@ type BackendConfiguration struct {
 	ValueUpdateInterval time.Duration
 }
 
+// BlockBackend is subset of the storage Backend which deals with raw
+// named + reference counted blocks.
+type BlockBackend interface {
+	// GetBlockData retrieves lazily (if need be) block data
+	GetBlockData(b *Block) []byte
+
+	// GetBlockById returns block by id or nil.
+	GetBlockById(id string) *Block
+
+	// DeleteBlock removes block from storage, and it MUST exist.
+	DeleteBlock(b *Block)
+
+	// StoreBlock adds new block to  It MUST NOT exist.
+	StoreBlock(b *Block)
+
+	// UpdateBlock updates block metadata in  It MUST exist.
+	UpdateBlock(b *Block) int
+}
+
+// NameBackend is subset of storage Backend which deals with names.
+type NameBackend interface {
+
+	// GetBlockIdByName returns block id mapped to particular name.
+	GetBlockIdByName(name string) string
+
+	// SetBlockIdName sets the logical name to map to particular block id.
+	SetNameToBlockId(name, block_id string)
+}
+
 // Backend is the shadow behind the throne; it actually handles the
 // low-level operations of blocks. It provides an API that returns
 // results that are consistent with the previous calls. How it does
@@ -42,34 +71,12 @@ type Backend interface {
 	// Close the backend
 	Close()
 
-	// Getters
-
-	// GetBlockData retrieves lazily (if need be) block data
-	GetBlockData(b *Block) []byte
-
-	// GetBlockById returns block by id or nil.
-	GetBlockById(id string) *Block
-
-	// GetBlockIdByName returns block id mapped to particular name.
-	GetBlockIdByName(name string) string
-
 	// GetBytesAvailable returns number of bytes available.
 	GetBytesAvailable() uint64
 
 	// GetBytesUsed returns number of bytes used.
 	GetBytesUsed() uint64
 
-	// Setters
-
-	// DeleteBlock removes block from storage, and it MUST exist.
-	DeleteBlock(b *Block)
-
-	// SetBlockIdName sets the logical name to map to particular block id.
-	SetNameToBlockId(name, block_id string)
-
-	// StoreBlock adds new block to  It MUST NOT exist.
-	StoreBlock(b *Block)
-
-	// UpdateBlock updates block metadata in  It MUST exist.
-	UpdateBlock(b *Block) int
+	BlockBackend
+	NameBackend
 }

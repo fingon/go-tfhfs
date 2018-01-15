@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 08:37:14 2017 mstenber
- * Last modified: Thu Jan  4 16:58:21 2018 mstenber
- * Edit time:     18 min
+ * Last modified: Mon Jan 15 18:43:51 2018 mstenber
+ * Edit time:     21 min
  *
  */
 
@@ -62,4 +62,8 @@ type BlockMetadata struct {
 	// Status describes the desired behavior of sub-references and
 	// availability of data of a block.
 	Status BlockStatus `zid:"1"`
+}
+
+type NameMapBlock struct {
+	NameToBlockId map[string]string
 }

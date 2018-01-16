@@ -58,8 +58,8 @@ func (self *inode) AddChild(name string, child *inode) (code fuse.Status) {
 		meta.Nchildren++
 		self.SetMetaInTransaction(meta, tr)
 
-		k := NewblockKeyDirFilename(self.ino, name)
-		rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
+		k := NewBlockKeyDirFilename(self.ino, name)
+		rk := NewBlockKeyReverseDirFilename(child.ino, self.ino, name)
 		tr.t.Set(ibtree.IBKey(k), string(util.Uint64Bytes(child.ino)))
 		tr.t.Set(ibtree.IBKey(rk), "")
 		return true
@@ -151,7 +151,7 @@ func (self *inode) FillEntryOut(out *fuse.EntryOut) fuse.Status {
 
 func (self *inode) GetChildByName(name string) *inode {
 	mlog.Printf2("fs/inode", "GetChildByName %s", name)
-	k := NewblockKeyDirFilename(self.ino, name)
+	k := NewBlockKeyDirFilename(self.ino, name)
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
 	v := tr.t.Get(ibtree.IBKey(k))
@@ -174,7 +174,7 @@ func (self *inode) GetFile(flags uint32) *inodeFH {
 
 func (self *inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
 	defer self.offsetMap.Locked(-1)()
-	k := NewblockKey(self.ino, BST_XATTR, attr)
+	k := NewBlockKey(self.ino, BST_XATTR, attr)
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
 	v := tr.t.Get(ibtree.IBKey(k))
@@ -188,16 +188,16 @@ func (self *inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
 }
 
 func (self *inode) IterateSubTypeKeys(bst BlockSubType,
-	keycb func(key blockKey) bool) {
+	keycb func(key BlockKey) bool) {
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
-	k := NewblockKey(self.ino, bst, "")
+	k := NewBlockKey(self.ino, bst, "")
 	for {
 		nkeyp := tr.t.NextKey(ibtree.IBKey(k))
 		if nkeyp == nil {
 			return
 		}
-		nkey := blockKey(*nkeyp)
+		nkey := BlockKey(*nkeyp)
 		if nkey.Ino() != self.ino || nkey.SubType() != bst {
 			return
 		}
@@ -212,7 +212,7 @@ func (self *inode) IterateSubTypeKeys(bst BlockSubType,
 func (self *inode) RemoveXAttr(attr string) (code fuse.Status) {
 	defer self.offsetMap.Locked(-1)()
 	self.Fs().Update(func(tr *fsTransaction) {
-		k := ibtree.IBKey(NewblockKey(self.ino, BST_XATTR, attr))
+		k := ibtree.IBKey(NewBlockKey(self.ino, BST_XATTR, attr))
 		mlog.Printf2("fs/inode", "RemoveXAttr %s - deleting %x", attr, k)
 		v := tr.t.Get(k)
 		if v == nil {
@@ -227,7 +227,7 @@ func (self *inode) RemoveXAttr(attr string) (code fuse.Status) {
 func (self *inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
 	defer self.offsetMap.Locked(-1)()
 	self.Fs().Update(func(tr *fsTransaction) {
-		k := NewblockKey(self.ino, BST_XATTR, attr)
+		k := NewBlockKey(self.ino, BST_XATTR, attr)
 		mlog.Printf2("fs/inode", "SetXAttr %s - setting %x", attr, k)
 		tr.t.Set(ibtree.IBKey(k), string(data))
 	})
@@ -288,8 +288,8 @@ func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 		meta.SetMTimeNow()
 		self.SetMetaInTransaction(meta, tr)
 
-		k := NewblockKeyDirFilename(self.ino, name)
-		rk := NewblockKeyReverseDirFilename(child.ino, self.ino, name)
+		k := NewBlockKeyDirFilename(self.ino, name)
+		rk := NewBlockKeyReverseDirFilename(child.ino, self.ino, name)
 		tr.t.Delete(ibtree.IBKey(k))
 		tr.t.Delete(ibtree.IBKey(rk))
 		return true
@@ -314,7 +314,7 @@ func decodeInodeMeta(v string) *InodeMeta {
 
 func (self *inode) getMeta() *InodeMeta {
 	mlog.Printf2("fs/inode", "inode.Meta #%d", self.ino)
-	k := NewblockKey(self.ino, BST_META, "")
+	k := NewBlockKey(self.ino, BST_META, "")
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
 	v := tr.t.Get(ibtree.IBKey(k))
@@ -358,7 +358,7 @@ func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *fsTransaction) bool
 		meta.setTimesNow(times&1 != 0, times&2 != 0, times&4 != 0)
 	}
 
-	k := NewblockKey(self.ino, BST_META, "")
+	k := NewBlockKey(self.ino, BST_META, "")
 	b, err := meta.MarshalMsg(nil)
 	if err != nil {
 		log.Panic(err)
@@ -385,9 +385,9 @@ func (self *inode) SetMetaSizeInTransaction(meta *InodeMeta, size uint64, tr *fs
 		meta.Data = nil
 	}
 	if shrink {
-		nextKey := NewblockKeyOffset(self.ino, size+dataExtentSize)
+		nextKey := NewBlockKeyOffset(self.ino, size+dataExtentSize)
 		mlog.Printf2("fs/inode", "SetSize shrinking inode %v - %x+ gone", self.ino, nextKey)
-		lastKey := NewblockKeyOffset(self.ino, 1<<62)
+		lastKey := NewBlockKeyOffset(self.ino, 1<<62)
 		tr.t.DeleteRange(ibtree.IBKey(nextKey), ibtree.IBKey(lastKey))
 	}
 	return true

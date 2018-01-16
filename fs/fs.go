@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Jan 11 08:20:10 2018 mstenber
- * Edit time:     333 min
+ * Last modified: Tue Jan 16 18:05:17 2018 mstenber
+ * Edit time:     336 min
  *
  */
 
@@ -126,7 +126,7 @@ func (self *Fs) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 
 func (self *Fs) GetTransaction() *fsTransaction {
 	// mlog.Printf2("fs/fs", "GetTransaction of %p", self.treeRoot)
-	return newFsTransaction(self)
+	return newfsTransaction(self)
 }
 
 // ListDir provides testing utility as output of ReadDir/ReadDirPlus
@@ -246,9 +246,11 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 		return
 	}
 	for _, c := range nd.Children {
-		k := blockKey(c.Key)
+		k := BlockKey(c.Key)
 		switch k.SubType() {
 		case BST_FILE_OFFSET2EXTENT:
+			cb(c.Value)
+		case BST_NAMEHASH_NAME_BLOCK:
 			cb(c.Value)
 		}
 	}

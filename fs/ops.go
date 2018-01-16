@@ -247,7 +247,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 			// e.g. 0100xxx seems to be needed at least for cp to work even)
 			if !root && meta.StUid != uid && mode != oldmode {
 				code = EPERM
-				mlog.Printf(" non-root setting non-owned mode")
+				mlog.Printf2("fs/ops", " non-root setting non-owned mode")
 				return
 			}
 
@@ -431,7 +431,7 @@ func (self *fsOps) unlinkInodeInInode(inode, child *inode, name string, isdir *b
 
 	code = self.stickyMutateCheck(inode, child, ctx)
 	if !code.Ok() {
-		mlog.Printf(" stickyMutateCheck failed")
+		mlog.Printf2("fs/ops", " stickyMutateCheck failed")
 		return
 	}
 
@@ -558,7 +558,7 @@ func (self *fsOps) ListXAttr(input *InHeader) (data []byte, code Status) {
 	}
 	b := bytes.NewBuffer([]byte{})
 	inode.IterateSubTypeKeys(BST_XATTR,
-		func(key blockKey) bool {
+		func(key BlockKey) bool {
 			b.Write([]byte(key.SubTypeData()))
 			b.WriteByte(0)
 			return true
@@ -607,7 +607,7 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 
 	code = self.stickyMutateCheck(inode, child, &input.Context)
 	if !code.Ok() {
-		mlog.Printf(" stickyMutateCheck src failed")
+		mlog.Printf2("fs/ops", " stickyMutateCheck src failed")
 		return
 	}
 
@@ -621,7 +621,7 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 
 	code = self.stickyMutateCheck(new_inode, child, &input.Context)
 	if !code.Ok() {
-		mlog.Printf(" stickyMutateCheck dst failed")
+		mlog.Printf2("fs/ops", " stickyMutateCheck dst failed")
 		return
 	}
 

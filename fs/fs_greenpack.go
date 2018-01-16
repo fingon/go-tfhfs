@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Tue Jan  2 14:43:53 2018 mstenber
- * Edit time:     20 min
+ * Last modified: Tue Jan 16 16:38:14 2018 mstenber
+ * Edit time:     25 min
  *
  */
 
@@ -42,6 +42,8 @@ const (
 	// value: FsData
 	// (this should be only in root inode)
 	//BST_FS_DATA = 0x30
+
+	BST_NAMEHASH_NAME_BLOCK BlockSubType = 0x30
 )
 
 type InodeMetaData struct {

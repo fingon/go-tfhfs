@@ -31,7 +31,7 @@ type inodeFH struct {
 	pos uint64
 
 	// last key in directory at pos (if any)
-	lastKey *blockKey
+	lastKey *BlockKey
 }
 
 func (self *inodeFH) String() string {
@@ -48,7 +48,7 @@ func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 	if kp == nil {
 		i := uint64(0)
 		self.inode.IterateSubTypeKeys(BST_DIR_NAME2INODE,
-			func(key blockKey) bool {
+			func(key BlockKey) bool {
 				mlog.Printf2("fs/fh", " #%d %v", i, key.SubTypeData()[filenameHashSize:])
 				if i == self.pos {
 					kp = &key
@@ -65,7 +65,7 @@ func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 			mlog.Printf2("fs/fh", " next missing")
 			return nil, ""
 		}
-		nkey := blockKey(*nkeyp)
+		nkey := BlockKey(*nkeyp)
 		kp = &nkey
 	}
 	if kp == nil {
@@ -97,7 +97,7 @@ func (self *inodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
 	ok, _ := l.AddDirEntry(e)
 	if ok {
-		nkey := NewblockKeyDirFilename(self.inode.ino, name)
+		nkey := NewBlockKeyDirFilename(self.inode.ino, name)
 		mlog.Printf2("fs/fh", " #%d %x", self.pos, nkey)
 		self.pos++
 		self.lastKey = &nkey
@@ -126,7 +126,7 @@ func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool 
 
 	// Move on with things
 	self.pos++
-	nkey := NewblockKeyDirFilename(self.inode.ino, name)
+	nkey := NewBlockKeyDirFilename(self.inode.ino, name)
 	self.lastKey = &nkey
 	return true
 }
@@ -169,7 +169,7 @@ func (self *inodeFH) read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 	if size <= embeddedSize {
 		b = meta.Data
 	} else {
-		k := NewblockKeyOffset(self.inode.ino, offset)
+		k := NewBlockKeyOffset(self.inode.ino, offset)
 		e := offset / dataExtentSize
 		offset -= e * dataExtentSize
 		end -= e * dataExtentSize
@@ -279,7 +279,7 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *fsTransaction, buf,
 		nbuf := bbuf[1:]
 		meta.Data = nbuf
 	} else {
-		k := NewblockKeyOffset(self.inode.ino, offset)
+		k := NewBlockKeyOffset(self.inode.ino, offset)
 		bl := tr.getStorageBlock(bbuf, nil)
 		bid := bl.Id()
 		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)

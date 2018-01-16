@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Fri Jan 12 11:52:00 2018 mstenber
- * Edit time:     166 min
+ * Last modified: Tue Jan 16 17:42:37 2018 mstenber
+ * Edit time:     178 min
  *
  */
 
@@ -13,8 +13,6 @@ package fs
 
 import (
 	"log"
-
-	"github.com/minio/sha256-simd"
 
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
@@ -42,16 +40,16 @@ type fsTransaction struct {
 	closed    bool
 }
 
-func newFsTransaction(fs *Fs) *fsTransaction {
+func newfsTransaction(fs *Fs) *fsTransaction {
 	defer fs.transactionsLock.Locked()()
 	root := fs.root.Get()
 	var rootBlock *storage.StorageBlock
 	// +1 ref when transaction starts
 	if root.block != nil {
-		mlog.Printf2("fs/fstransaction", "newFsTransaction - root:%v", root.block)
+		mlog.Printf2("fs/fstransaction", "newfsTransaction - root:%v", root.block)
 		rootBlock = root.block.Open()
 	} else {
-		mlog.Printf2("fs/fstransaction", "newFsTransaction - no root block")
+		mlog.Printf2("fs/fstransaction", "newfsTransaction - no root block")
 	}
 	tr := &fsTransaction{fs: fs, root: root, rootBlock: rootBlock,
 		t: ibtree.NewTransaction(root.node)}
@@ -59,21 +57,19 @@ func newFsTransaction(fs *Fs) *fsTransaction {
 	return tr
 }
 
-// ibtree.IBTreeSaver API
-func (self *fsTransaction) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
-	if self.fs.nodeDataCache == nil {
-		// In unit tests, ensure we're not saving garbage
-		nd.CheckNodeStructure()
-
-	}
-
+func IBNodeDataToBytes(nd *ibtree.IBNodeData) []byte {
 	bb := make([]byte, nd.Msgsize()+1)
 	bb[0] = byte(BDT_NODE)
 	b, err := nd.MarshalMsg(bb[1:1])
 	if err != nil {
 		log.Panic(err)
 	}
-	b = bb[0 : 1+len(b)]
+	return bb[0 : 1+len(b)]
+}
+
+// ibtree.IBTreeSaver API
+func (self *fsTransaction) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
+	b := IBNodeDataToBytes(nd)
 	mlog.Printf2("fs/fstransaction", "SaveNode %d bytes", len(b))
 	bl := self.getStorageBlock(b, nd)
 	bid := ibtree.BlockId(bl.Id())
@@ -129,10 +125,10 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 		}
 
 		mlog.Printf2("fs/fstransaction", " root has changed under us; doing delta")
-		tr := newFsTransaction(self.fs)
+		tr := newfsTransaction(self.fs)
 		defer tr.Close()
 		setIfNewer := func(newC *ibtree.IBNodeDataChild) {
-			bk := blockKey(newC.Key)
+			bk := BlockKey(newC.Key)
 			if bk.SubType() == BST_META {
 				ourMeta := decodeInodeMeta(newC.Value)
 				op := tr.t.Get(ibtree.IBKey(newC.Key))
@@ -180,7 +176,7 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 		node.PrintToMLogAll()
 
 		// Ensure root metadata is still there
-		k := ibtree.IBKey(NewblockKey(uint64(1), BST_META, ""))
+		k := ibtree.IBKey(NewBlockKey(uint64(1), BST_META, ""))
 		tr := self.fs.GetTransaction()
 		defer tr.Close()
 		v := tr.t.Get(k)
@@ -228,15 +224,9 @@ func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *sto
 	if self.closed {
 		mlog.Panicf("getStorageBlock in closed transaction")
 	}
-	h := sha256.Sum256(b)
-	bid := h[:]
-	id := string(bid)
+	bl := self.fs.storage.ReferOrStoreBlockBytes0(b)
 	if nd != nil && self.fs.nodeDataCache != nil {
-		self.fs.nodeDataCache.Set(ibtree.BlockId(id), nd)
-	}
-	bl := self.fs.storage.ReferOrStoreBlock0(id, b)
-	if bl == nil {
-		return nil
+		self.fs.nodeDataCache.Set(ibtree.BlockId(bl.Id()), nd)
 	}
 	defer self.blockLock.Locked()()
 	if self.blocks == nil {

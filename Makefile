@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Jan 12 09:48:25 2018 mstenber
-# Edit time:     86 min
+# Last modified: Tue Jan 16 15:16:19 2018 mstenber
+# Edit time:     92 min
 #
 #
 
@@ -30,7 +30,7 @@ bench: .done.buildable
 
 get: .done.getprebuild
 
-generate: .done.buildable .done.generated
+generate: .done.buildable
 
 fs/fstreerootpointer_gen.go: Makefile xxx/pointer.go
 	( echo "package fs" ; \
@@ -120,7 +120,7 @@ update-deps:
 	for FILE in $(GREENPACKS); do greenpack $(GREENPACK_OPTS) -file $$FILE ; done
 	touch $@
 
-.done.buildable: .done.greenpack .done.mlog .done.generated .done.get2
+.done.buildable: .done.greenpack .done.protoc  .done.generated .done.mlog .done.get2
 	touch $@
 
 .done.generated: $(GENERATED)
@@ -132,6 +132,10 @@ update-deps:
 
 .done.mlog: Makefile $(wildcard */*.go)
 	find . -type f -name '*.go' | sed 's/^\.\///' | xargs python3 mlog/fix-print2.py
+	touch $@
+
+.done.protoc: Makefile pb/$(wildcard *.proto)
+	(cd pb && protoc --go_out=plugins=grpc:. *.proto )
 	touch $@
 
 fstest: tfhfs

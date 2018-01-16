@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package pb;
+
+service Fs {
+  rpc ClearBlocksInName(BlockName) returns (ClearResult) {}
+
+  // Get block id, or empty if not set.
+  rpc GetBlockIdByName(BlockName) returns (BlockId) {}
+
+  // Get block
+  rpc GetBlockById(GetBlockRequest) returns (Block) {}
+
+  rpc MergeBlockNameTo(MergeRequest) returns (MergeResult) {}
+
+  rpc SetNameToBlockId(SetNameRequest) returns (SetNameResult) {}
+
+  // Store block, normal ref if no weak blocks. (Block is equivalent
+  // of GetBlockById(..wantData=false, wantMissing=true)).
+  rpc StoreBlock(StoreRequest) returns (Block) {}
+
+  // Upgrade block to non-weak status
+  rpc UpgradeBlockNonWeak(BlockId) returns (Block) {}
+}
+
+message Block {
+  string id = 1;
+  int32 status = 2;
+  string data = 3;
+  repeated string missingIds = 4;
+}
+
+message BlockName {
+  string name = 1;
+}
+
+message BlockId {
+  string id = 1;
+}
+
+// Specific requests
+
+message GetBlockRequest {
+  string id = 1;
+  bool wantData = 2;
+  bool wantMissing = 3;
+}
+
+message MergeRequest {
+  string fromName = 1;
+  string toName = 2;
+}
+
+message StoreRequest {
+  string name = 1;
+  Block block = 2;
+}
+
+message SetNameRequest {
+  string name = 1;
+  string id = 2;
+}
+
+
+// Assorted results
+
+message MergeResult {
+  bool ok = 1;
+}
+
+message SetNameResult {
+  bool ok = 1;
+}
+
+message ClearResult {
+
+}

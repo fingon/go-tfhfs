@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Wed Jan 10 16:16:51 2018 mstenber
- * Edit time:     233 min
+ * Last modified: Tue Jan 16 19:45:04 2018 mstenber
+ * Edit time:     277 min
  *
  */
 
@@ -122,14 +122,6 @@ func (self *Block) flush() int {
 		self.Backend = self.storage.Backend
 		ops++
 	} else {
-		if self.Stored.Status != self.Status && self.haveDiskRefs {
-			mlog.Printf2("storage/block", " status changed")
-			// Add dependencies with current status
-			self.updateDependencies(true, false, &self.Status)
-			// Remove old disk dependencies if they existed
-			self.updateDependencies(false, false, &self.Stored.Status)
-			ops++
-		}
 		ops += self.storage.Backend.UpdateBlock(self)
 	}
 	haveRefs := self.RefCount != 0
@@ -206,39 +198,73 @@ func (self *Block) markDirty() {
 	self.storage.dirtyBlocks[self.Id] = self
 }
 
-func (self *Block) setStatus(st BlockStatus) {
+func (self *Block) setStatus(st BlockStatus) bool {
+	if self.Status == st {
+		return true
+	}
 	mlog.Printf2("storage/block", "%v.setStatus = %v", self, st)
+	// Check if the status transition is actually POSSIBLE first
+	shouldHaveDeps := st < BlockStatus_WANT_NORMAL
+	hadDeps := self.Status < BlockStatus_WANT_NORMAL
+	changingDeps := shouldHaveDeps != hadDeps
+	if changingDeps && shouldHaveDeps {
+		refs := make([]*Block, 0)
+		cleanrefs := func() {
+			for _, b := range refs {
+				b.addStorageRefCount(0)
+			}
+		}
+		defer cleanrefs()
+		possible := true
+		self.iterateReferences(func(id string) {
+			if !possible {
+				return
+			}
+			b := self.storage.getBlockById(id)
+			if b == nil {
+				possible = false
+				return
+			}
+			refs = append(refs, b)
+		})
+
+		if !possible {
+			return false
+		}
+	}
+
 	self.markDirty()
+	if changingDeps {
+		disk := false
+		storage := false
+		// Set the dependencies according to what we know is
+		// there
+		if self.Stored.RefCount > 0 {
+			self.setDependencies(true, false, st)
+			disk = true
+		} else if self.storageRefCount > 0 {
+			self.setDependencies(true, true, st)
+			storage = true
+		}
+		// Clear old dependencies
+		self.shouldHaveStorageDependencies(false)
+		self.shouldHaveDiskDependencies(false)
+		// And note that dependency state actually matches
+		// what we manually set
+		self.haveDiskRefs = disk
+		self.haveStorageRefs = storage
+	}
 	self.Status = st
+	return true
 
 }
 
-func (self *Block) updateDependencies(add, storage bool, stp *BlockStatus) {
-	st := self.Status
-	if stp != nil {
-		st = *stp
-	}
-	// No sub-references
+func (self *Block) setDependencies(add, storage bool, st BlockStatus) {
+	// These do not need actual ones
 	if st >= BlockStatus_WANT_NORMAL {
 		return
 	}
-	if self.storage.IterateReferencesCallback == nil {
-		return
-	}
-	if storage {
-		if self.haveStorageRefs == add {
-			return
-		}
-		self.haveStorageRefs = add
-	} else if stp == nil {
-		if self.haveDiskRefs == add {
-			return
-		}
-		self.haveDiskRefs = add
-	}
-	mlog.Printf2("storage/block", "%v.updateDependencies %v %v %v", self, add, storage, st)
-
-	self.storage.IterateReferencesCallback(self.Id, self.GetData(), func(id string) {
+	self.iterateReferences(func(id string) {
 		b := self.storage.getBlockById(id)
 		if b == nil {
 			log.Panicf("Block %x awol in updateBlockDataDependencies", id)
@@ -259,6 +285,33 @@ func (self *Block) updateDependencies(add, storage bool, stp *BlockStatus) {
 
 		}
 	})
+}
+
+func (self *Block) updateDependencies(add, storage bool, stp *BlockStatus) {
+	st := self.Status
+	if stp != nil {
+		st = *stp
+	}
+	if storage {
+		if self.haveStorageRefs == add {
+			return
+		}
+		self.haveStorageRefs = add
+	} else if stp == nil {
+		if self.haveDiskRefs == add {
+			return
+		}
+		self.haveDiskRefs = add
+	}
+	mlog.Printf2("storage/block", "%v.updateDependencies %v %v %v", self, add, storage, st)
+	self.setDependencies(add, storage, st)
+}
+
+func (self *Block) iterateReferences(cb func(id string)) {
+	if self.storage.IterateReferencesCallback == nil {
+		return
+	}
+	self.storage.IterateReferencesCallback(self.Id, self.GetData(), cb)
 }
 
 func (self *Block) shouldHaveStorageDependencies(value bool) {

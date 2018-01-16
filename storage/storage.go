@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Jan 11 08:34:10 2018 mstenber
+ * Last modified: Tue Jan 16 17:13:52 2018 mstenber
  * Edit time:     609 min
  *
  */
@@ -14,6 +14,7 @@ package storage
 import (
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/minio/sha256-simd"
 )
 
 type BlockReferenceCallback func(string)
@@ -200,4 +201,12 @@ func (self *Storage) flush() int {
 
 	mlog.Printf2("storage/storage", " ops:%v", ops)
 	return ops
+}
+
+func (self *Storage) ReferOrStoreBlockBytes0(b []byte) *StorageBlock {
+	h := sha256.Sum256(b)
+	bid := h[:]
+	id := string(bid)
+	bl := self.ReferOrStoreBlock0(id, b)
+	return bl
 }

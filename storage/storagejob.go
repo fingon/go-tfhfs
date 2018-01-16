@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Thu Jan 11 08:33:34 2018 mstenber
- * Edit time:     0 min
+ * Last modified: Tue Jan 16 18:46:55 2018 mstenber
+ * Edit time:     10 min
  *
  */
 
@@ -18,11 +18,6 @@ import (
 	"github.com/fingon/go-tfhfs/mlog"
 )
 
-type jobOut struct {
-	sb *StorageBlock
-	id string
-}
-
 type jobType int
 
 const (
@@ -30,6 +25,7 @@ const (
 	jobGetBlockById
 	jobGetBlockIdByName
 	jobSetNameToBlockId
+	jobSetStorageBlockStatus
 	jobReferOrStoreBlock            // ReferOrStoreBlock, ReferOrStoreBlock0
 	jobUpdateBlockIdRefCount        // ReferBlockId, ReleaseBlockId
 	jobUpdateBlockIdStorageRefCount // ReleaseStorageBlockId
@@ -45,6 +41,8 @@ func (self jobType) String() string {
 		return "jobGetBlockById"
 	case jobGetBlockIdByName:
 		return "jobGetBlockIdByName"
+	case jobSetStorageBlockStatus:
+		return "jobSetStorageBlockStatus"
 	case jobSetNameToBlockId:
 		return "jobSetNameToBlockId"
 	case jobReferOrStoreBlock:
@@ -60,6 +58,12 @@ func (self jobType) String() string {
 	default:
 		return fmt.Sprintf("%d", int(self))
 	}
+}
+
+type jobOut struct {
+	sb *StorageBlock
+	id string
+	ok bool
 }
 
 type jobIn struct {
@@ -138,6 +142,9 @@ func (self *Storage) run() {
 			b.addStorageRefCount(job.count)
 		case jobSetNameToBlockId:
 			self.setNameToBlockId(job.name, job.id)
+		case jobSetStorageBlockStatus:
+			jo := &jobOut{ok: job.sb.block.setStatus(job.status)}
+			job.out <- jo
 		default:
 			log.Panicf("Unknown job type: %d", job.jobType)
 		}
@@ -227,4 +234,14 @@ func (self *Storage) StoreBlock(id string, data []byte) *StorageBlock {
 
 func (self *Storage) StoreBlock0(id string, data []byte) *StorageBlock {
 	return self.storeBlockInternal(jobStoreBlock, id, data, 0)
+}
+
+func (self *Storage) setStorageBlockStatus(sb *StorageBlock, status BlockStatus) bool {
+
+	out := make(chan *jobOut)
+	self.jobChannel <- &jobIn{jobType: jobSetStorageBlockStatus, out: out,
+		sb: sb, status: status,
+	}
+	jr := <-out
+	return jr.ok
 }

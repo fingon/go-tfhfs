@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Wed Jan 10 16:47:50 2018 mstenber
- * Edit time:     21 min
+ * Last modified: Tue Jan 16 19:18:31 2018 mstenber
+ * Edit time:     25 min
  *
  */
 
@@ -71,6 +71,10 @@ func (self *StorageBlock) Id() string {
 	return self.block.Id
 }
 
+func (self *StorageBlock) IterateReferences(cb func(id string)) {
+	self.block.iterateReferences(cb)
+}
+
 func (self *StorageBlock) Data() []byte {
 	if self.closed {
 		log.Panic("use after close  of ", self)
@@ -85,11 +89,11 @@ func (self *StorageBlock) Status() BlockStatus {
 	return self.block.Status
 }
 
-func (self *StorageBlock) SetStatus(status BlockStatus) {
+func (self *StorageBlock) SetStatus(status BlockStatus) bool {
 	if self.closed {
 		log.Panic("use after close  of ", self)
 	}
-	self.block.setStatus(status)
+	return self.block.storage.setStorageBlockStatus(self, status)
 }
 
 func (self *StorageBlock) String() string {

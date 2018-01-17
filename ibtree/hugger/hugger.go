@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Wed Jan 17 13:20:39 2018 mstenber
- * Edit time:     12 min
+ * Last modified: Wed Jan 17 14:05:55 2018 mstenber
+ * Edit time:     20 min
  *
  */
 
@@ -169,23 +169,34 @@ func (self *Hugger) Flush() {
 	}
 }
 
-func (self *Hugger) RootIsNew() bool {
-	rootbid := self.Storage.GetBlockIdByName(self.RootName)
-	if rootbid != "" {
-		bid := ibtree.BlockId(rootbid)
-		node := self.tree.LoadRoot(bid)
+func (self *Hugger) LoadNodeByName(name string) (*ibtree.Node, string, bool) {
+	bid := self.Storage.GetBlockIdByName(name)
+	if bid != "" {
+		node := self.tree.LoadRoot(ibtree.BlockId(bid))
 		if node == nil {
 			log.Panicf("Loading of root block %x failed", bid)
 		}
-		block := self.Storage.GetBlockById(string(bid))
-		root := &treeRoot{node, block}
-		self.root.Set(root)
+		return node, bid, true
 	}
-	if self.root.Get() == nil {
-		self.root.Set(&treeRoot{node: self.tree.NewRoot()})
-		return true
+	return self.NewRootNode(), "", false
+}
+
+func (self *Hugger) RootBlock() *storage.StorageBlock {
+	return self.root.Get().block
+}
+
+func (self *Hugger) RootIsNew() bool {
+	node, bid, ok := self.LoadNodeByName(self.RootName)
+	root := &treeRoot{node: node}
+	if ok {
+		root.block = self.Storage.GetBlockById(string(bid))
 	}
-	return false
+	self.root.Set(root)
+	return !ok
+}
+
+func (self *Hugger) NewRootNode() *ibtree.Node {
+	return self.tree.NewRoot()
 }
 
 func BytesToNodeData(bd []byte) *ibtree.NodeData {

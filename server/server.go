@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Wed Jan 17 13:28:26 2018 mstenber
- * Edit time:     98 min
+ * Last modified: Wed Jan 17 15:38:41 2018 mstenber
+ * Edit time:     118 min
  *
  */
 
@@ -13,6 +13,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 
@@ -33,22 +34,26 @@ type Server struct {
 	Fs              *fs.Fs
 	Storage         *storage.Storage
 	grpcServer      *grpc.Server
+	listener        net.Listener
 }
 
-func (self *Server) Init() *Server {
+func (self Server) Init() *Server {
 	self.RootName = rootName
 	self.Hugger.Storage = self.Storage
 	lis, err := net.Listen(self.Family, self.Address)
 	if err != nil {
 		log.Panic(err)
 	}
+	self.listener = lis
 	grpcServer := grpc.NewServer()
-	RegisterFsServer(grpcServer, self)
-	grpcServer.Serve(lis)
+	RegisterFsServer(grpcServer, &self)
+	go func() {
+		grpcServer.Serve(lis)
+	}()
 	self.grpcServer = grpcServer
 	// Load the root
 	self.Hugger.RootIsNew()
-	return self
+	return &self
 }
 
 func (self *Server) Close() {
@@ -99,8 +104,21 @@ func (self *Server) GetBlockById(ctx context.Context, req *GetBlockRequest) (*Bl
 }
 
 func (self *Server) MergeBlockNameTo(ctx context.Context, req *MergeRequest) (*MergeResult, error) {
-	// TBD
-	return &MergeResult{}, nil
+	n0 := fmt.Sprintf("%s.%s", req.FromName, req.ToName)
+	b0, _, _ := self.Fs.LoadNodeByName(n0)
+	b, _, ok := self.Fs.LoadNodeByName(req.FromName)
+	if !ok {
+		log.Panic("nonexistent src")
+	}
+	if req.ToName != self.Fs.RootName {
+		log.Panic("non-fs merges not supported")
+	}
+	self.Fs.Update(func(tr *hugger.Transaction) {
+		fs.MergeTo3(tr, b0, b, false)
+	})
+	block := self.Fs.RootBlock()
+	self.Storage.SetNameToBlockId(n0, block.Id())
+	return &MergeResult{Ok: true}, nil
 }
 
 func (self *Server) SetNameToBlockId(ctx context.Context, req *SetNameRequest) (*SetNameResult, error) {

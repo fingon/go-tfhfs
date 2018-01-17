@@ -2,6 +2,7 @@
 coverage.out
 .done.*
 *.pb.go
+*.twirp.go
 *_gen.go
 *_gen_test.go
 *.prof

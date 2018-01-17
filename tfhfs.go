@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Tue Jan 16 14:51:49 2018 mstenber
- * Edit time:     51 min
+ * Last modified: Wed Jan 17 16:34:58 2018 mstenber
+ * Edit time:     52 min
  *
  */
 
@@ -38,7 +38,7 @@ func main() {
 	cpuprofile := flag.String("cpuprofile", "", "CPU profile file")
 	memprofile := flag.String("memprofile", "", "Memory profile file")
 	cachesize := flag.Int("cachesize", 10000, "Number of btree nodes to cache (~few k each)")
-	family := flag.String("family", "tcp", "Address family to use for server")
+	//family := flag.String("family", "tcp", "Address family to use for server")
 	address := flag.String("address", "localhost::12345", "Address to use for server")
 
 	flag.Parse()
@@ -70,7 +70,7 @@ func main() {
 	}
 
 	// grpc server
-	rpcServer := (&server.Server{Family: *family, Address: *address, Fs: myfs, Storage: st}).Init()
+	rpcServer := (&server.Server{Address: *address, Fs: myfs, Storage: st}).Init()
 
 	// fuse server
 	server, err := fuse.NewServer(&myfs.Ops, mountpoint, opts)

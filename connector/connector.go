@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 14:19:35 2018 mstenber
- * Last modified: Wed Jan 17 16:24:24 2018 mstenber
- * Edit time:     58 min
+ * Last modified: Wed Jan 17 16:40:31 2018 mstenber
+ * Edit time:     60 min
  *
  */
 
@@ -13,13 +13,13 @@ package connector
 
 import (
 	"context"
+	"fmt"
+	"net/http"
 
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/pb"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/util"
-
-	"google.golang.org/grpc"
 )
 
 type Connection struct {
@@ -56,17 +56,10 @@ func (self *Connector) Run() error {
 	return nil
 }
 
-func (self *Connector) getClient(c *Connection) (pb.FsClient, error) {
-	mlog.Printf("getClient %v", c.Address)
-	conn, err := grpc.Dial(c.Address, grpc.WithInsecure())
-	//, grpc.WithDialer(func(string, time.Duration) (net.Conn, error) {
-	//return net.Dial(c.Family, c.Address))
-	if err != nil {
-		mlog.Printf2("connector/connector", " unable to connect src: %s", err)
-		return nil, err
-	}
-	defer conn.Close()
-	return pb.NewFsClient(conn), nil
+func (self *Connector) getClient(c *Connection) (pb.Fs, error) {
+	mlog.Printf2("connector/connector", "getClient %v", c.Address)
+	url := fmt.Sprintf("http://%s", c.Address)
+	return pb.NewFsProtobufClient(url, &http.Client{}), nil
 
 }
 
@@ -121,7 +114,7 @@ func (self *Connector) Sync(from *Connection, to *Connection) (err error) {
 	return
 }
 
-func (self *Connector) copyBlockTo(fclient, tclient pb.FsClient, bid, inName string) (err error) {
+func (self *Connector) copyBlockTo(fclient, tclient pb.Fs, bid, inName string) (err error) {
 	mlog.Printf2("connector/connector", "copyBlockTo %x @%x", bid, inName)
 	bg := context.Background()
 
@@ -146,7 +139,7 @@ func (self *Connector) copyBlockTo(fclient, tclient pb.FsClient, bid, inName str
 	return self.upgradeBlock(fclient, tclient, bid, inName, b)
 }
 
-func (self *Connector) upgradeBlock(fclient, tclient pb.FsClient, bid, inName string, b *pb.Block) (err error) {
+func (self *Connector) upgradeBlock(fclient, tclient pb.Fs, bid, inName string, b *pb.Block) (err error) {
 	bg := context.Background()
 	for {
 		if b.MissingIds != nil {

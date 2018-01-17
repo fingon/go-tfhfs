@@ -4,7 +4,7 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Jan 17 12:46:10 2018 mstenber
+# Last modified: Wed Jan 17 16:29:38 2018 mstenber
 # Edit time:     93 min
 #
 #
@@ -135,7 +135,7 @@ update-deps:
 	touch $@
 
 .done.protoc: Makefile pb/$(wildcard *.proto)
-	(cd pb && protoc --go_out=plugins=grpc:. *.proto )
+	(cd pb && protoc --go_out=. --twirp_out=. *.proto )
 	touch $@
 
 fstest: tfhfs

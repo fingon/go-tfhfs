@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Wed Jan 17 16:24:45 2018 mstenber
- * Edit time:     122 min
+ * Last modified: Wed Jan 17 16:48:11 2018 mstenber
+ * Edit time:     132 min
  *
  */
 
@@ -15,14 +15,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
+	"net/http"
 
 	"github.com/fingon/go-tfhfs/fs"
 	"github.com/fingon/go-tfhfs/ibtree/hugger"
-	"github.com/fingon/go-tfhfs/mlog"
 	. "github.com/fingon/go-tfhfs/pb"
 	"github.com/fingon/go-tfhfs/storage"
-	"google.golang.org/grpc"
 )
 
 const rootName = "sync"
@@ -34,32 +32,23 @@ type Server struct {
 	Family, Address string
 	Fs              *fs.Fs
 	Storage         *storage.Storage
-	grpcServer      *grpc.Server
-	listener        net.Listener
 }
 
 func (self Server) Init() *Server {
 	self.RootName = rootName
 	self.Hugger.Storage = self.Storage
-	lis, err := net.Listen(self.Family, self.Address)
-	if err != nil {
-		log.Panic(err)
-	}
-	mlog.Printf("Server at %s %s", self.Family, self.Address)
-	self.listener = lis
-	grpcServer := grpc.NewServer()
-	RegisterFsServer(grpcServer, &self)
+	(&self.Hugger).Init(0)
+	twirpHandler := NewFsServer(&self, nil)
 	go func() {
-		grpcServer.Serve(lis)
+		http.ListenAndServe(self.Address, twirpHandler)
 	}()
-	self.grpcServer = grpcServer
 	// Load the root
 	self.Hugger.RootIsNew()
 	return &self
 }
 
 func (self *Server) Close() {
-	self.grpcServer.Stop()
+	// TBD how to clean this up correctly
 }
 
 func (self *Server) ClearBlocksInName(ctx context.Context, n *BlockName) (*ClearResult, error) {
@@ -79,7 +68,7 @@ func (self *Server) GetBlockIdByName(ctx context.Context, name *BlockName) (*Blo
 func (self *Server) getBlock(id string, wantData, wantMissing bool) *Block {
 	b := self.Storage.GetBlockById(id)
 	if b == nil {
-		return nil
+		return &Block{}
 	}
 	defer b.Close()
 	res := &Block{Id: id, Status: int32(b.Status())}
@@ -130,15 +119,17 @@ func (self *Server) SetNameToBlockId(ctx context.Context, req *SetNameRequest) (
 }
 
 func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, error) {
-	var bl *storage.StorageBlock
+	var bid string
 	self.Update(func(tr *hugger.Transaction) {
 		bdata := []byte(req.Block.Data)
 		st := storage.BlockStatus(req.Block.Status)
-		bl = tr.GetStorageBlock(st, bdata, nil)
+		bl := tr.GetStorageBlock(st, bdata, nil)
 		k := fs.NewBlockKeyNameBlock(req.Name, bl.Id()).IB()
 		tr.IB().Set(k, bl.Id())
+		bid = bl.Id()
 	})
-	return self.getBlock(bl.Id(), false, true), nil
+
+	return self.getBlock(bid, false, true), nil
 }
 
 func (self *Server) UpgradeBlockNonWeak(ctx context.Context, bid *BlockId) (*Block, error) {

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 10:43:03 2018 mstenber
- * Last modified: Wed Jan 17 13:11:16 2018 mstenber
- * Edit time:     50 min
+ * Last modified: Wed Jan 17 13:47:08 2018 mstenber
+ * Edit time:     56 min
  *
  */
 
@@ -69,6 +69,9 @@ func MergeTo3(tr *hugger.Transaction, src, dst *ibtree.Node, local bool) {
 							v = MV_NONE
 						} else {
 							srcMeta := decodeInodeMeta(oldC.Value)
+							if srcMeta.IsDir() {
+								isdir[k.Ino()] = true
+							}
 							otherMeta := decodeInodeMeta(*op)
 							if srcMeta.StCtimeNs >= otherMeta.StCtimeNs {
 								v = MV_NONE

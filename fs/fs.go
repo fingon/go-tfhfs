@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan 17 13:17:43 2018 mstenber
- * Edit time:     356 min
+ * Last modified: Wed Jan 17 17:51:53 2018 mstenber
+ * Edit time:     360 min
  *
  */
 
@@ -181,4 +181,12 @@ func BytesToNodeData(bd []byte) *ibtree.NodeData {
 		log.Panicf("BytesToNodeData - wrong dt:%v", dt)
 	}
 	return nil
+}
+
+// WithoutParallelWrites ensures the data being read is entirely
+// consistent. This means that there is no locks on filehandles, and
+// that all pending data has been written to Storage (which will
+// persist it eventually).
+func (self *Fs) WithoutParallelWrites(cb func()) {
+	self.writeLimiter.Exclusive(cb)
 }

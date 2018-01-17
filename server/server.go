@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Wed Jan 17 17:14:40 2018 mstenber
- * Edit time:     135 min
+ * Last modified: Wed Jan 17 17:55:24 2018 mstenber
+ * Edit time:     140 min
  *
  */
 
@@ -62,10 +62,16 @@ func (self *Server) ClearBlocksInName(ctx context.Context, n *BlockName) (*Clear
 
 func (self *Server) GetBlockIdByName(ctx context.Context, name *BlockName) (*BlockId, error) {
 	if name.Name == self.Fs.RootName {
-		block := self.Fs.RootBlock()
-		if block != nil {
-			return &BlockId{Id: block.Id()}, nil
-
+		var bid string
+		self.Fs.WithoutParallelWrites(
+			func() {
+				block := self.Fs.RootBlock()
+				if block != nil {
+					bid = block.Id()
+				}
+			})
+		if bid != "" {
+			return &BlockId{Id: bid}, nil
 		}
 	}
 	id := self.Storage.GetBlockIdByName(name.Name)

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Fri Jan 12 14:10:00 2018 mstenber
- * Edit time:     207 min
+ * Last modified: Wed Jan 17 11:48:50 2018 mstenber
+ * Edit time:     210 min
  *
  */
 
@@ -102,13 +102,13 @@ func ProdFsFile(t *testing.T, u *FSUser) {
 	tn = 3*embeddedSize + 5
 	assert.True(t, tn%3 != 0)
 	assert.True(t, tn%7 != 0)
-	ProdFsFile1(t, u, tn, 1, 1)
+	// ProdFsFile1(t, u, tn, 1, 1)
 	ProdFsFile1(t, u, tn, 7, 3)
 	ProdFsFile1(t, u, tn, 3, 7)
 
 	// Then bit larger writes for larger things
 	tn = 3 * dataExtentSize
-	ProdFsFile1(t, u, tn, 41, 13)
+	// ProdFsFile1(t, u, tn, 41, 13)
 	ProdFsFile1(t, u, tn, 257, 41)
 }
 
@@ -346,7 +346,7 @@ func (self *DummyGenerator) CreateInodeNumber() uint64 {
 
 func TestFs(t *testing.T) {
 	check := func(t *testing.T, fs *Fs) {
-		mlog.Printf2("fs/rawfs_test", "Root: %s = %x", fs.rootName, fs.root.Get().block.Id())
+		mlog.Printf2("fs/rawfs_test", "Root: %s = %x", fs.RootName, fs.root.Get().block.Id())
 		fs.root.Get().node.PrintToMLogAll()
 		root := NewFSUser(fs)
 		_, err := root.Stat("/public")
@@ -358,10 +358,10 @@ func TestFs(t *testing.T) {
 			func(t *testing.T) {
 				t.Parallel()
 				mlog.Printf2("fs/rawfs_test", "starting")
-				rootName := "toor"
+				RootName := "toor"
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
-				fs := NewFs(st, rootName, 0)
+				fs := NewFs(st, RootName, 0)
 				defer fs.Close()
 				if gen != nil {
 					fs.generator = gen
@@ -374,7 +374,7 @@ func TestFs(t *testing.T) {
 				check(t, fs)
 
 				mlog.Printf2("fs/rawfs_test", "omstart from storage")
-				fs2 := NewFs(st, rootName, 0)
+				fs2 := NewFs(st, RootName, 0)
 				check(t, fs2)
 				fs2.storage.Backend = nil
 			})
@@ -397,10 +397,10 @@ func TestFsParallel(t *testing.T) {
 			func(t *testing.T) {
 				t.Parallel()
 
-				rootName := "toor"
+				RootName := "toor"
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
-				fs := NewFs(st, rootName, 0)
+				fs := NewFs(st, RootName, 0)
 				defer fs.Close()
 
 				randomReaderWriter := func(path string, u *FSUser) {
@@ -491,9 +491,9 @@ func TestFsParallel(t *testing.T) {
 
 			})
 	}
-	add(1, 1000, 123, 1)
-	add(3, 200, 123, 1)
-	add(7, 100, 1234, 100)
-	add(13, 20, 12345, 12345)
+	add(1, 500, 123, 1)
+	add(3, 100, 123, 1)
+	add(7, 50, 1234, 100)
+	add(13, 10, 12345, 12345)
 
 }

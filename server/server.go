@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Wed Jan 17 15:38:41 2018 mstenber
- * Edit time:     118 min
+ * Last modified: Wed Jan 17 16:24:45 2018 mstenber
+ * Edit time:     122 min
  *
  */
 
@@ -19,6 +19,7 @@ import (
 
 	"github.com/fingon/go-tfhfs/fs"
 	"github.com/fingon/go-tfhfs/ibtree/hugger"
+	"github.com/fingon/go-tfhfs/mlog"
 	. "github.com/fingon/go-tfhfs/pb"
 	"github.com/fingon/go-tfhfs/storage"
 	"google.golang.org/grpc"
@@ -44,6 +45,7 @@ func (self Server) Init() *Server {
 	if err != nil {
 		log.Panic(err)
 	}
+	mlog.Printf("Server at %s %s", self.Family, self.Address)
 	self.listener = lis
 	grpcServer := grpc.NewServer()
 	RegisterFsServer(grpcServer, &self)

@@ -36,22 +36,22 @@ package storage
 type BlockStatus byte
 
 const (
-	BlockStatus_UNSET BlockStatus = iota
+	BS_UNSET BlockStatus = iota
 
 	// Has references on based on data, data present
-	BlockStatus_NORMAL
+	BS_NORMAL
 
 	// Has references on based on data, data gone
-	BlockStatus_MISSING
+	BS_MISSING
 
 	// No references on based on data, no data
-	BlockStatus_WANT_NORMAL
+	BS_WANT_NORMAL
 
 	// No references on based on data, data present
-	BlockStatus_WEAK
+	BS_WEAK
 
 	// No references on based on data, no data
-	BlockStatus_WANT_WEAK
+	BS_WANT_WEAK
 )
 
 type BlockMetadata struct {

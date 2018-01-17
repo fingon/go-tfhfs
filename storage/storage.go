@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Jan 16 17:13:52 2018 mstenber
- * Edit time:     609 min
+ * Last modified: Wed Jan 17 10:10:13 2018 mstenber
+ * Edit time:     611 min
  *
  */
 
@@ -203,10 +203,10 @@ func (self *Storage) flush() int {
 	return ops
 }
 
-func (self *Storage) ReferOrStoreBlockBytes0(b []byte) *StorageBlock {
+func (self *Storage) ReferOrStoreBlockBytes0(status BlockStatus, b []byte) *StorageBlock {
 	h := sha256.Sum256(b)
 	bid := h[:]
 	id := string(bid)
-	bl := self.ReferOrStoreBlock0(id, b)
+	bl := self.ReferOrStoreBlock0(id, status, b)
 	return bl
 }

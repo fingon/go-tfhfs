@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Tue Jan 16 18:46:55 2018 mstenber
- * Edit time:     10 min
+ * Last modified: Wed Jan 17 11:46:28 2018 mstenber
+ * Edit time:     14 min
  *
  */
 
@@ -111,7 +111,6 @@ func (self *Storage) run() {
 				job.out <- &jobOut{sb: NewStorageBlock(b)}
 				continue
 			}
-			job.status = BlockStatus_NORMAL
 			mlog.Printf2("storage/storagejob", "fallthrough to storing block")
 			fallthrough
 		case jobStoreBlock:
@@ -124,6 +123,11 @@ func (self *Storage) run() {
 			//b.Data.Set(&nd)
 			b.Data.Set(&job.data)
 			self.blocks[job.id] = b
+			// Note: This order matters. setStatus with
+			// nonzero refcounts will do
+			// things. addRefCount will also do things,
+			// and in theory they work correctly both ways
+			// but better safe than sorry.
 			b.setStatus(job.status)
 			b.addRefCount(job.count)
 			job.out <- &jobOut{sb: NewStorageBlock(b)}
@@ -176,24 +180,24 @@ func (self *Storage) GetBlockIdByName(name string) string {
 	return jr.id
 }
 
-func (self *Storage) storeBlockInternal(jobType jobType, id string, data []byte, count int32) *StorageBlock {
+func (self *Storage) storeBlockInternal(jobType jobType, id string, status BlockStatus, data []byte, count int32) *StorageBlock {
 	if data == nil {
 		mlog.Printf2("storage/storagejob", "no data given")
 	}
 	out := make(chan *jobOut)
 	self.jobChannel <- &jobIn{jobType: jobType, out: out,
-		id: id, data: data, count: count, status: BlockStatus_NORMAL,
+		id: id, data: data, count: count, status: status,
 	}
 	jr := <-out
 	return jr.sb
 }
 
-func (self *Storage) ReferOrStoreBlock(id string, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobReferOrStoreBlock, id, data, 1)
+func (self *Storage) ReferOrStoreBlock(id string, status BlockStatus, data []byte) *StorageBlock {
+	return self.storeBlockInternal(jobReferOrStoreBlock, id, status, data, 1)
 }
 
-func (self *Storage) ReferOrStoreBlock0(id string, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobReferOrStoreBlock, id, data, 0)
+func (self *Storage) ReferOrStoreBlock0(id string, status BlockStatus, data []byte) *StorageBlock {
+	return self.storeBlockInternal(jobReferOrStoreBlock, id, status, data, 0)
 }
 
 func (self *Storage) ReferBlockId(id string) {
@@ -228,12 +232,12 @@ func (self *Storage) SetNameToBlockId(name, block_id string) {
 	}
 }
 
-func (self *Storage) StoreBlock(id string, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobStoreBlock, id, data, 1)
+func (self *Storage) StoreBlock(id string, status BlockStatus, data []byte) *StorageBlock {
+	return self.storeBlockInternal(jobStoreBlock, id, status, data, 1)
 }
 
-func (self *Storage) StoreBlock0(id string, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobStoreBlock, id, data, 0)
+func (self *Storage) StoreBlock0(id string, status BlockStatus, data []byte) *StorageBlock {
+	return self.storeBlockInternal(jobStoreBlock, id, status, data, 0)
 }
 
 func (self *Storage) setStorageBlockStatus(sb *StorageBlock, status BlockStatus) bool {

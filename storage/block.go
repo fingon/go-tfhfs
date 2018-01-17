@@ -204,8 +204,8 @@ func (self *Block) setStatus(st BlockStatus) bool {
 	}
 	mlog.Printf2("storage/block", "%v.setStatus = %v", self, st)
 	// Check if the status transition is actually POSSIBLE first
-	shouldHaveDeps := st < BlockStatus_WANT_NORMAL
-	hadDeps := self.Status < BlockStatus_WANT_NORMAL
+	shouldHaveDeps := st < BS_WANT_NORMAL
+	hadDeps := self.Status < BS_WANT_NORMAL
 	changingDeps := shouldHaveDeps != hadDeps
 	if changingDeps && shouldHaveDeps {
 		refs := make([]*Block, 0)
@@ -261,7 +261,7 @@ func (self *Block) setStatus(st BlockStatus) bool {
 
 func (self *Block) setDependencies(add, storage bool, st BlockStatus) {
 	// These do not need actual ones
-	if st >= BlockStatus_WANT_NORMAL {
+	if st >= BS_WANT_NORMAL {
 		return
 	}
 	self.iterateReferences(func(id string) {

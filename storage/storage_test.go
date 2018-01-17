@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:19:24 2017 mstenber
- * Last modified: Wed Jan 10 16:40:16 2018 mstenber
+ * Last modified: Wed Jan 17 10:24:27 2018 mstenber
  * Edit time:     227 min
  *
  */
@@ -32,7 +32,7 @@ func ProdBackend(t *testing.T, factory func() storage.Backend) {
 
 	b1 := &storage.Block{Id: "foo",
 		BlockMetadata: storage.BlockMetadata{RefCount: 123,
-			Status: storage.BlockStatus_NORMAL}}
+			Status: storage.BS_NORMAL}}
 	data := []byte("data")
 	b1.Data.Set(&data)
 	be.SetNameToBlockId("name", "foo")
@@ -47,10 +47,10 @@ func ProdBackend(t *testing.T, factory func() storage.Backend) {
 	// populated by default.
 	//assert.Equal(t, b1, b2)
 	assert.Equal(t, int(b2.RefCount), 123)
-	assert.Equal(t, b2.Status, storage.BlockStatus_NORMAL)
+	assert.Equal(t, b2.Status, storage.BS_NORMAL)
 
-	//be.UpdateBlockStatus(b1, BlockStatus_MISSING)
-	//assert.Equal(t, b2.Status, BlockStatus_MISSING)
+	//be.UpdateBlockStatus(b1, BS_MISSING)
+	//assert.Equal(t, b2.Status, BS_MISSING)
 
 	mlog.Printf2("storage/storage_test", " get nok?")
 	bn := be.GetBlockIdByName("name")
@@ -82,11 +82,12 @@ func ProdStorageOne(t *testing.T, s *storage.Storage) {
 	mlog.Printf2("storage/storage_test", "ProdStorageOne")
 	assert.Equal(t, s.TransientCount(), 0)
 	v := []byte("v")
-	b := s.ReferOrStoreBlock("key", v) // +1 key ref, sref
+	st := storage.BS_NORMAL
+	b := s.ReferOrStoreBlock("key", st, v) // +1 key ref, sref
 	// assert.Equal(t, int(b.storageRefCount), 2)
 	assert.True(t, b != nil)
 	// assert.Equal(t, int(b.RefCount), 1)
-	b2 := s.ReferOrStoreBlock("key", v) // +1 key ref, sref
+	b2 := s.ReferOrStoreBlock("key", st, v) // +1 key ref, sref
 	assert.Equal(t, b, b2)
 	// assert.Equal(t, int(b.storageRefCount), 3)
 	// assert.Equal(t, int(b.RefCount), 2)
@@ -96,7 +97,7 @@ func ProdStorageOne(t *testing.T, s *storage.Storage) {
 	// assert.Equal(t, s.dirtyBlocks.Get().Len(), 0)
 	// assert.Equal(t, int(b.storageRefCount), 2) // two references kept below
 
-	b3 := s.ReferOrStoreBlock("key2", v) // +1 key2 ref, sref
+	b3 := s.ReferOrStoreBlock("key2", st, v) // +1 key2 ref, sref
 	// assert.Equal(t, s.blocks.Get().Len(), 2)
 	// assert.Equal(t, s.dirtyBlocks.Get().Len(), 1)
 	// assert.Equal(t, int(b3.storageRefCount), 2)
@@ -166,7 +167,7 @@ func ProdStorageDeps(t *testing.T, be storage.Backend) {
 		k2v[v.key] = v.value
 		nv := make([]byte, len(v.value))
 		copy(nv, []byte(v.value))
-		s.ReferOrStoreBlock(v.key, nv).Close()
+		s.ReferOrStoreBlock(v.key, storage.BS_NORMAL, nv).Close()
 	}
 	name := "subname"
 	s.SetNameToBlockId(name, "sub")

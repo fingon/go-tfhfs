@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Tue Jan 16 19:50:15 2018 mstenber
- * Edit time:     79 min
+ * Last modified: Wed Jan 17 11:40:59 2018 mstenber
+ * Edit time:     92 min
  *
  */
 
@@ -62,13 +62,22 @@ func (self *Server) Init() *Server {
 }
 
 func (self *Server) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
-	return self.Fs.LoadNode(id)
+	b := self.Storage.GetBlockById(string(id))
+	if b == nil {
+		log.Panicf("Unable to find node %x", id)
+	}
+	defer b.Close()
+	nd := fs.BytesToIBNodeData(b.Data())
+	if nd == nil {
+		log.Panicf("Unable to convert node %x", id)
+	}
+	return nd
 }
 
 func (self *Server) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
 	self.lock.AssertLocked()
 	b := fs.IBNodeDataToBytes(nd)
-	bl := self.Storage.ReferOrStoreBlockBytes0(b)
+	bl := self.Storage.ReferOrStoreBlockBytes0(storage.BS_NORMAL, b)
 	if self.blocks == nil {
 		self.blocks = make(map[string]*storage.StorageBlock)
 	}
@@ -97,9 +106,9 @@ func (self *Server) commit(t *ibtree.IBTransaction) {
 func (self *Server) ClearBlocksInName(ctx context.Context, n *BlockName) (*ClearResult, error) {
 	defer self.lock.Locked()()
 	t := ibtree.NewTransaction(self.root)
-	k1 := fs.NewBlockKeyNameBlock(n.Name, "")
-	k2 := fs.NewBlockKeyNameEnd(n.Name)
-	t.DeleteRange(ibtree.IBKey(k1), ibtree.IBKey(k2))
+	k1 := fs.NewBlockKeyNameBlock(n.Name, "").IB()
+	k2 := fs.NewBlockKeyNameEnd(n.Name).IB()
+	t.DeleteRange(k1, k2)
 	self.commit(t)
 	return &ClearResult{}, nil
 }
@@ -119,7 +128,7 @@ func (self *Server) getBlock(id string, wantData, wantMissing bool) *Block {
 	if wantData {
 		res.Data = string(b.Data())
 	}
-	if wantMissing && b.Status() == storage.BlockStatus_WEAK {
+	if wantMissing && b.Status() == storage.BS_WEAK {
 		missing := make([]string, 0)
 		b.IterateReferences(func(id string) {
 			b2 := self.Storage.GetBlockById(id)
@@ -138,7 +147,7 @@ func (self *Server) GetBlockById(ctx context.Context, req *GetBlockRequest) (*Bl
 	return self.getBlock(req.Id, req.WantData, req.WantMissing), nil
 }
 
-func (self *Server) MergeBlockNameTo(context.Context, *MergeRequest) (*MergeResult, error) {
+func (self *Server) MergeBlockNameTo(ctx context.Context, req *MergeRequest) (*MergeResult, error) {
 	// TBD
 	return &MergeResult{}, nil
 }
@@ -152,16 +161,17 @@ func (self *Server) SetNameToBlockId(ctx context.Context, req *SetNameRequest) (
 func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, error) {
 	var bl *storage.StorageBlock
 	bdata := []byte(req.Block.Data)
+	st := storage.BlockStatus(req.Block.Status)
 	if req.Block.Id != "" {
-		bl = self.Storage.ReferOrStoreBlock0(req.Block.Id, bdata)
+		bl = self.Storage.ReferOrStoreBlock0(req.Block.Id, st, bdata)
 	} else {
-		bl = self.Storage.ReferOrStoreBlockBytes0(bdata)
+		bl = self.Storage.ReferOrStoreBlockBytes0(st, bdata)
 	}
 	defer self.lock.Locked()()
 	self.blocks[bl.Id()] = bl
 	t := ibtree.NewTransaction(self.root)
-	k := fs.NewBlockKeyNameBlock(req.Name, bl.Id())
-	t.Set(ibtree.IBKey(k), bl.Id())
+	k := fs.NewBlockKeyNameBlock(req.Name, bl.Id()).IB()
+	t.Set(k, bl.Id())
 	self.commit(t)
 	return self.getBlock(bl.Id(), false, true), nil
 }
@@ -169,7 +179,7 @@ func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, 
 func (self *Server) UpgradeBlockNonWeak(ctx context.Context, bid *BlockId) (*Block, error) {
 	b := self.Storage.GetBlockById(bid.Id)
 	if b != nil {
-		b.SetStatus(storage.BlockStatus_NORMAL)
+		b.SetStatus(storage.BS_NORMAL)
 	}
 	return self.getBlock(bid.Id, false, true), nil
 }

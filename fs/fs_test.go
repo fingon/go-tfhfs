@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Wed Jan 10 12:03:12 2018 mstenber
+ * Last modified: Wed Jan 17 11:28:25 2018 mstenber
  * Edit time:     34 min
  *
  */
@@ -18,7 +18,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/storage/factory"
 	"github.com/stvp/assert"
@@ -38,10 +37,10 @@ func TestBlockKey(t *testing.T) {
 func TestfsTransaction(t *testing.T) {
 	t.Parallel()
 
-	rootName := "toor"
+	RootName := "toor"
 	backend := factory.New("inmemory", "")
 	st := storage.Storage{Backend: backend}.Init()
-	fs := NewFs(st, rootName, 0)
+	fs := NewFs(st, RootName, 0)
 	defer fs.Close()
 
 	st.IterateReferencesCallback = nil
@@ -96,7 +95,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 
 	tr := fs.GetTransaction()
 	for i := 0; i < n; i++ {
-		k := ibtree.IBKey(NewBlockKey(uint64(i), BST_META, ""))
+		k := NewBlockKey(uint64(i), BST_META, "").IB()
 		tr.t.Set(k, fmt.Sprintf("v%d", i))
 	}
 	tr.CommitUntilSucceeds()
@@ -106,7 +105,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
-			k := ibtree.IBKey(NewBlockKey(uint64(j), BST_META, ""))
+			k := NewBlockKey(uint64(j), BST_META, "").IB()
 			tr.t.Get(k)
 			tr.Close()
 		}
@@ -117,7 +116,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
-			k := ibtree.IBKey(NewBlockKey(uint64(j), BST_META, ""))
+			k := NewBlockKey(uint64(j), BST_META, "").IB()
 			tr.t.Get(k)
 			tr.Close()
 		}
@@ -128,7 +127,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
-			k := ibtree.IBKey(NewBlockKey(uint64(j), BST_META, ""))
+			k := NewBlockKey(uint64(j), BST_META, "").IB()
 			tr.t.Set(k, fmt.Sprintf("V%d%d", j, i))
 			tr.CommitUntilSucceeds()
 		}
@@ -139,7 +138,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
-			k := ibtree.IBKey(NewBlockKey(uint64(j), BST_META, ""))
+			k := NewBlockKey(uint64(j), BST_META, "").IB()
 			tr.t.Delete(k)
 			tr.CommitUntilSucceeds()
 		}

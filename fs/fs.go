@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Jan 16 18:05:17 2018 mstenber
- * Edit time:     336 min
+ * Last modified: Wed Jan 17 10:29:46 2018 mstenber
+ * Edit time:     343 min
  *
  */
 
@@ -36,15 +36,16 @@ const inodeDataLength = 8
 const blockSubTypeOffset = inodeDataLength
 
 type Fs struct {
+	Ops      fsOps
+	RootName string
+
 	// These have their own locking or are used in single-threaded way
 	inodeTracker
-	Ops                  fsOps
 	closing              chan chan struct{}
 	flushInterval        time.Duration
 	server               *fuse.Server
 	tree                 *ibtree.IBTree
 	storage              *storage.Storage
-	rootName             string
 	root                 fsTreeRootAtomicPointer
 	nodeDataCache        gcache.Cache
 	transactionRetryLock util.MutexLocked
@@ -84,13 +85,17 @@ func (self *Fs) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
 		v, _ = self.nodeDataCache.Get(id)
 	}
 	if v == nil {
-		nd := self.loadNode(id)
-		if nd != nil {
-			if self.nodeDataCache != nil {
-				self.nodeDataCache.Set(id, nd)
-			}
-		} else {
+		b := self.storage.GetBlockById(string(id))
+		if b == nil {
 			log.Panicf("Unable to find node %x", id)
+		}
+		defer b.Close()
+		nd := BytesToIBNodeData(b.Data())
+		if nd == nil {
+			log.Panicf("Unable to find node %x", id)
+		}
+		if self.nodeDataCache != nil {
+			self.nodeDataCache.Set(id, nd)
 		}
 		return nd
 	}
@@ -151,16 +156,13 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 	return
 }
 
-func NewFs(st *storage.Storage, rootName string, cacheSize int) *Fs {
-	fs := &Fs{storage: st, rootName: rootName}
+func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
+	fs := &Fs{storage: st, RootName: RootName}
 	fs.transactions = make(map[*fsTransaction]bool)
 	fs.oldRoots = make(map[*storage.StorageBlock]bool)
 	if cacheSize > 0 {
 		fs.nodeDataCache = gcache.New(cacheSize).
 			ARC().
-			//	LoaderFunc(func(k interface{}) (interface{}, error) {
-			//		return fs.loadNode(k.(ibtree.BlockId)), nil
-			//}).
 			Build()
 	}
 	fs.Ops.fs = fs
@@ -172,7 +174,7 @@ func NewFs(st *storage.Storage, rootName string, cacheSize int) *Fs {
 	st.IterateReferencesCallback = func(id string, data []byte, cb storage.BlockReferenceCallback) {
 		fs.iterateReferencesCallback(id, data, cb)
 	}
-	rootbid := st.GetBlockIdByName(rootName)
+	rootbid := st.GetBlockIdByName(RootName)
 	if rootbid != "" {
 		bid := ibtree.BlockId(rootbid)
 		node := fs.tree.LoadRoot(bid)
@@ -233,7 +235,7 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 	if v != nil {
 		nd = v.(*ibtree.IBNodeData)
 	} else {
-		nd = self.loadNodeFromBytes(data)
+		nd = BytesToIBNodeData(data)
 		if nd == nil {
 			return
 		}
@@ -256,8 +258,8 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 	}
 }
 
-func (self *Fs) loadNodeFromBytes(bd []byte) *ibtree.IBNodeData {
-	mlog.Printf2("fs/fs", "loadNodeFromBytes - %d bytes", len(bd))
+func BytesToIBNodeData(bd []byte) *ibtree.IBNodeData {
+	mlog.Printf2("fs/fs", "BytesToIBNodeData - %d bytes", len(bd))
 	dt := BlockDataType(bd[0])
 	switch dt {
 	case BDT_EXTENT:
@@ -270,17 +272,7 @@ func (self *Fs) loadNodeFromBytes(bd []byte) *ibtree.IBNodeData {
 		}
 		return nd
 	default:
-		log.Panicf("loadNodeFromString - wrong dt:%v", dt)
+		log.Panicf("BytesToIBNodeData - wrong dt:%v", dt)
 	}
 	return nil
-}
-
-func (self *Fs) loadNode(id ibtree.BlockId) *ibtree.IBNodeData {
-	mlog.Printf2("fs/fs", "fs.loadNode %x", id)
-	b := self.storage.GetBlockById(string(id))
-	if b == nil {
-		return nil
-	}
-	defer b.Close()
-	return self.loadNodeFromBytes(b.Data())
 }

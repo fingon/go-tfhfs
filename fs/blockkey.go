@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 00:34:54 2017 mstenber
- * Last modified: Tue Jan 16 16:39:42 2018 mstenber
- * Edit time:     31 min
+ * Last modified: Wed Jan 17 11:26:57 2018 mstenber
+ * Edit time:     34 min
  *
  */
 
@@ -17,10 +17,15 @@ import (
 	"fmt"
 	"hash/fnv"
 
+	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/util"
 )
 
 type BlockKey string
+
+func (self BlockKey) IB() ibtree.IBKey {
+	return ibtree.IBKey(self)
+}
 
 func (self BlockKey) String() string {
 	return fmt.Sprintf("bkey{ino:%v,subtype:%v,subtypedata:%x}", self.Ino(), self.SubType(), self.SubTypeData())

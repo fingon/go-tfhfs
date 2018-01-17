@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Tue Jan 16 17:42:37 2018 mstenber
- * Edit time:     178 min
+ * Last modified: Wed Jan 17 11:36:01 2018 mstenber
+ * Edit time:     186 min
  *
  */
 
@@ -127,39 +127,7 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 		mlog.Printf2("fs/fstransaction", " root has changed under us; doing delta")
 		tr := newfsTransaction(self.fs)
 		defer tr.Close()
-		setIfNewer := func(newC *ibtree.IBNodeDataChild) {
-			bk := BlockKey(newC.Key)
-			if bk.SubType() == BST_META {
-				ourMeta := decodeInodeMeta(newC.Value)
-				op := tr.t.Get(ibtree.IBKey(newC.Key))
-				if op != nil {
-					theirMeta := decodeInodeMeta(*op)
-					if theirMeta.StAtimeNs > ourMeta.StAtimeNs {
-						return
-					}
-				}
-			}
-			tr.t.Set(newC.Key, newC.Value)
-		}
-		node.IterateDelta(self.root.node,
-			func(oldC, newC *ibtree.IBNodeDataChild) {
-				if newC == nil {
-					// Delete
-					v := tr.t.Get(oldC.Key)
-					if v != nil {
-						mlog.Printf2("fs/fstransaction", " delete %x", oldC.Key)
-						tr.t.Delete(oldC.Key)
-					}
-				} else if oldC == nil {
-					// Insert
-					mlog.Printf2("fs/fstransaction", " insert %x", newC.Key)
-					setIfNewer(newC)
-				} else {
-					// Update
-					mlog.Printf2("fs/fstransaction", " update %x", newC.Key)
-					setIfNewer(newC)
-				}
-			})
+		MergeTo3(tr.t, self.root.node, node, true)
 		mlog.Printf2("fs/fstransaction", " delta done")
 		return tr.commit(true, true)
 	}
@@ -168,7 +136,7 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 	// much it matters (as we next update will anyway have us
 	// sticking in the updated version of the tree, as it was
 	// correctly updated)
-	self.fs.storage.SetNameToBlockId(self.fs.rootName, string(bid))
+	self.fs.storage.SetNameToBlockId(self.fs.RootName, string(bid))
 
 	// Paranoia stuff
 	if self.fs.nodeDataCache == nil {
@@ -176,7 +144,7 @@ func (self *fsTransaction) commit(retryUntilSucceeds, recursed bool) bool {
 		node.PrintToMLogAll()
 
 		// Ensure root metadata is still there
-		k := ibtree.IBKey(NewBlockKey(uint64(1), BST_META, ""))
+		k := NewBlockKey(uint64(1), BST_META, "").IB()
 		tr := self.fs.GetTransaction()
 		defer tr.Close()
 		v := tr.t.Get(k)
@@ -224,7 +192,7 @@ func (self *fsTransaction) getStorageBlock(b []byte, nd *ibtree.IBNodeData) *sto
 	if self.closed {
 		mlog.Panicf("getStorageBlock in closed transaction")
 	}
-	bl := self.fs.storage.ReferOrStoreBlockBytes0(b)
+	bl := self.fs.storage.ReferOrStoreBlockBytes0(storage.BS_NORMAL, b)
 	if nd != nil && self.fs.nodeDataCache != nil {
 		self.fs.nodeDataCache.Set(ibtree.BlockId(bl.Id()), nd)
 	}

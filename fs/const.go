@@ -17,6 +17,6 @@ const filenameHashSize = 4
 const attrValidity = 5
 const entryValidity = 5
 
-const embeddedSize = 1024
+const EmbeddedSize = 1024
 const dataExtentSize = 65536
 const dataHeaderMaximumSize = 100

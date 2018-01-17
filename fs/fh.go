@@ -167,7 +167,7 @@ func (self *inodeFH) read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 	}
 
 	var b []byte
-	if size <= embeddedSize {
+	if size <= EmbeddedSize {
 		b = meta.Data
 	} else {
 		k := NewBlockKeyOffset(self.inode.ino, offset)
@@ -274,7 +274,7 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *hugger.Transaction,
 	bbuf := obuf[:len(obuf)-len(wbuf)]
 	mlog.Printf2("fs/fh", " bbuf %v", len(bbuf))
 
-	if meta.StSize <= embeddedSize && end <= embeddedSize {
+	if meta.StSize <= EmbeddedSize && end <= EmbeddedSize {
 		// in .Data this will live long -> make new copy of
 		// the (small) slice
 		nbuf := bbuf[1:]
@@ -319,10 +319,10 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 	done = false
 	need := dataExtentSize + dataHeaderMaximumSize
 	var odata []byte
-	if meta.StSize <= embeddedSize && e == 0 {
+	if meta.StSize <= EmbeddedSize && e == 0 {
 		odata = meta.Data
-		if end <= embeddedSize {
-			need = embeddedSize + 1
+		if end <= EmbeddedSize {
+			need = EmbeddedSize + 1
 		}
 	}
 
@@ -351,7 +351,7 @@ func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse
 	written = uint32(w)
 
 	mlog.Printf2("fs/fh", " wrote %v", written)
-	if meta.StSize <= embeddedSize && end <= embeddedSize {
+	if meta.StSize <= EmbeddedSize && end <= EmbeddedSize {
 		self.writeInTransaction(meta, tr, buf, odata, obuf, wbuf, bofs, offset, end)
 		done = true
 	}

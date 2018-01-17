@@ -389,7 +389,7 @@ func (self *inode) SetMetaSizeInTransaction(meta *InodeMeta, size uint64, tr *hu
 		shrink = true
 	}
 	meta.StSize = size
-	if size > embeddedSize {
+	if size > EmbeddedSize {
 		mlog.Printf2("fs/inode", "SetSize cleared in-place metadata")
 		meta.Data = nil
 	}

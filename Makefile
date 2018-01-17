@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Tue Jan 16 15:16:19 2018 mstenber
-# Edit time:     92 min
+# Last modified: Wed Jan 17 12:46:10 2018 mstenber
+# Edit time:     93 min
 #
 #
 
@@ -14,7 +14,7 @@ GREENPACK_OPTS=-alltuple
 # ^ remove -alltuple someday if we want to pretend to be compatible over versions
 
 GENERATED=\
-	fs/fstreerootpointer_gen.go \
+	ibtree/hugger/treerootpointer_gen.go \
 	fs/inodemetapointer_gen.go \
 	storage/blockpointerfuture_gen.go \
 	util/byteslicefuture_gen.go \
@@ -32,10 +32,10 @@ get: .done.getprebuild
 
 generate: .done.buildable
 
-fs/fstreerootpointer_gen.go: Makefile xxx/pointer.go
-	( echo "package fs" ; \
+ibtree/hugger/treerootpointer_gen.go: Makefile xxx/pointer.go
+	( echo "package hugger" ; \
 		egrep -A 9999 '^import' xxx/pointer.go | \
-		sed 's/XXXType/(*fsTreeRoot)/g;s/XXX/fsTreeRoot/g' | \
+		sed 's/XXXType/(*treeRoot)/g;s/XXX/treeRoot/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

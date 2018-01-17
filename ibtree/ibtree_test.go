@@ -23,12 +23,12 @@ import (
 type N2IBKeyCallback func(n int) IBKey
 
 type DummyTree struct {
-	IBTree
+	Tree
 	idcb N2IBKeyCallback
 }
 
 func (self DummyTree) Init(be *DummyBackend) *DummyTree {
-	self.IBTree = *(self.IBTree.Init(be))
+	self.Tree = *(self.Tree.Init(be))
 	if self.idcb == nil {
 		self.idcb = nonpaddedIBKey
 	}
@@ -38,12 +38,12 @@ func (self DummyTree) Init(be *DummyBackend) *DummyTree {
 const debug = 1
 const nodeSize = 256
 
-func (self *DummyTree) checkNextKey(t *testing.T, r *IBNode, n int) {
+func (self *DummyTree) checkNextKey(t *testing.T, r *Node, n int) {
 	// check NextKey works
 	lkv := IBKey("")
 	lk := &lkv
 	cnt := 0
-	r.iterateLeafFirst(func(n *IBNode) {
+	r.iterateLeafFirst(func(n *Node) {
 		if !n.Leafy {
 			return
 		}
@@ -61,7 +61,7 @@ func (self *DummyTree) checkNextKey(t *testing.T, r *IBNode, n int) {
 	assert.Nil(t, nk, "weird next for", *lk, nk)
 }
 
-func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n, s int) {
+func (self *DummyTree) checkTree2(t *testing.T, r *Node, n, s int) {
 	if debug > 1 {
 		r.PrintToMLogDirty()
 		mlog.Printf2("ibtree/ibtree_test", "checkTree [%d..%d[\n", s, n)
@@ -84,7 +84,7 @@ func (self *DummyTree) checkTree2(t *testing.T, r *IBNode, n, s int) {
 
 }
 
-func (self *DummyTree) checkTree(t *testing.T, r *IBNode, n int) {
+func (self *DummyTree) checkTree(t *testing.T, r *Node, n int) {
 	self.checkTree2(t, r, n, 0)
 }
 
@@ -96,10 +96,10 @@ func paddedIBKey(n int) IBKey {
 	return IBKey(fmt.Sprintf("pk%08d", n))
 }
 
-func EnsureDelta(t *testing.T, old, new *IBNode, del, upd, add int) {
+func EnsureDelta(t *testing.T, old, new *Node, del, upd, add int) {
 	var got_upd, got_add, got_del int
-	var previous *IBNodeDataChild
-	new.IterateDelta(old, func(c1, c2 *IBNodeDataChild) {
+	var previous *NodeDataChild
+	new.IterateDelta(old, func(c1, c2 *NodeDataChild) {
 		mlog.Printf2("ibtree/ibtree_test", "c0:%v c:%v", c1, c2)
 		c := c1
 		if c1 == nil {
@@ -122,11 +122,11 @@ func EnsureDelta(t *testing.T, old, new *IBNode, del, upd, add int) {
 	assert.Equal(t, got_del, del)
 }
 
-func EnsureDelta2(t *testing.T, old, new *IBNode, del, upd, add int) {
+func EnsureDelta2(t *testing.T, old, new *Node, del, upd, add int) {
 	EnsureDelta(t, old, new, del, upd, add)
 	EnsureDelta(t, new, old, add, upd, del)
 }
-func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
+func (self *DummyTree) CreateTree(t *testing.T, n int) *Node {
 	var st IBStack
 	r0 := self.NewRoot()
 	r := r0
@@ -159,7 +159,7 @@ func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
 			log.Panic("asdf3", r, st.nodes[0])
 		}
 		found := false
-		r.IterateDelta(r0, func(old, new *IBNodeDataChild) {
+		r.IterateDelta(r0, func(old, new *NodeDataChild) {
 			assert.Nil(t, old)
 			assert.True(t, new != nil)
 			assert.True(t, !found)
@@ -174,7 +174,7 @@ func (self *DummyTree) CreateIBTree(t *testing.T, n int) *IBNode {
 	return r
 }
 
-func EmptyIBTreeForward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode {
+func EmptyTreeForward(t *testing.T, dt *DummyTree, r *Node, n int) *Node {
 	var st IBStack
 	for i := 0; i < n; i++ {
 		if debug > 1 {
@@ -187,7 +187,7 @@ func EmptyIBTreeForward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode {
 		r0 := r
 		r = r.Delete(k, &st)
 		found := false
-		r.IterateDelta(r0, func(old, new *IBNodeDataChild) {
+		r.IterateDelta(r0, func(old, new *NodeDataChild) {
 			assert.Nil(t, new)
 			assert.True(t, old != nil)
 			assert.True(t, !found)
@@ -198,7 +198,7 @@ func EmptyIBTreeForward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode {
 	return r
 }
 
-func EmptyIBTreeBackward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode {
+func EmptyTreeBackward(t *testing.T, dt *DummyTree, r *Node, n int) *Node {
 	var st IBStack
 	for i := n - 1; i > 0; i-- {
 		if debug > 2 {
@@ -213,8 +213,8 @@ func EmptyIBTreeBackward(t *testing.T, dt *DummyTree, r *IBNode, n int) *IBNode 
 	return r
 }
 
-func ProdIBTree(t *testing.T, tree *DummyTree, n int) *IBNode {
-	r := tree.CreateIBTree(t, n)
+func ProdTree(t *testing.T, tree *DummyTree, n int) *Node {
+	r := tree.CreateTree(t, n)
 	// Check forward and backwards iteration
 	var st IBStack
 	st.nodes[0] = r
@@ -245,26 +245,26 @@ func ProdIBTree(t *testing.T, tree *DummyTree, n int) *IBNode {
 	assert.Equal(t, "z", *rr.Get(k, &st))
 	assert.Equal(t, "v0", *r.Get(k, &IBStack{}))
 	tree.checkTree(t, r, n)
-	EmptyIBTreeForward(t, tree, r, n)
-	EmptyIBTreeBackward(t, tree, r, n)
+	EmptyTreeForward(t, tree, r, n)
+	EmptyTreeBackward(t, tree, r, n)
 	return r
 }
 
-func TestIBTree(t *testing.T) {
+func TestTree(t *testing.T) {
 	n := 10000
 	t.Parallel()
 	tree := DummyTree{}.Init(nil)
 	tree.setNodeMaximumSize(nodeSize) // more depth = smaller examples that blow up
-	r := ProdIBTree(t, tree, n)
+	r := ProdTree(t, tree, n)
 	tree.checkNextKey(t, r, n)
 }
 
-func TestIBTreeDeleteRange(t *testing.T) {
+func TestTreeDeleteRange(t *testing.T) {
 	t.Parallel()
 	tree := DummyTree{idcb: paddedIBKey}.Init(nil)
 	n := 1000
-	r := tree.CreateIBTree(t, n)
-	mlog.Printf2("ibtree/ibtree_test", "TestIBTreeDeleteRange start")
+	r := tree.CreateTree(t, n)
+	mlog.Printf2("ibtree/ibtree_test", "TestTreeDeleteRange start")
 	r1 := r.DeleteRange(paddedIBKey(-1), paddedIBKey(-1), &IBStack{})
 	assert.Equal(t, r1, r)
 	r2 := r.DeleteRange(IBKey("z"), IBKey("z"), &IBStack{})
@@ -327,12 +327,12 @@ func TestIBTreeDeleteRange(t *testing.T) {
 	}
 }
 
-func TestIBTreeStorage(t *testing.T) {
+func TestTreeStorage(t *testing.T) {
 	t.Parallel()
 	n := 1000
 	be := DummyBackend{}.Init()
 	tree := DummyTree{}.Init(be)
-	r, bid := tree.CreateIBTree(t, n).Commit()
+	r, bid := tree.CreateTree(t, n).Commit()
 	assert.True(t, string(bid) != "")
 	c1 := r.nestedNodeCount()
 	assert.True(t, r.blockId != nil)
@@ -350,12 +350,12 @@ func TestIBTreeStorage(t *testing.T) {
 	assert.Equal(t, os, be.saves)
 }
 
-func TestIBTransaction(t *testing.T) {
+func TestTransaction(t *testing.T) {
 	t.Parallel()
 	n := 100
 	be := DummyBackend{}.Init()
 	tree := DummyTree{}.Init(be)
-	r, bid := tree.CreateIBTree(t, n).Commit()
+	r, bid := tree.CreateTree(t, n).Commit()
 	assert.True(t, string(bid) != "")
 	tr := NewTransaction(r)
 	r2, bid2 := tr.Commit()

@@ -13,7 +13,7 @@ package ibtree
 
 import "github.com/fingon/go-tfhfs/mlog"
 
-type IBDeltaCallback func(old, new *IBNodeDataChild)
+type IBDeltaCallback func(old, new *NodeDataChild)
 
 // IterateDelta produces callback for every difference in the leaves
 // local tree as opposed to 'other'.
@@ -21,7 +21,7 @@ type IBDeltaCallback func(old, new *IBNodeDataChild)
 // Some clever things are done to avoid pointless subtree iteration.
 // Still, this is pretty expensive operation and should be done only
 // in background.
-func (self *IBNode) IterateDelta(original *IBNode, deltacb IBDeltaCallback) {
+func (self *Node) IterateDelta(original *Node, deltacb IBDeltaCallback) {
 	var st, st0 IBStack
 	st0.nodes[0] = original
 	st.nodes[0] = self

@@ -32,11 +32,11 @@ func (self DummyBackend) Init() *DummyBackend {
 	return &self
 }
 
-func (self *DummyBackend) LoadNode(id BlockId) *IBNodeData {
+func (self *DummyBackend) LoadNode(id BlockId) *NodeData {
 	defer self.lock.Locked()()
 	self.loads++
-	// Create new copy of IBNodeData WITHOUT childNode's set
-	nd := &IBNodeData{}
+	// Create new copy of NodeData WITHOUT childNode's set
+	nd := &NodeData{}
 	_, err := nd.UnmarshalMsg(self.h2nd[id])
 	if err != nil {
 		log.Panic(err)
@@ -44,7 +44,7 @@ func (self *DummyBackend) LoadNode(id BlockId) *IBNodeData {
 	return nd
 }
 
-func (self *DummyBackend) SaveNode(nd *IBNodeData) BlockId {
+func (self *DummyBackend) SaveNode(nd *NodeData) BlockId {
 	b, _ := nd.MarshalMsg(nil)
 	h := sha256.Sum256(b)
 	bid := BlockId(h[:])

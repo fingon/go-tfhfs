@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Wed Jan 17 11:41:28 2018 mstenber
- * Edit time:     336 min
+ * Last modified: Wed Jan 17 13:18:34 2018 mstenber
+ * Edit time:     338 min
  *
  */
 
@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/fingon/go-tfhfs/ibtree"
+	"github.com/fingon/go-tfhfs/ibtree/hugger"
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
@@ -39,7 +40,7 @@ type inode struct {
 
 func (self *inode) AddChild(name string, child *inode) (code fuse.Status) {
 	mlog.Printf2("fs/inode", "inode.AddChild %v = %v", name, child)
-	self.Fs().Update2(func(tr *fsTransaction) bool {
+	self.Fs().Update2(func(tr *hugger.Transaction) bool {
 		meta := child.Meta()
 		if meta == nil {
 			code = fuse.ENOENT
@@ -63,8 +64,8 @@ func (self *inode) AddChild(name string, child *inode) (code fuse.Status) {
 
 		k := NewBlockKeyDirFilename(self.ino, name).IB()
 		rk := NewBlockKeyReverseDirFilename(child.ino, self.ino, name).IB()
-		tr.t.Set(k, string(util.Uint64Bytes(child.ino)))
-		tr.t.Set(rk, "")
+		tr.IB().Set(k, string(util.Uint64Bytes(child.ino)))
+		tr.IB().Set(rk, "")
 		return true
 	})
 	return
@@ -159,10 +160,10 @@ func (self *inode) GetChildByName(name string) *inode {
 	k := NewBlockKeyDirFilename(self.ino, name)
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
-	v := tr.t.Get(k.IB())
+	v := tr.IB().Get(k.IB())
 	if v == nil {
 		mlog.Printf2("fs/inode", " child %v not in tree", k)
-		tr.root.node.PrintToMLogAll()
+		// tr.root.node.PrintToMLogAll()
 		return nil
 	}
 	ino := binary.BigEndian.Uint64([]byte(*v))
@@ -182,7 +183,7 @@ func (self *inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
 	k := NewBlockKey(self.ino, BST_XATTR, attr)
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
-	v := tr.t.Get(k.IB())
+	v := tr.IB().Get(k.IB())
 	if v == nil {
 		code = fuse.ENOATTR
 		return
@@ -192,7 +193,7 @@ func (self *inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
 	return
 }
 
-func IterateInoSubTypeKeys(t *ibtree.IBTransaction, ino uint64, bst BlockSubType, keycb func(key BlockKey) bool) {
+func IterateInoSubTypeKeys(t *ibtree.Transaction, ino uint64, bst BlockSubType, keycb func(key BlockKey) bool) {
 	k := NewBlockKey(ino, bst, "")
 	for {
 		nkeyp := t.NextKey(k.IB())
@@ -214,37 +215,36 @@ func IterateInoSubTypeKeys(t *ibtree.IBTransaction, ino uint64, bst BlockSubType
 func (self *inode) IterateSubTypeKeys(bst BlockSubType, keycb func(key BlockKey) bool) {
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
-	IterateInoSubTypeKeys(tr.t, self.ino, bst, keycb)
+	IterateInoSubTypeKeys(tr.IB(), self.ino, bst, keycb)
 }
 
 func (self *inode) RemoveXAttr(attr string) (code fuse.Status) {
 	defer self.offsetMap.Locked(-1)()
-	self.Fs().Update(func(tr *fsTransaction) {
+	self.Fs().Update(func(tr *hugger.Transaction) {
 		k := NewBlockKey(self.ino, BST_XATTR, attr).IB()
 		mlog.Printf2("fs/inode", "RemoveXAttr %s - deleting %x", attr, k)
-		v := tr.t.Get(k)
+		v := tr.IB().Get(k)
 		if v == nil {
 			code = fuse.ENOATTR
 			return
 		}
-		tr.t.Delete(k)
+		tr.IB().Delete(k)
 	})
 	return
 }
 
 func (self *inode) SetXAttr(attr string, data []byte) (code fuse.Status) {
 	defer self.offsetMap.Locked(-1)()
-	self.Fs().Update(func(tr *fsTransaction) {
+	self.Fs().Update(func(tr *hugger.Transaction) {
 		k := NewBlockKey(self.ino, BST_XATTR, attr)
 		mlog.Printf2("fs/inode", "SetXAttr %s - setting %x", attr, k)
-		tr.t.Set(k.IB(), string(data))
+		tr.IB().Set(k.IB(), string(data))
 	})
 	return fuse.OK
 }
 
 func (self *inode) IsDir() bool {
-	meta := self.Meta()
-	return meta != nil && (meta.StMode&fuse.S_IFDIR) != 0
+	return self.Meta().IsDir()
 }
 
 func (self *inode) IsFile() bool {
@@ -277,7 +277,7 @@ func (self *inode) Forget(nlookup uint64) {
 
 func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 	mlog.Printf2("fs/inode", "inode.RemoveChildByName %v", name)
-	self.Fs().Update2(func(tr *fsTransaction) bool {
+	self.Fs().Update2(func(tr *hugger.Transaction) bool {
 		meta := child.Meta()
 		if meta == nil {
 			code = fuse.ENOENT
@@ -299,8 +299,8 @@ func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 
 		k := NewBlockKeyDirFilename(self.ino, name)
 		rk := NewBlockKeyReverseDirFilename(child.ino, self.ino, name)
-		tr.t.Delete(k.IB())
-		tr.t.Delete(rk.IB())
+		tr.IB().Delete(k.IB())
+		tr.IB().Delete(rk.IB())
 		return true
 	})
 	mlog.Printf2("fs/inode", " Removed %v", child)
@@ -326,7 +326,7 @@ func (self *inode) getMeta() *InodeMeta {
 	k := NewBlockKey(self.ino, BST_META, "")
 	tr := self.Fs().GetTransaction()
 	defer tr.Close()
-	v := tr.t.Get(k.IB())
+	v := tr.IB().Get(k.IB())
 	if v == nil {
 		mlog.Printf2("fs/inode", " not found")
 		return nil
@@ -351,7 +351,7 @@ func (self *inode) Meta() *InodeMeta {
 	return &nm
 }
 
-func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *fsTransaction) bool {
+func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *hugger.Transaction) bool {
 	self.metaWriteLock.AssertLocked()
 	times := 0
 	if meta.StAtimeNs == 0 {
@@ -374,14 +374,14 @@ func (self *inode) SetMetaInTransaction(meta *InodeMeta, tr *fsTransaction) bool
 	}
 	old := self.meta.Get()
 	if old == nil || old.InodeMetaData != meta.InodeMetaData || !bytes.Equal(meta.Data, old.Data) {
-		tr.t.Set(k.IB(), string(b))
+		tr.IB().Set(k.IB(), string(b))
 		self.meta.Set(meta)
 		return true
 	}
 	return false
 }
 
-func (self *inode) SetMetaSizeInTransaction(meta *InodeMeta, size uint64, tr *fsTransaction) bool {
+func (self *inode) SetMetaSizeInTransaction(meta *InodeMeta, size uint64, tr *hugger.Transaction) bool {
 	shrink := false
 	if size == meta.StSize {
 		return false
@@ -397,7 +397,7 @@ func (self *inode) SetMetaSizeInTransaction(meta *InodeMeta, size uint64, tr *fs
 		nextKey := NewBlockKeyOffset(self.ino, size+dataExtentSize)
 		mlog.Printf2("fs/inode", "SetSize shrinking inode %v - %x+ gone", self.ino, nextKey)
 		lastKey := NewBlockKeyOffset(self.ino, 1<<62)
-		tr.t.DeleteRange(nextKey.IB(), lastKey.IB())
+		tr.IB().DeleteRange(nextKey.IB(), lastKey.IB())
 	}
 	return true
 }
@@ -561,4 +561,9 @@ func (self *InodeMetaData) SetCTimeNow() {
 
 func (self *InodeMetaData) SetMTimeNow() {
 	self.setTimesNow(true, true, true)
+}
+
+func (self *InodeMetaData) IsDir() bool {
+	return self != nil && (self.StMode&fuse.S_IFDIR) != 0
+
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Wed Jan 17 11:17:07 2018 mstenber
- * Edit time:     457 min
+ * Last modified: Wed Jan 17 13:18:51 2018 mstenber
+ * Edit time:     458 min
  *
  */
 
@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fingon/go-tfhfs/ibtree/hugger"
 	"github.com/fingon/go-tfhfs/mlog"
 	. "github.com/hanwen/go-fuse/fuse"
 )
@@ -167,7 +168,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		return gid == input.Context.Gid
 	}
 
-	self.fs.Update(func(tr *fsTransaction) {
+	self.fs.Update(func(tr *hugger.Transaction) {
 		meta := inode.Meta()
 		newmeta := meta.InodeMetaData
 		if input.Valid&(FATTR_ATIME|FATTR_MTIME|FATTR_ATIME_NOW|FATTR_MTIME_NOW|FATTR_CTIME) != 0 {
@@ -323,7 +324,7 @@ func (self *fsOps) Open(input *OpenIn, out *OpenOut) (code Status) {
 		return
 	}
 
-	self.fs.Update(func(tr *fsTransaction) {
+	self.fs.Update(func(tr *hugger.Transaction) {
 		meta := inode.Meta()
 		// No ATime for now
 		if mode&W_OK != 0 {
@@ -406,7 +407,7 @@ func (self *fsOps) create(input *InHeader, name string, meta *InodeMeta, allowRe
 
 	child = self.fs.CreateInode()
 	defer child.metaWriteLock.Locked()()
-	self.fs.Update(func(tr *fsTransaction) {
+	self.fs.Update(func(tr *hugger.Transaction) {
 		child.SetMetaInTransaction(meta, tr)
 	})
 	inode.AddChild(name, child)

@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Wed Jan 17 11:28:25 2018 mstenber
+ * Last modified: Wed Jan 17 13:19:33 2018 mstenber
  * Edit time:     34 min
  *
  */
@@ -34,7 +34,7 @@ func TestBlockKey(t *testing.T) {
 	assert.Equal(t, k.SubTypeData(), bstd)
 }
 
-func TestfsTransaction(t *testing.T) {
+func TestTransaction(t *testing.T) {
 	t.Parallel()
 
 	RootName := "toor"
@@ -47,38 +47,38 @@ func TestfsTransaction(t *testing.T) {
 
 	// simulate 3 parallel operations
 
-	tr1 := newfsTransaction(fs)
-	tr1.t.Set("foo1", "v1")
+	tr1 := fs.GetTransaction()
+	tr1.IB().Set("foo1", "v1")
 
-	tr2 := newfsTransaction(fs)
-	tr2.t.Set("foo2", "v2")
+	tr2 := fs.GetTransaction()
+	tr2.IB().Set("foo2", "v2")
 
-	tr3 := newfsTransaction(fs)
-	tr3.t.Set("foo3", "v3")
+	tr3 := fs.GetTransaction()
+	tr3.IB().Set("foo3", "v3")
 
 	tr1.CommitUntilSucceeds()
 	tr2.CommitUntilSucceeds()
 	tr3.CommitUntilSucceeds()
 
-	tr1 = newfsTransaction(fs)
-	tr2 = newfsTransaction(fs)
-	tr3 = newfsTransaction(fs)
-	assert.Equal(t, *tr1.t.Get("foo1"), "v1")
-	assert.Equal(t, *tr1.t.Get("foo2"), "v2")
-	assert.Equal(t, *tr1.t.Get("foo3"), "v3")
+	tr1 = fs.GetTransaction()
+	tr2 = fs.GetTransaction()
+	tr3 = fs.GetTransaction()
+	assert.Equal(t, *tr1.IB().Get("foo1"), "v1")
+	assert.Equal(t, *tr1.IB().Get("foo2"), "v2")
+	assert.Equal(t, *tr1.IB().Get("foo3"), "v3")
 
 	// Now tr1 updates, tr2 deletes one key, and second key vice versa
-	tr1.t.Set("foo1", "v11")
-	tr1.t.Delete("foo2")
-	tr2.t.Delete("foo1")
-	tr2.t.Set("foo2", "v21")
+	tr1.IB().Set("foo1", "v11")
+	tr1.IB().Delete("foo2")
+	tr2.IB().Delete("foo1")
+	tr2.IB().Set("foo2", "v21")
 	tr1.CommitUntilSucceeds()
 	tr2.CommitUntilSucceeds()
 
 	// Most recent write wins in this case -> should have what tr2 did
-	tr1 = newfsTransaction(fs)
-	assert.Nil(t, tr1.t.Get("foo1"))
-	assert.Equal(t, *tr1.t.Get("foo2"), "v21")
+	tr1 = fs.GetTransaction()
+	assert.Nil(t, tr1.IB().Get("foo1"))
+	assert.Equal(t, *tr1.IB().Get("foo2"), "v21")
 }
 
 func BenchmarkBadgerFs(b *testing.B) {
@@ -96,7 +96,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 	tr := fs.GetTransaction()
 	for i := 0; i < n; i++ {
 		k := NewBlockKey(uint64(i), BST_META, "").IB()
-		tr.t.Set(k, fmt.Sprintf("v%d", i))
+		tr.IB().Set(k, fmt.Sprintf("v%d", i))
 	}
 	tr.CommitUntilSucceeds()
 
@@ -106,7 +106,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := NewBlockKey(uint64(j), BST_META, "").IB()
-			tr.t.Get(k)
+			tr.IB().Get(k)
 			tr.Close()
 		}
 	})
@@ -117,7 +117,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := NewBlockKey(uint64(j), BST_META, "").IB()
-			tr.t.Get(k)
+			tr.IB().Get(k)
 			tr.Close()
 		}
 	})
@@ -128,7 +128,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := NewBlockKey(uint64(j), BST_META, "").IB()
-			tr.t.Set(k, fmt.Sprintf("V%d%d", j, i))
+			tr.IB().Set(k, fmt.Sprintf("V%d%d", j, i))
 			tr.CommitUntilSucceeds()
 		}
 	})
@@ -139,7 +139,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 			tr := fs.GetTransaction()
 			j := rand.Int() % n
 			k := NewBlockKey(uint64(j), BST_META, "").IB()
-			tr.t.Delete(k)
+			tr.IB().Delete(k)
 			tr.CommitUntilSucceeds()
 		}
 	})

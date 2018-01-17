@@ -13,17 +13,17 @@ package ibtree
 
 type IBKey string
 
-type IBNodeDataChild struct {
+type NodeDataChild struct {
 	Key       IBKey
 	Value     string
-	childNode *IBNode // .. if any loaded ..
+	childNode *Node // .. if any loaded ..
 }
 
-type IBNodeData struct {
+type NodeData struct {
 	// Leafy indicates if Node is BTree leaf.
 	// If so, values are whatever the client is storing there.
 	// If not, values are block ids of child nodes.
 	Leafy bool
 
-	Children []*IBNodeDataChild
+	Children []*NodeDataChild
 }

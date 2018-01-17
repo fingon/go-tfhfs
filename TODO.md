@@ -28,6 +28,11 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
 
 # Pending later TODO #
 
+* add some sort of reasonable caching to Storage, and get rid of gcache;
+  something like e.g. CART seems sensible (
+  https://www.usenix.org/legacy/events/fast04/tech/full_papers/bansal/bansal.pdf
+  )
+
 * define some way to BlockBackend to index them by Status => can easily get
   blocks with statuses that are awkward (or come up with an algorithm that
   does not require magic state and instead stores its state outside fs root

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 00:34:54 2017 mstenber
- * Last modified: Wed Jan 17 11:26:57 2018 mstenber
- * Edit time:     34 min
+ * Last modified: Wed Jan 17 12:39:48 2018 mstenber
+ * Edit time:     35 min
  *
  */
 
@@ -40,6 +40,9 @@ func (self BlockKey) SubType() BlockSubType {
 }
 
 func (self BlockKey) Ino() uint64 {
+	if len(self) < inodeDataLength {
+		return 0
+	}
 	b := []byte(self[:inodeDataLength])
 	return binary.BigEndian.Uint64(b)
 }

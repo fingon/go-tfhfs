@@ -16,7 +16,7 @@
 // behavior; root is defined by simply root node's hash, and similarly
 // also all the children.
 //
-// ONLY root and dirty IBNodes are kept in memory; the rest count on (caching)
+// ONLY root and dirty Nodes are kept in memory; the rest count on (caching)
 // storage backend + persistence layer being 'fast enough'.
 package ibtree
 
@@ -31,25 +31,25 @@ const hashSize = 32
 
 type BlockId string
 
-type IBTreeSaver interface {
+type TreeSaver interface {
 	// SaveNode persists the node, and returns the backend id for it.
-	SaveNode(nd *IBNodeData) BlockId
+	SaveNode(nd *NodeData) BlockId
 }
 
-type IBTreeLoader interface {
+type TreeLoader interface {
 	// LoadNode loads node based on backend id.
-	LoadNode(id BlockId) *IBNodeData
+	LoadNode(id BlockId) *NodeData
 }
 
-type IBTreeBackend interface {
-	IBTreeLoader
-	IBTreeSaver
+type TreeBackend interface {
+	TreeLoader
+	TreeSaver
 }
 
-// IBTree represents static configuration that can be used over
+// Tree represents static configuration that can be used over
 // multiple B+ trees. If this is changed with existing trees, bad
 // things WILL happen.
-type IBTree struct {
+type Tree struct {
 	// Can be provided externally
 	NodeMaximumSize int
 	halfSize        int
@@ -57,7 +57,7 @@ type IBTree struct {
 
 	// Internal stuff
 	// backend is mandatory and therefore Init argument.
-	backend IBTreeBackend
+	backend TreeBackend
 
 	// Used to represent references to nodes
 	placeholderValue string
@@ -66,7 +66,7 @@ type IBTree struct {
 const minimumNodeMaximumSize = 512
 const maximumTreeDepth = 10
 
-func (self IBTree) Init(backend IBTreeBackend) *IBTree {
+func (self Tree) Init(backend TreeBackend) *Tree {
 	maximumSize := self.NodeMaximumSize
 	if maximumSize < minimumNodeMaximumSize {
 		maximumSize = minimumNodeMaximumSize
@@ -78,44 +78,44 @@ func (self IBTree) Init(backend IBTreeBackend) *IBTree {
 	return &self
 }
 
-func (self *IBTree) LoadRoot(bid BlockId) *IBNode {
+func (self *Tree) LoadRoot(bid BlockId) *Node {
 	mlog.Printf2("ibtree/ibtree", "t.LoadRoot %x", bid)
 	data := self.backend.LoadNode(bid)
 	if data == nil {
 		return nil
 	}
-	return &IBNode{tree: self, IBNodeData: *data, blockId: &bid}
+	return &Node{tree: self, NodeData: *data, blockId: &bid}
 }
 
 // NewRoot creates a new node; by default, it is essentially new tree
-// of its own. IBTree is really just factory for root nodes.
-func (self *IBTree) NewRoot() *IBNode {
+// of its own. Tree is really just factory for root nodes.
+func (self *Tree) NewRoot() *Node {
 	mlog.Printf2("ibtree/ibtree", "t.NewRoot")
-	return &IBNode{tree: self, IBNodeData: IBNodeData{Leafy: true}}
+	return &Node{tree: self, NodeData: NodeData{Leafy: true}}
 }
 
-func (self *IBTree) setNodeMaximumSize(maximumSize int) {
+func (self *Tree) setNodeMaximumSize(maximumSize int) {
 	self.NodeMaximumSize = maximumSize
 	self.halfSize = self.NodeMaximumSize / 2
 	self.smallSize = self.halfSize / 2
 }
 
-// IBNode represents single node in single tree.
-type IBNode struct {
-	IBNodeData
+// Node represents single node in single tree.
+type Node struct {
+	NodeData
 	blockId *BlockId // on disk, if any
-	tree    *IBTree
+	tree    *Tree
 }
 
-func (self *IBNodeData) String() string {
+func (self *NodeData) String() string {
 	return fmt.Sprintf("ibnd{%p}", self)
 }
 
-func (self *IBNode) String() string {
+func (self *Node) String() string {
 	return fmt.Sprintf("ibn{%p}", self)
 }
 
-func (self *IBNode) Delete(key IBKey, st *IBStack) *IBNode {
+func (self *Node) Delete(key IBKey, st *IBStack) *Node {
 	self.search(key, st)
 	c := st.child()
 	if c.Key != key {
@@ -125,8 +125,8 @@ func (self *IBNode) Delete(key IBKey, st *IBStack) *IBNode {
 	return st.commit()
 }
 
-// CommitTo pushes dirty IBNode to the specified backend, returning the new root.
-func (self *IBNode) CommitTo(backend IBTreeSaver) (*IBNode, BlockId) {
+// CommitTo pushes dirty Node to the specified backend, returning the new root.
+func (self *Node) CommitTo(backend TreeSaver) (*Node, BlockId) {
 	// Iterate through the tree, updating the nodes as we go.
 
 	if self.blockId != nil {
@@ -151,13 +151,13 @@ func (self *IBNode) CommitTo(backend IBTreeSaver) (*IBNode, BlockId) {
 
 			// Need to copy children if not leafy; leafy children
 			// are data-only, and therefore can be copied as is
-			cl = make([]*IBNodeDataChild, len(self.Children))
+			cl = make([]*NodeDataChild, len(self.Children))
 			copy(cl, self.Children)
 
 			handleOne := func(i int) {
 				c := cl[i]
 				_, bid := c.childNode.CommitTo(backend)
-				cl[i] = &IBNodeDataChild{Key: c.Key, Value: string(bid)}
+				cl[i] = &NodeDataChild{Key: c.Key, Value: string(bid)}
 			}
 
 			if cc == 1 {
@@ -186,18 +186,18 @@ func (self *IBNode) CommitTo(backend IBTreeSaver) (*IBNode, BlockId) {
 	n := self.copy()
 	n.Children = cl
 
-	bid := backend.SaveNode(&n.IBNodeData)
+	bid := backend.SaveNode(&n.NodeData)
 	n.blockId = &bid
 	mlog.Printf2("ibtree/ibtree", "in.Commit, new bid %x..", bid[:10])
 	return n, bid
 }
 
-// Commit pushes dirty IBNode to default backend, returning the new root.
-func (self *IBNode) Commit() (*IBNode, BlockId) {
+// Commit pushes dirty Node to default backend, returning the new root.
+func (self *Node) Commit() (*Node, BlockId) {
 	return self.CommitTo(self.tree.backend)
 }
 
-func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
+func (self *Node) DeleteRange(key1, key2 IBKey, st2 *IBStack) *Node {
 	if key1 > key2 {
 		mlog.Panicf("ibt.DeleteRange: first key more than second key: %x > %x", key1, key2)
 	}
@@ -244,7 +244,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	idx1 := st.indexes[st.top]
 	idx2 := st2.indexes[st.top]
 	mlog.Printf2("ibtree/ibtree", "idx1:%d idx2:%d", idx1, idx2)
-	ncl := make([]*IBNodeDataChild, len(cl)-(idx2-idx1)+1)
+	ncl := make([]*NodeDataChild, len(cl)-(idx2-idx1)+1)
 	copy(ncl, cl[:idx1])
 	ncl[idx1] = st.child()
 	if len(cl) > idx2 {
@@ -254,7 +254,7 @@ func (self *IBNode) DeleteRange(key1, key2 IBKey, st2 *IBStack) *IBNode {
 	return st2.commit()
 }
 
-func (self *IBNode) Get(key IBKey, st *IBStack) *string {
+func (self *Node) Get(key IBKey, st *IBStack) *string {
 	self.search(key, st)
 	c := st.child()
 	st.top = 0
@@ -265,7 +265,7 @@ func (self *IBNode) Get(key IBKey, st *IBStack) *string {
 
 }
 
-func (self *IBNode) NextKey(key IBKey, st *IBStack) *IBKey {
+func (self *Node) NextKey(key IBKey, st *IBStack) *IBKey {
 	self.searchGreater(key, st)
 	c := st.child()
 	st.top = 0
@@ -275,9 +275,9 @@ func (self *IBNode) NextKey(key IBKey, st *IBStack) *IBKey {
 	return &c.Key
 }
 
-func (self *IBNode) Set(key IBKey, value string, st *IBStack) *IBNode {
+func (self *Node) Set(key IBKey, value string, st *IBStack) *Node {
 	self.search(key, st)
-	child := &IBNodeDataChild{Key: key, Value: value}
+	child := &NodeDataChild{Key: key, Value: value}
 	c := st.child()
 	if c == nil || c.Key != key {
 		// now at next -> insertion point is where it pointing at
@@ -291,7 +291,7 @@ func (self *IBNode) Set(key IBKey, value string, st *IBStack) *IBNode {
 
 }
 
-func (self *IBNode) search(key IBKey, st *IBStack) {
+func (self *Node) search(key IBKey, st *IBStack) {
 	if st.nodes[0] == nil {
 		st.nodes[0] = self
 	} else if self != st.nodes[0] {
@@ -303,12 +303,12 @@ func (self *IBNode) search(key IBKey, st *IBStack) {
 	st.search(key)
 }
 
-func (self *IBNode) copy() *IBNode {
-	return &IBNode{tree: self.tree, blockId: self.blockId,
-		IBNodeData: self.IBNodeData}
+func (self *Node) copy() *Node {
+	return &Node{tree: self.tree, blockId: self.blockId,
+		NodeData: self.NodeData}
 }
 
-func (self *IBNode) childNode(idx int) *IBNode {
+func (self *Node) childNode(idx int) *Node {
 	// Get the corresponding child node.
 	c := self.Children[idx]
 	if c.childNode != nil {
@@ -325,10 +325,10 @@ func (self *IBNode) childNode(idx int) *IBNode {
 	if nd == nil {
 		mlog.Panicf("childNode - backend LoadNode for %x failed", bid)
 	}
-	return &IBNode{tree: self.tree, blockId: &bid, IBNodeData: *nd}
+	return &Node{tree: self.tree, blockId: &bid, NodeData: *nd}
 }
 
-func (self *IBNode) PrintToMLogDirty() {
+func (self *Node) PrintToMLogDirty() {
 	if !mlog.IsEnabled() {
 		return
 	}
@@ -347,7 +347,7 @@ func (self *IBNode) PrintToMLogDirty() {
 
 }
 
-func (self *IBNode) PrintToMLogAll() {
+func (self *Node) PrintToMLogAll() {
 	if !mlog.IsEnabled() {
 		return
 	}
@@ -365,7 +365,7 @@ func (self *IBNode) PrintToMLogAll() {
 
 }
 
-func (self *IBNode) iterateLeafFirst(fun func(n *IBNode)) {
+func (self *Node) iterateLeafFirst(fun func(n *Node)) {
 	for _, c := range self.Children {
 		if c.childNode != nil {
 			c.childNode.iterateLeafFirst(fun)
@@ -375,7 +375,7 @@ func (self *IBNode) iterateLeafFirst(fun func(n *IBNode)) {
 }
 
 // CheckNodeStructure allows sanity checking a node's content (should not be really used except for debugging)
-func (self *IBNodeData) CheckNodeStructure() {
+func (self *NodeData) CheckNodeStructure() {
 	for i, c := range self.Children {
 		if c.Key == "" {
 			mlog.Panicf("tree broke: empty key at [%d] of %v", i, self)
@@ -389,21 +389,21 @@ func (self *IBNodeData) CheckNodeStructure() {
 	}
 }
 
-func (self *IBNode) checkTreeStructure() {
-	self.iterateLeafFirst(func(n *IBNode) {
+func (self *Node) checkTreeStructure() {
+	self.iterateLeafFirst(func(n *Node) {
 		n.CheckNodeStructure()
 	})
 }
 
-func (self *IBNode) nestedNodeCount() int {
+func (self *Node) nestedNodeCount() int {
 	cnt := 0
-	self.iterateLeafFirst(func(n *IBNode) {
+	self.iterateLeafFirst(func(n *Node) {
 		cnt++
 	})
 	return cnt
 }
 
-func (self *IBNode) searchLesser(key IBKey, st *IBStack) {
+func (self *Node) searchLesser(key IBKey, st *IBStack) {
 	self.search(key, st)
 	c := st.child()
 	if c != nil && c.Key == key {
@@ -412,7 +412,7 @@ func (self *IBNode) searchLesser(key IBKey, st *IBStack) {
 	}
 }
 
-func (self *IBNode) searchGreater(key IBKey, st *IBStack) {
+func (self *Node) searchGreater(key IBKey, st *IBStack) {
 	self.search(key, st)
 	c := st.child()
 	if c != nil && c.Key == key {

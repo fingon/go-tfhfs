@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Wed Jan 17 11:40:59 2018 mstenber
- * Edit time:     92 min
+ * Last modified: Wed Jan 17 13:28:26 2018 mstenber
+ * Edit time:     98 min
  *
  */
 
@@ -17,29 +17,27 @@ import (
 	"net"
 
 	"github.com/fingon/go-tfhfs/fs"
-	"github.com/fingon/go-tfhfs/ibtree"
+	"github.com/fingon/go-tfhfs/ibtree/hugger"
 	. "github.com/fingon/go-tfhfs/pb"
 	"github.com/fingon/go-tfhfs/storage"
-	"github.com/fingon/go-tfhfs/util"
 	"google.golang.org/grpc"
 )
 
 const rootName = "sync"
 
 type Server struct {
+	// We have our own tree (rooted at 'rootName')
+	hugger.Hugger
+
 	Family, Address string
 	Fs              *fs.Fs
 	Storage         *storage.Storage
 	grpcServer      *grpc.Server
-
-	// lock controls access to stuff below here
-	lock   util.MutexLocked
-	tree   *ibtree.IBTree
-	root   *ibtree.IBNode
-	blocks map[string]*storage.StorageBlock
 }
 
 func (self *Server) Init() *Server {
+	self.RootName = rootName
+	self.Hugger.Storage = self.Storage
 	lis, err := net.Listen(self.Family, self.Address)
 	if err != nil {
 		log.Panic(err)
@@ -48,68 +46,21 @@ func (self *Server) Init() *Server {
 	RegisterFsServer(grpcServer, self)
 	grpcServer.Serve(lis)
 	self.grpcServer = grpcServer
-	self.tree = ibtree.IBTree{NodeMaximumSize: 4096}.Init(self)
-	bid := self.Storage.GetBlockIdByName(rootName)
-	if bid != "" {
-		self.root = self.tree.LoadRoot(ibtree.BlockId(bid))
-		if self.root == nil {
-			log.Panic("Loading of root block %x failed", bid)
-		}
-	} else {
-		self.root = self.tree.NewRoot()
-	}
+	// Load the root
+	self.Hugger.RootIsNew()
 	return self
-}
-
-func (self *Server) LoadNode(id ibtree.BlockId) *ibtree.IBNodeData {
-	b := self.Storage.GetBlockById(string(id))
-	if b == nil {
-		log.Panicf("Unable to find node %x", id)
-	}
-	defer b.Close()
-	nd := fs.BytesToIBNodeData(b.Data())
-	if nd == nil {
-		log.Panicf("Unable to convert node %x", id)
-	}
-	return nd
-}
-
-func (self *Server) SaveNode(nd *ibtree.IBNodeData) ibtree.BlockId {
-	self.lock.AssertLocked()
-	b := fs.IBNodeDataToBytes(nd)
-	bl := self.Storage.ReferOrStoreBlockBytes0(storage.BS_NORMAL, b)
-	if self.blocks == nil {
-		self.blocks = make(map[string]*storage.StorageBlock)
-	}
-	self.blocks[bl.Id()] = bl
-	return ibtree.BlockId(bl.Id())
 }
 
 func (self *Server) Close() {
 	self.grpcServer.Stop()
 }
 
-func (self *Server) commit(t *ibtree.IBTransaction) {
-	root, bid := t.Commit()
-	if root == self.root {
-		return
-	}
-
-	self.Storage.SetNameToBlockId(rootName, string(bid))
-
-	for _, b := range self.blocks {
-		b.Close()
-	}
-	self.blocks = nil
-}
-
 func (self *Server) ClearBlocksInName(ctx context.Context, n *BlockName) (*ClearResult, error) {
-	defer self.lock.Locked()()
-	t := ibtree.NewTransaction(self.root)
-	k1 := fs.NewBlockKeyNameBlock(n.Name, "").IB()
-	k2 := fs.NewBlockKeyNameEnd(n.Name).IB()
-	t.DeleteRange(k1, k2)
-	self.commit(t)
+	self.Update(func(tr *hugger.Transaction) {
+		k1 := fs.NewBlockKeyNameBlock(n.Name, "").IB()
+		k2 := fs.NewBlockKeyNameEnd(n.Name).IB()
+		tr.IB().DeleteRange(k1, k2)
+	})
 	return &ClearResult{}, nil
 }
 
@@ -160,19 +111,13 @@ func (self *Server) SetNameToBlockId(ctx context.Context, req *SetNameRequest) (
 
 func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, error) {
 	var bl *storage.StorageBlock
-	bdata := []byte(req.Block.Data)
-	st := storage.BlockStatus(req.Block.Status)
-	if req.Block.Id != "" {
-		bl = self.Storage.ReferOrStoreBlock0(req.Block.Id, st, bdata)
-	} else {
-		bl = self.Storage.ReferOrStoreBlockBytes0(st, bdata)
-	}
-	defer self.lock.Locked()()
-	self.blocks[bl.Id()] = bl
-	t := ibtree.NewTransaction(self.root)
-	k := fs.NewBlockKeyNameBlock(req.Name, bl.Id()).IB()
-	t.Set(k, bl.Id())
-	self.commit(t)
+	self.Update(func(tr *hugger.Transaction) {
+		bdata := []byte(req.Block.Data)
+		st := storage.BlockStatus(req.Block.Status)
+		bl = tr.GetStorageBlock(st, bdata, nil)
+		k := fs.NewBlockKeyNameBlock(req.Name, bl.Id()).IB()
+		tr.IB().Set(k, bl.Id())
+	})
 	return self.getBlock(bl.Id(), false, true), nil
 }
 

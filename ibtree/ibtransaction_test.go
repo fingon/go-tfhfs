@@ -49,7 +49,7 @@ func getSeededRng() *rand.Rand {
 
 func ProdTree(t *testing.T, rng *rand.Rand) {
 	be := ibtree.DummyBackend{}.Init()
-	tree := ibtree.IBTree{}.Init(be)
+	tree := ibtree.Tree{}.Init(be)
 	root := tree.NewRoot()
 	iter := 1000
 

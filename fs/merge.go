@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 10:43:03 2018 mstenber
- * Last modified: Wed Jan 17 11:38:06 2018 mstenber
- * Edit time:     34 min
+ * Last modified: Wed Jan 17 13:11:16 2018 mstenber
+ * Edit time:     50 min
  *
  */
 
@@ -13,6 +13,7 @@ package fs
 
 import (
 	"github.com/fingon/go-tfhfs/ibtree"
+	"github.com/fingon/go-tfhfs/ibtree/hugger"
 	"github.com/fingon/go-tfhfs/mlog"
 )
 
@@ -32,17 +33,26 @@ const (
 
 // MergeTo3 performs 3-way merge. It iterates changes in orig -> new,
 // and then compares them with the current state in the tree that is
-// handed in as the IBTransaction.
-func MergeTo3(t *ibtree.IBTransaction, src, dst *ibtree.IBNode, local bool) {
+// handed in as the Transaction.  If local is set, all changes are
+// assumed to be dealt with on per-leaf node difference
+// basis. Otherwise metadata of the particular inode is used to
+// determine which version of the truth is preferrable.
+func MergeTo3(tr *hugger.Transaction, src, dst *ibtree.Node, local bool) {
+	t := tr.IB()
 	m := make(map[uint64]mergeVerdict)
+	isdir := make(map[uint64]bool)
+	isdir[1] = true
 	dst.IterateDelta(src,
-		func(oldC, newC *ibtree.IBNodeDataChild) {
+		func(oldC, newC *ibtree.NodeDataChild) {
 			var k BlockKey
+			var c *ibtree.NodeDataChild
+			// My god, if I only had ternary operator..
 			if oldC == nil {
-				k = BlockKey(newC.Key)
+				c = newC
 			} else {
-				k = BlockKey(oldC.Key)
+				c = oldC
 			}
+			k = BlockKey(c.Key)
 
 			ino := k.Ino()
 			v, ok := m[ino]
@@ -75,6 +85,9 @@ func MergeTo3(t *ibtree.IBTransaction, src, dst *ibtree.IBNode, local bool) {
 						} else {
 							dstMeta := decodeInodeMeta(newC.Value)
 							otherMeta := decodeInodeMeta(*op)
+							if dstMeta.IsDir() {
+								isdir[k.Ino()] = true
+							}
 							if dstMeta.StCtimeNs > otherMeta.StCtimeNs {
 								v = MV_NEW
 							} else {
@@ -103,24 +116,40 @@ func MergeTo3(t *ibtree.IBTransaction, src, dst *ibtree.IBNode, local bool) {
 			// MV_NONE is handled separately as
 			// DeleteRange (more efficient and also more
 			// correct).
-			if v != MV_NEW {
+			if v == MV_NONE {
+				return
+			}
+
+			// In non-local mode, only MV_NEW changes are
+			// worth propagating unless it is a directory,
+			// which we will handle anyway as if it was
+			// local mode. (Files are separate concerns
+			// from each other and can be modified
+			// atomically.)
+			if !local && v != MV_NEW && !isdir[k.Ino()] {
 				return
 			}
 			if newC == nil {
 				// Delete
-				v := t.Get(oldC.Key)
-				if v != nil {
-					mlog.Printf2("fs/fstransaction", " delete %x", oldC.Key)
+				cv := t.Get(oldC.Key)
+				if cv != nil && (*cv == oldC.Value || v == MV_NEW) {
+					mlog.Printf2("fs/merge", " delete %x", oldC.Key)
 					t.Delete(oldC.Key)
 				}
 			} else if oldC == nil {
 				// Insert
-				mlog.Printf2("fs/fstransaction", " insert %x", newC.Key)
-				t.Set(newC.Key, newC.Value)
+				cv := t.Get(newC.Key)
+				if cv == nil || v == MV_NEW {
+					mlog.Printf2("fs/merge", " insert %x", newC.Key)
+					t.Set(newC.Key, newC.Value)
+				}
 			} else {
 				// Update
-				mlog.Printf2("fs/fstransaction", " update %x", newC.Key)
-				t.Set(newC.Key, newC.Value)
+				cv := t.Get(oldC.Key)
+				if (cv != nil && *cv == oldC.Value) || v == MV_NEW {
+					mlog.Printf2("fs/merge", " update %x", newC.Key)
+					t.Set(newC.Key, newC.Value)
+				}
 			}
 		})
 	for ino, v := range m {

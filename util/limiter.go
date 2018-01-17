@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 07:40:22 2018 mstenber
- * Last modified: Thu Jan 11 07:54:08 2018 mstenber
- * Edit time:     9 min
+ * Last modified: Wed Jan 17 17:50:26 2018 mstenber
+ * Edit time:     13 min
  *
  */
 
@@ -47,22 +47,27 @@ func (self *ParallelLimiter) init() {
 	self.initialized = true
 }
 
-func (self *ParallelLimiter) Limited() func() {
+// Limited2 reserves 'count' execution slots.
+func (self *ParallelLimiter) Limited2(count int) func() {
 	defer self.lock.Locked()()
 
 	if !self.initialized {
 		self.init()
 	}
 
-	for self.running >= self.LimitTotal {
+	for (self.running + count) > self.LimitTotal {
 		self.cond.Wait()
 	}
-	self.running++
+	self.running += count
 	return func() {
 		defer self.lock.Locked()()
-		self.running--
+		self.running -= count
 		self.cond.Signal()
 	}
+}
+
+func (self *ParallelLimiter) Limited() func() {
+	return self.Limited2(1)
 }
 
 func (self *ParallelLimiter) Go(cb func()) {
@@ -71,4 +76,10 @@ func (self *ParallelLimiter) Go(cb func()) {
 		defer unlock()
 		cb()
 	}()
+}
+
+func (self *ParallelLimiter) Exclusive(cb func()) {
+	unlock := self.Limited2(self.LimitTotal)
+	defer unlock()
+	cb()
 }

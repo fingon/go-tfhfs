@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Wed Jan 17 11:46:28 2018 mstenber
+ * Last modified: Wed Jan 17 16:58:36 2018 mstenber
  * Edit time:     14 min
  *
  */
@@ -123,12 +123,7 @@ func (self *Storage) run() {
 			//b.Data.Set(&nd)
 			b.Data.Set(&job.data)
 			self.blocks[job.id] = b
-			// Note: This order matters. setStatus with
-			// nonzero refcounts will do
-			// things. addRefCount will also do things,
-			// and in theory they work correctly both ways
-			// but better safe than sorry.
-			b.setStatus(job.status)
+			b.Status = job.status
 			b.addRefCount(job.count)
 			job.out <- &jobOut{sb: NewStorageBlock(b)}
 		case jobUpdateBlockIdRefCount:

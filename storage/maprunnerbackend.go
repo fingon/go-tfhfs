@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 10 09:22:12 2018 mstenber
- * Last modified: Thu Jan 18 17:12:47 2018 mstenber
- * Edit time:     31 min
+ * Last modified: Thu Jan 18 18:23:30 2018 mstenber
+ * Edit time:     38 min
  *
  */
 
@@ -37,12 +37,18 @@ func (self *mapRunnerBackend) Close() {
 
 func (self *mapRunnerBackend) runWithBlock(b *Block, cb func()) {
 	b.addStorageRefCount(1)
-	// This ordering is intentional and basically maximizes the
-	// amount of parallel work we are doing; we will try to keep #
-	// of allowed parallelism inodes busy at same time, as within
-	// inode the paralellism will not work anyway.
-	self.mr.Go(b.Id, func() {
-		self.pl.Go(cb)
+	// This ordering is intentional!
+	//
+	// Doing it other way around would be more correct in terms of
+	// parallelism, but unfortunately it would cause orders of
+	// magnitude more memory usage due to blocked goroutines
+	// waiting for ParallelLimiter.
+	//
+	// Now in the worst case we will have just 1 write at a time
+	// _to particular block id_, but in general colliding ops to
+	// those should be rare and therefore this order is better.
+	self.pl.Go(func() {
+		self.mr.Call(b.Id, cb)
 	})
 	b.addStorageRefCount(-1)
 }
@@ -64,8 +70,8 @@ func (self *mapRunnerBackend) GetBlockData(b *Block) []byte {
 
 func (self *mapRunnerBackend) GetBlockById(id string) *Block {
 	var fut BlockPointerFuture
-	self.mr.Go(id, func() {
-		self.pl.Go(func() {
+	self.pl.Go(func() {
+		self.mr.Call(id, func() {
 			bl := self.Backend.GetBlockById(id)
 			if bl != nil {
 				bl.Backend = self

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Thu Jan 18 17:39:44 2018 mstenber
- * Edit time:     27 min
+ * Last modified: Thu Jan 18 18:10:08 2018 mstenber
+ * Edit time:     31 min
  *
  */
 
@@ -157,13 +157,13 @@ func (self *Storage) run() {
 }
 
 func (self *Storage) Flush() {
-	out := make(chan *jobOut)
+	out := make(chan *jobOut, 1)
 	self.jobChannel <- &jobIn{jobType: jobFlush, out: out}
 	<-out
 }
 
 func (self *Storage) GetBlockById(id string) *StorageBlock {
-	out := make(chan *jobOut)
+	out := make(chan *jobOut, 1)
 	self.jobChannel <- &jobIn{jobType: jobGetBlockById, out: out,
 		id: id,
 	}
@@ -172,7 +172,7 @@ func (self *Storage) GetBlockById(id string) *StorageBlock {
 }
 
 func (self *Storage) GetBlockIdByName(name string) string {
-	out := make(chan *jobOut)
+	out := make(chan *jobOut, 1)
 	self.jobChannel <- &jobIn{jobType: jobGetBlockIdByName, out: out,
 		name: name,
 	}
@@ -184,7 +184,7 @@ func (self *Storage) storeBlockInternal(jobType jobType, id string, status Block
 	if data == nil {
 		mlog.Printf2("storage/storagejob", "no data given")
 	}
-	out := make(chan *jobOut)
+	out := make(chan *jobOut, 1)
 	self.jobChannel <- &jobIn{jobType: jobType, out: out,
 		id: id, data: data, deps: deps, count: count, status: status,
 	}
@@ -242,7 +242,7 @@ func (self *Storage) StoreBlock0(id string, status BlockStatus, data []byte) *St
 
 func (self *Storage) setStorageBlockStatus(sb *StorageBlock, status BlockStatus) bool {
 
-	out := make(chan *jobOut)
+	out := make(chan *jobOut, 1)
 	self.jobChannel <- &jobIn{jobType: jobSetStorageBlockStatus, out: out,
 		sb: sb, status: status,
 	}

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan 17 10:10:13 2018 mstenber
- * Edit time:     611 min
+ * Last modified: Thu Jan 18 10:44:06 2018 mstenber
+ * Edit time:     614 min
  *
  */
 
@@ -69,9 +69,14 @@ func (self Storage) Init() *Storage {
 	self.blocks = make(blockMap)
 	self.dirtyBlocks = make(blockMap)
 
-	// No need to special case Codec = nil elsewhere with this
 	if self.Codec != nil {
+		// No need to care about encoding elsewhere with this
+		// (except server part)
 		self.Backend = codecBackend{Codec: self.Codec}.SetBackend(self.Backend)
+	} else {
+		// Similarly provide nop Codec so code can always
+		// assume Codec is present
+		self.Codec = codec.CodecChain{}.Init()
 	}
 	self.Backend = mapRunnerBackend{}.SetBackend(self.Backend)
 	go func() {

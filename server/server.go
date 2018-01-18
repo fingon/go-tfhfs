@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Wed Jan 17 17:55:24 2018 mstenber
- * Edit time:     140 min
+ * Last modified: Thu Jan 18 10:58:15 2018 mstenber
+ * Edit time:     149 min
  *
  */
 
@@ -13,6 +13,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -24,6 +25,8 @@ import (
 )
 
 const rootName = "sync"
+
+var ErrWrongId = errors.New("Block id mismatch decode <> locally calculated")
 
 type Server struct {
 	// We have our own tree (rooted at 'rootName')
@@ -78,15 +81,24 @@ func (self *Server) GetBlockIdByName(ctx context.Context, name *BlockName) (*Blo
 	return &BlockId{Id: id}, nil
 }
 
-func (self *Server) getBlock(id string, wantData, wantMissing bool) *Block {
+func (self *Server) getBlock(id string, wantData, wantMissing bool) (*Block, error) {
 	b := self.Storage.GetBlockById(id)
 	if b == nil {
-		return &Block{}
+		return &Block{}, nil
 	}
 	defer b.Close()
 	res := &Block{Id: id, Status: int32(b.Status())}
 	if wantData {
-		res.Data = string(b.Data())
+		data := b.Data()
+		// TBD: Should there be separate API to get
+		// e.g. EncodedData()? It would complicate Storage's
+		// internal APIs somewhat, but save the cost of
+		// encoding here.
+		encodedData, err := self.Storage.Codec.EncodeBytes(data, []byte(id))
+		if err != nil {
+			return nil, err
+		}
+		res.Data = string(encodedData)
 	}
 	if wantMissing && b.Status() == storage.BS_WEAK {
 		missing := make([]string, 0)
@@ -100,11 +112,11 @@ func (self *Server) getBlock(id string, wantData, wantMissing bool) *Block {
 		})
 		res.MissingIds = missing
 	}
-	return res
+	return res, nil
 }
 
 func (self *Server) GetBlockById(ctx context.Context, req *GetBlockRequest) (*Block, error) {
-	return self.getBlock(req.Id, req.WantData, req.WantMissing), nil
+	return self.getBlock(req.Id, req.WantData, req.WantMissing)
 }
 
 func (self *Server) MergeBlockNameTo(ctx context.Context, req *MergeRequest) (*MergeResult, error) {
@@ -132,17 +144,27 @@ func (self *Server) SetNameToBlockId(ctx context.Context, req *SetNameRequest) (
 }
 
 func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, error) {
-	var bid string
+	bid := req.Block.Id
+	encodedData := []byte(req.Block.Data)
+	data, err := self.Storage.Codec.DecodeBytes(encodedData, []byte(bid))
+	if err != nil {
+		return nil, err
+	}
 	self.Update(func(tr *hugger.Transaction) {
-		bdata := []byte(req.Block.Data)
 		st := storage.BlockStatus(req.Block.Status)
-		bl := tr.GetStorageBlock(st, bdata, nil)
+		bl := tr.GetStorageBlock(st, data, nil)
+		if bl.Id() != bid {
+			err = ErrWrongId
+			return
+		}
 		k := fs.NewBlockKeyNameBlock(req.Name, bl.Id()).IB()
 		tr.IB().Set(k, bl.Id())
 		bid = bl.Id()
 	})
-
-	return self.getBlock(bid, false, true), nil
+	if err != nil {
+		return nil, err
+	}
+	return self.getBlock(bid, false, true)
 }
 
 func (self *Server) UpgradeBlockNonWeak(ctx context.Context, bid *BlockId) (*Block, error) {
@@ -150,5 +172,5 @@ func (self *Server) UpgradeBlockNonWeak(ctx context.Context, bid *BlockId) (*Blo
 	if b != nil {
 		b.SetStatus(storage.BS_NORMAL)
 	}
-	return self.getBlock(bid.Id, false, true), nil
+	return self.getBlock(bid.Id, false, true)
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 14:19:35 2018 mstenber
- * Last modified: Wed Jan 17 17:25:17 2018 mstenber
- * Edit time:     69 min
+ * Last modified: Wed Jan 17 18:05:56 2018 mstenber
+ * Edit time:     70 min
  *
  */
 
@@ -33,8 +33,7 @@ type Connection struct {
 // synchronized with RightName on right server and vice versa. This is
 // repeated every SyncInterval if there is need.
 type Connector struct {
-	Left, Right  Connection
-	SyncInterval int
+	Left, Right Connection
 }
 
 func (self *Connector) Run() (int, error) {

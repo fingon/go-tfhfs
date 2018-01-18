@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 16:53:09 2018 mstenber
- * Last modified: Wed Jan 10 09:31:35 2018 mstenber
- * Edit time:     21 min
+ * Last modified: Thu Jan 18 17:43:22 2018 mstenber
+ * Edit time:     22 min
  *
  */
 
@@ -32,6 +32,12 @@ func (self *YYYList) getElement(v YYYType) (e *YYYListElement) {
 	e.Next = nil
 	e.Value = v
 	return e
+}
+
+func (self *YYYList) Iterate(cb func(v YYYType)) {
+	for e := self.Front; e != nil; e = e.Next {
+		cb(e.Value)
+	}
 }
 
 func (self *YYYList) PushBack(v YYYType) {

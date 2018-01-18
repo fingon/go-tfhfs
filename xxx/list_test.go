@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 17:05:40 2018 mstenber
- * Last modified: Wed Jan 10 09:33:02 2018 mstenber
- * Edit time:     7 min
+ * Last modified: Thu Jan 18 17:45:36 2018 mstenber
+ * Edit time:     9 min
  *
  */
 
@@ -25,6 +25,7 @@ func Test(t *testing.T) {
 	v2 := YYYType(13)
 	v3 := YYYType(42)
 
+	values := []YYYType{v3, v2, v1}
 	fun := func(fr bool) {
 		if fr {
 			l.PushFront(v1)
@@ -35,6 +36,12 @@ func Test(t *testing.T) {
 			l.PushBack(v2)
 			l.PushBack(v1)
 		}
+
+		i := 0
+		l.Iterate(func(v YYYType) {
+			assert.Equal(t, v, values[i])
+			i++
+		})
 
 		assert.Equal(t, l.Front.Value, v3)
 		assert.Equal(t, l.Front.Next.Value, v2)

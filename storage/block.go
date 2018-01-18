@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Thu Jan 18 17:59:50 2018 mstenber
- * Edit time:     312 min
+ * Last modified: Thu Jan 18 18:36:18 2018 mstenber
+ * Edit time:     315 min
  *
  */
 
@@ -140,7 +140,7 @@ func (self *Block) flush() int {
 		}
 	}
 	self.Stored = nil
-	delete(self.storage.dirtyBlocks, self.Id)
+	delete(self.storage.dirtyBlocks, self)
 
 	self.addStorageRefCount(-1)
 	return ops
@@ -169,16 +169,16 @@ func (self *Block) addStorageRefCount(v int32) {
 	case rc < 0:
 		log.Panic("Negative reference count", rc)
 	case rc == 0:
-		self.storage.dirtyStorageRefBlocks[self.Id] = self
+		self.storage.dirtyStorageRefBlocks[self] = true
 	default:
 		if (self.RefCount == 0) != self.haveStorageRefs {
-			self.storage.dirtyStorageRefBlocks[self.Id] = self
+			self.storage.dirtyStorageRefBlocks[self] = true
 		}
 	}
 }
 
 func (self *Block) flushStorageRef() int {
-	delete(self.storage.dirtyStorageRefBlocks, self.Id)
+	delete(self.storage.dirtyStorageRefBlocks, self)
 	if self.storageRefCount == 0 {
 		self.shouldHaveStorageDependencies(false)
 		delete(self.storage.blocks, self.Id)
@@ -201,16 +201,13 @@ func (self *Block) addExternalStorageRefCount(v int32) {
 func (self *Block) markDirty() {
 	if self.Stored != nil {
 		mlog.Printf2("storage/block", "%v.markDirty (already)", self)
-		if self.storage.dirtyBlocks[self.Id] != self {
-			mlog.Panicf("markDirty - Stored set but not in dirtyBlocks list")
-		}
 		return
 	}
 	mlog.Printf2("storage/block", "%v.markDirty (fresh)", self)
 	self.addStorageRefCount(1)
 	self.Stored = &BlockMetadata{Status: self.Status,
 		RefCount: self.RefCount}
-	self.storage.dirtyBlocks[self.Id] = self
+	self.storage.dirtyBlocks[self] = true
 }
 
 func (self *Block) setStatus(st BlockStatus) bool {

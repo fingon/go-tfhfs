@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Jan 18 17:36:38 2018 mstenber
- * Edit time:     625 min
+ * Last modified: Thu Jan 18 18:37:03 2018 mstenber
+ * Edit time:     627 min
  *
  */
 
@@ -31,6 +31,8 @@ type oldNewStruct struct {
 
 type blockMap map[string]*Block
 
+type blockObjectMap map[*Block]bool
+
 type Storage struct {
 	// Backend specifies the backend to use.
 	Backend Backend
@@ -55,7 +57,8 @@ type Storage struct {
 	// storage-reference. dirtyRefBlocks on the other hand do NOT
 	// have references, but consist of blocks with either recently
 	// zeroed or non-zeroed storageRefCount
-	blocks, dirtyBlocks, dirtyStorageRefBlocks blockMap
+	blocks                             blockMap
+	dirtyBlocks, dirtyStorageRefBlocks blockObjectMap
 
 	// Stuff below here is ~DelayedStorage
 	names map[string]*oldNewStruct
@@ -70,8 +73,8 @@ func (self Storage) Init() *Storage {
 	self.names = make(map[string]*oldNewStruct)
 	self.jobChannel = make(chan *jobIn, self.QueueLength)
 	self.blocks = make(blockMap)
-	self.dirtyBlocks = make(blockMap)
-	self.dirtyStorageRefBlocks = make(blockMap)
+	self.dirtyBlocks = make(blockObjectMap)
+	self.dirtyStorageRefBlocks = make(blockObjectMap)
 
 	if self.Codec != nil {
 		// No need to care about encoding elsewhere with this
@@ -189,7 +192,7 @@ func (self *Storage) flush() int {
 		mlog.Printf2("storage/storage", " flushing %d dirty", len(self.dirtyBlocks))
 		// first nonzero refcounts as they may add references;
 		// then zero refcounts as they reduce references
-		for _, b := range self.dirtyBlocks {
+		for b, _ := range self.dirtyBlocks {
 			if b.RefCount != 0 {
 				ops += b.flush()
 			}
@@ -200,7 +203,7 @@ func (self *Storage) flush() int {
 
 		// only removals left
 		mlog.Printf2("storage/storage", " flushing refcnt=0")
-		for _, b := range self.dirtyBlocks {
+		for b, _ := range self.dirtyBlocks {
 			if b.RefCount != 0 {
 				break
 			}
@@ -211,7 +214,7 @@ func (self *Storage) flush() int {
 	// similarly handle the storageRefCounts
 	for len(self.dirtyStorageRefBlocks) > 0 {
 		oops := ops
-		for _, b := range self.dirtyStorageRefBlocks {
+		for b, _ := range self.dirtyStorageRefBlocks {
 			if b.storageRefCount != 0 {
 				ops += b.flushStorageRef()
 			}
@@ -219,7 +222,7 @@ func (self *Storage) flush() int {
 		if ops != oops {
 			continue
 		}
-		for _, b := range self.dirtyStorageRefBlocks {
+		for b, _ := range self.dirtyStorageRefBlocks {
 			if b.storageRefCount != 0 {
 				break
 			}

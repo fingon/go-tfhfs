@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Jan 18 10:44:06 2018 mstenber
- * Edit time:     614 min
+ * Last modified: Thu Jan 18 16:35:44 2018 mstenber
+ * Edit time:     620 min
  *
  */
 
@@ -51,8 +51,10 @@ type Storage struct {
 	// blocks is Block object herd; they are reference counted, so
 	// as long as someone keeps a reference to one, it stays
 	// here. Being in dirtyBlocks means it also has extra
-	// reference.
-	blocks, dirtyBlocks blockMap
+	// storage-reference. dirtyRefBlocks on the other hand do NOT
+	// have references, but consist of blocks with either recently
+	// zeroed or non-zeroed storageRefCount
+	blocks, dirtyBlocks, dirtyStorageRefBlocks blockMap
 
 	// Stuff below here is ~DelayedStorage
 	names map[string]*oldNewStruct
@@ -68,6 +70,7 @@ func (self Storage) Init() *Storage {
 	self.jobChannel = make(chan *jobIn, self.QueueLength)
 	self.blocks = make(blockMap)
 	self.dirtyBlocks = make(blockMap)
+	self.dirtyStorageRefBlocks = make(blockMap)
 
 	if self.Codec != nil {
 		// No need to care about encoding elsewhere with this
@@ -201,6 +204,25 @@ func (self *Storage) flush() int {
 				break
 			}
 			ops += b.flush()
+		}
+	}
+
+	// similarly handle the storageRefCounts
+	for len(self.dirtyStorageRefBlocks) > 0 {
+		oops := ops
+		for _, b := range self.dirtyStorageRefBlocks {
+			if b.storageRefCount != 0 {
+				ops += b.flushStorageRef()
+			}
+		}
+		if ops != oops {
+			continue
+		}
+		for _, b := range self.dirtyStorageRefBlocks {
+			if b.storageRefCount != 0 {
+				break
+			}
+			ops += b.flushStorageRef()
 		}
 	}
 

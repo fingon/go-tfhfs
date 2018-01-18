@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Tue Jan 16 19:45:04 2018 mstenber
- * Edit time:     277 min
+ * Last modified: Thu Jan 18 16:33:40 2018 mstenber
+ * Edit time:     300 min
  *
  */
 
@@ -161,18 +161,29 @@ func (self *Block) addRefCount(count int32) {
 func (self *Block) addStorageRefCount(v int32) {
 	mlog.Printf2("storage/block", "%v.addStorageRefCount %v", self, v)
 	self.storageRefCount += v
-	nv := self.storageRefCount
-	if nv < 0 {
-		log.Panic("Negative reference count", nv)
-	} else if nv == 0 {
-		// Get rid of storage dependencies if any as well
+	switch rc := self.storageRefCount; {
+	case rc < 0:
+		log.Panic("Negative reference count", rc)
+	case rc == 0:
+		self.storage.dirtyStorageRefBlocks[self.Id] = self
+	default:
+		if (self.RefCount == 0) != self.haveStorageRefs {
+			self.storage.dirtyStorageRefBlocks[self.Id] = self
+		}
+	}
+}
+
+func (self *Block) flushStorageRef() int {
+	delete(self.storage.dirtyStorageRefBlocks, self.Id)
+	if self.storageRefCount == 0 {
 		self.shouldHaveStorageDependencies(false)
 		delete(self.storage.blocks, self.Id)
-	} else if self.RefCount == 0 {
-		// Ensure we have at least in-memory references to dependencies
-		self.shouldHaveStorageDependencies(true)
-
+		return 1
 	}
+	if self.shouldHaveStorageDependencies(self.RefCount == 0) {
+		return 1
+	}
+	return 0
 }
 
 func (self *Block) addExternalStorageRefCount(v int32) {
@@ -287,24 +298,25 @@ func (self *Block) setDependencies(add, storage bool, st BlockStatus) {
 	})
 }
 
-func (self *Block) updateDependencies(add, storage bool, stp *BlockStatus) {
+func (self *Block) updateDependencies(add, storage bool, stp *BlockStatus) bool {
 	st := self.Status
 	if stp != nil {
 		st = *stp
 	}
 	if storage {
 		if self.haveStorageRefs == add {
-			return
+			return false
 		}
 		self.haveStorageRefs = add
 	} else if stp == nil {
 		if self.haveDiskRefs == add {
-			return
+			return false
 		}
 		self.haveDiskRefs = add
 	}
 	mlog.Printf2("storage/block", "%v.updateDependencies %v %v %v", self, add, storage, st)
 	self.setDependencies(add, storage, st)
+	return true
 }
 
 func (self *Block) iterateReferences(cb func(id string)) {
@@ -314,12 +326,12 @@ func (self *Block) iterateReferences(cb func(id string)) {
 	self.storage.IterateReferencesCallback(self.Id, self.GetData(), cb)
 }
 
-func (self *Block) shouldHaveStorageDependencies(value bool) {
-	self.updateDependencies(value, true, nil)
+func (self *Block) shouldHaveStorageDependencies(value bool) bool {
+	return self.updateDependencies(value, true, nil)
 }
 
-func (self *Block) shouldHaveDiskDependencies(value bool) {
-	self.updateDependencies(value, false, nil)
+func (self *Block) shouldHaveDiskDependencies(value bool) bool {
+	return self.updateDependencies(value, false, nil)
 }
 
 // getBlockById returns Block (if any) that matches id.

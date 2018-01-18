@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 10 09:22:12 2018 mstenber
- * Last modified: Thu Jan 11 08:30:04 2018 mstenber
- * Edit time:     28 min
+ * Last modified: Thu Jan 18 17:12:47 2018 mstenber
+ * Edit time:     31 min
  *
  */
 
@@ -37,8 +37,12 @@ func (self *mapRunnerBackend) Close() {
 
 func (self *mapRunnerBackend) runWithBlock(b *Block, cb func()) {
 	b.addStorageRefCount(1)
-	self.pl.Go(func() {
-		self.mr.Go(b.Id, cb)
+	// This ordering is intentional and basically maximizes the
+	// amount of parallel work we are doing; we will try to keep #
+	// of allowed parallelism inodes busy at same time, as within
+	// inode the paralellism will not work anyway.
+	self.mr.Go(b.Id, func() {
+		self.pl.Go(cb)
 	})
 	b.addStorageRefCount(-1)
 }
@@ -60,8 +64,8 @@ func (self *mapRunnerBackend) GetBlockData(b *Block) []byte {
 
 func (self *mapRunnerBackend) GetBlockById(id string) *Block {
 	var fut BlockPointerFuture
-	self.pl.Go(func() {
-		self.mr.Go(id, func() {
+	self.mr.Go(id, func() {
+		self.pl.Go(func() {
 			bl := self.Backend.GetBlockById(id)
 			if bl != nil {
 				bl.Backend = self

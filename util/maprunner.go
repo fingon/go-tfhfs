@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 16:45:31 2018 mstenber
- * Last modified: Thu Jan 11 08:15:34 2018 mstenber
- * Edit time:     41 min
+ * Last modified: Thu Jan 18 18:25:02 2018 mstenber
+ * Edit time:     46 min
  *
  */
 
@@ -53,7 +53,7 @@ func (self *MapRunner) Close() {
 	}
 }
 
-func (self *MapRunner) Go(key interface{}, cb MapRunnerCallback) {
+func (self *MapRunner) queueOrReserve(key interface{}, cb MapRunnerCallback) (queued bool) {
 	defer self.lock.Locked()()
 	if self.busy == nil {
 		self.died.L = &self.lock
@@ -69,15 +69,36 @@ func (self *MapRunner) Go(key interface{}, cb MapRunnerCallback) {
 			self.blockedPerTarget[key] = l
 		}
 		l.PushBack(cb)
-		return
+		return true
 	}
 	self.Ran++
 	if self.closed {
 		log.Panicf("Attempt to .Run() on closed MapRunner")
 	}
-	// It's not busy, we can just start goroutine and mark it busy
+	// It's not busy, we can just reserve it for us mark it busy
 	mlog.Printf2("util/maprunner", "mr.Run immediate")
 	self.busy[key] = true
+	return false
+}
+
+// Call assumes the current coroutine can be used for callbacks. It
+// may lead to one or more callbacks, if more are queued during the
+// execution of this one. The benefit is that it causes no extra
+// coroutines to be created (as opposed to Go).
+func (self *MapRunner) Call(key interface{}, cb MapRunnerCallback) {
+	if self.queueOrReserve(key, cb) {
+		return
+	}
+	self.run(key, cb)
+}
+
+// Go queues new goroutine for executing things related to key, if it
+// does not already exist, and runs cb. If it exists, queued one is
+// given cb to be ran later instead.
+func (self *MapRunner) Go(key interface{}, cb MapRunnerCallback) {
+	if self.queueOrReserve(key, cb) {
+		return
+	}
 	go func() {
 		self.run(key, cb)
 	}()

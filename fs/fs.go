@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan 17 17:51:53 2018 mstenber
- * Edit time:     360 min
+ * Last modified: Thu Jan 18 12:16:22 2018 mstenber
+ * Edit time:     363 min
  *
  */
 
@@ -147,10 +147,14 @@ func (self *Fs) hasExternalReferences(id string) bool {
 }
 
 func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.BlockReferenceCallback) {
-	nd := BytesToNodeData(data)
+	nd := self.GetCachedNodeData(id)
 	if nd == nil {
-		return
+		nd = BytesToNodeData(data)
+		if nd == nil {
+			return
+		}
 	}
+
 	if !nd.Leafy {
 		for _, c := range nd.Children {
 			cb(c.Value)

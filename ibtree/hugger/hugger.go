@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Wed Jan 17 14:05:55 2018 mstenber
- * Edit time:     20 min
+ * Last modified: Thu Jan 18 12:15:36 2018 mstenber
+ * Edit time:     23 min
  *
  */
 
@@ -167,6 +167,17 @@ func (self *Hugger) Flush() {
 			mlog.Printf2("ibtree/hugger/hugger", " cleared %d roots", nroots)
 		}
 	}
+}
+
+func (self *Hugger) GetCachedNodeData(id string) *ibtree.NodeData {
+	if self.nodeDataCache == nil {
+		return nil
+	}
+	v, _ := self.nodeDataCache.GetIFPresent(ibtree.BlockId(id))
+	if v == nil {
+		return nil
+	}
+	return v.(*ibtree.NodeData)
 }
 
 func (self *Hugger) LoadNodeByName(name string) (*ibtree.Node, string, bool) {

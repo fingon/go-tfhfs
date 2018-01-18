@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Wed Jan 17 13:32:43 2018 mstenber
- * Edit time:     199 min
+ * Last modified: Thu Jan 18 17:35:20 2018 mstenber
+ * Edit time:     210 min
  *
  */
 
@@ -65,7 +65,17 @@ func (self *Transaction) IB() *ibtree.Transaction {
 func (self *Transaction) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 	b := NodeDataToBytes(nd)
 	mlog.Printf2("ibtree/hugger/htransaction", "SaveNode %d bytes", len(b))
-	bl := self.GetStorageBlock(storage.BS_NORMAL, b, nd)
+	sl := &util.StringList{}
+	if self.hugger.IterateReferencesCallback != nil {
+		self.hugger.IterateReferencesCallback(nd,
+			func(s string) {
+				sl.PushFront(s)
+			})
+	} else {
+		// Fall back to storage-level reference iteration
+		sl = nil
+	}
+	bl := self.GetStorageBlock(storage.BS_NORMAL, b, nd, sl)
 	bid := ibtree.BlockId(bl.Id())
 	return bid
 }
@@ -173,13 +183,14 @@ func (self *Transaction) Close() {
 
 // getStorageBlock block ids for given bytes/data.
 // This one expires the blocks when the transaction is gone.
-func (self *Transaction) GetStorageBlock(st storage.BlockStatus, b []byte, nd *ibtree.NodeData) *storage.StorageBlock {
+// nd and deps are optional, but may speed up processing (or not).
+func (self *Transaction) GetStorageBlock(st storage.BlockStatus, b []byte, nd *ibtree.NodeData, deps *util.StringList) *storage.StorageBlock {
 	if self.closed {
 		mlog.Panicf("GetStorageBlock in closed transaction")
 	}
-	bl := self.hugger.Storage.ReferOrStoreBlockBytes0(st, b)
-	if nd != nil && self.hugger.nodeDataCache != nil {
-		self.hugger.nodeDataCache.Set(ibtree.BlockId(bl.Id()), nd)
+	bl := self.hugger.Storage.ReferOrStoreBlockBytes0(st, b, deps)
+	if nd != nil {
+		self.hugger.SetCachedNodeData(ibtree.BlockId(bl.Id()), nd)
 	}
 	defer self.blockLock.Locked()()
 	if self.blocks == nil {

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Jan 18 12:16:22 2018 mstenber
- * Edit time:     363 min
+ * Last modified: Thu Jan 18 17:49:12 2018 mstenber
+ * Edit time:     371 min
  *
  */
 
@@ -92,10 +92,29 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 	return
 }
 
+func iterateNodeReferences(nd *ibtree.NodeData, cb storage.BlockReferenceCallback) {
+	if !nd.Leafy {
+		for _, c := range nd.Children {
+			cb(c.Value)
+		}
+		return
+	}
+	for _, c := range nd.Children {
+		k := BlockKey(c.Key)
+		switch k.SubType() {
+		case BST_FILE_OFFSET2EXTENT:
+			cb(c.Value)
+		case BST_NAMEHASH_NAME_BLOCK:
+			cb(c.Value)
+		}
+	}
+}
+
 func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	fs := &Fs{storage: st}
 	fs.RootName = RootName
 	fs.Hugger.Storage = st
+	fs.Hugger.IterateReferencesCallback = iterateNodeReferences
 	fs.MergeCallback = MergeTo3
 	(&fs.Hugger).Init(cacheSize)
 	fs.Ops.fs = fs
@@ -147,29 +166,14 @@ func (self *Fs) hasExternalReferences(id string) bool {
 }
 
 func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.BlockReferenceCallback) {
-	nd := self.GetCachedNodeData(id)
-	if nd == nil {
+	nd, ok := self.GetCachedNodeData(ibtree.BlockId(id))
+	if !ok {
 		nd = BytesToNodeData(data)
-		if nd == nil {
-			return
-		}
 	}
-
-	if !nd.Leafy {
-		for _, c := range nd.Children {
-			cb(c.Value)
-		}
+	if nd == nil {
 		return
 	}
-	for _, c := range nd.Children {
-		k := BlockKey(c.Key)
-		switch k.SubType() {
-		case BST_FILE_OFFSET2EXTENT:
-			cb(c.Value)
-		case BST_NAMEHASH_NAME_BLOCK:
-			cb(c.Value)
-		}
-	}
+	self.Hugger.IterateReferencesCallback(nd, cb)
 }
 
 func BytesToNodeData(bd []byte) *ibtree.NodeData {

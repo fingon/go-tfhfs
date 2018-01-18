@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Thu Jan 18 12:15:36 2018 mstenber
- * Edit time:     23 min
+ * Last modified: Thu Jan 18 17:34:10 2018 mstenber
+ * Edit time:     29 min
  *
  */
 
@@ -28,6 +28,7 @@ const (
 )
 
 type MergeCallback func(t *Transaction, src, dst *ibtree.Node, local bool)
+type NodeIterateReferencesCallback func(*ibtree.NodeData, storage.BlockReferenceCallback)
 
 // Hugger, or treehugger, is an abstraction which provides its own
 // transaction mechanism (on top of Tree's own), and atomically
@@ -38,6 +39,11 @@ type MergeCallback func(t *Transaction, src, dst *ibtree.Node, local bool)
 type Hugger struct {
 	RootName string
 	Storage  *storage.Storage
+
+	// IterateReferencesCallback should be provided; it is much
+	// more efficient than fallback on storage's
+	// IterateReferencesCallback as it does unmarshal+marshal
+	IterateReferencesCallback NodeIterateReferencesCallback
 
 	// MergeCallback MUST be provided if
 	// Transaction.CommitUntilSucceeds is used. Otherwise it is
@@ -138,9 +144,7 @@ func (self *Hugger) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 		if nd == nil {
 			log.Panicf("Unable to find node %x", id)
 		}
-		if self.nodeDataCache != nil {
-			self.nodeDataCache.Set(id, nd)
-		}
+		self.SetCachedNodeData(id, nd)
 		return nd
 	}
 	mlog.Printf2("ibtree/hugger/hugger", "fs.LoadNode found %x in cache: %p", id, v)
@@ -169,15 +173,22 @@ func (self *Hugger) Flush() {
 	}
 }
 
-func (self *Hugger) GetCachedNodeData(id string) *ibtree.NodeData {
+func (self *Hugger) GetCachedNodeData(id ibtree.BlockId) (*ibtree.NodeData, bool) {
 	if self.nodeDataCache == nil {
-		return nil
+		return nil, false
 	}
-	v, _ := self.nodeDataCache.GetIFPresent(ibtree.BlockId(id))
-	if v == nil {
-		return nil
+	v, err := self.nodeDataCache.GetIFPresent(id)
+	if err != nil {
+		return nil, false
 	}
-	return v.(*ibtree.NodeData)
+	return v.(*ibtree.NodeData), true
+}
+
+func (self *Hugger) SetCachedNodeData(id ibtree.BlockId, nd *ibtree.NodeData) {
+	if self.nodeDataCache == nil {
+		return
+	}
+	self.nodeDataCache.Set(id, nd)
 }
 
 func (self *Hugger) LoadNodeByName(name string) (*ibtree.Node, string, bool) {

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Wed Jan 17 16:58:36 2018 mstenber
- * Edit time:     14 min
+ * Last modified: Thu Jan 18 17:39:44 2018 mstenber
+ * Edit time:     27 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"log"
 
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util"
 )
 
 type jobType int
@@ -84,6 +85,9 @@ type jobIn struct {
 	// block data
 	data []byte
 
+	// dependencies (if any)
+	deps *util.StringList
+
 	status BlockStatus
 
 	out chan *jobOut
@@ -116,6 +120,7 @@ func (self *Storage) run() {
 		case jobStoreBlock:
 			b := &Block{Id: job.id,
 				storage: self,
+				deps:    job.deps,
 			}
 			//nd := make([]byte, len(job.data))
 			//mlog.Printf2("storage/storagejob", "allocated size:%d", len(job.data))
@@ -175,24 +180,24 @@ func (self *Storage) GetBlockIdByName(name string) string {
 	return jr.id
 }
 
-func (self *Storage) storeBlockInternal(jobType jobType, id string, status BlockStatus, data []byte, count int32) *StorageBlock {
+func (self *Storage) storeBlockInternal(jobType jobType, id string, status BlockStatus, data []byte, deps *util.StringList, count int32) *StorageBlock {
 	if data == nil {
 		mlog.Printf2("storage/storagejob", "no data given")
 	}
 	out := make(chan *jobOut)
 	self.jobChannel <- &jobIn{jobType: jobType, out: out,
-		id: id, data: data, count: count, status: status,
+		id: id, data: data, deps: deps, count: count, status: status,
 	}
 	jr := <-out
 	return jr.sb
 }
 
 func (self *Storage) ReferOrStoreBlock(id string, status BlockStatus, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobReferOrStoreBlock, id, status, data, 1)
+	return self.storeBlockInternal(jobReferOrStoreBlock, id, status, data, nil, 1)
 }
 
-func (self *Storage) ReferOrStoreBlock0(id string, status BlockStatus, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobReferOrStoreBlock, id, status, data, 0)
+func (self *Storage) ReferOrStoreBlock0(id string, status BlockStatus, data []byte, deps *util.StringList) *StorageBlock {
+	return self.storeBlockInternal(jobReferOrStoreBlock, id, status, data, deps, 0)
 }
 
 func (self *Storage) ReferBlockId(id string) {
@@ -228,11 +233,11 @@ func (self *Storage) SetNameToBlockId(name, block_id string) {
 }
 
 func (self *Storage) StoreBlock(id string, status BlockStatus, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobStoreBlock, id, status, data, 1)
+	return self.storeBlockInternal(jobStoreBlock, id, status, data, nil, 1)
 }
 
 func (self *Storage) StoreBlock0(id string, status BlockStatus, data []byte) *StorageBlock {
-	return self.storeBlockInternal(jobStoreBlock, id, status, data, 0)
+	return self.storeBlockInternal(jobStoreBlock, id, status, data, nil, 0)
 }
 
 func (self *Storage) setStorageBlockStatus(sb *StorageBlock, status BlockStatus) bool {

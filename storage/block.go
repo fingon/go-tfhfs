@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Thu Jan 18 16:33:40 2018 mstenber
- * Edit time:     300 min
+ * Last modified: Thu Jan 18 17:59:50 2018 mstenber
+ * Edit time:     312 min
  *
  */
 
@@ -42,6 +42,10 @@ type Block struct {
 	// Stored version of the block metadata, if any. Set only if
 	// something has changed locally. For fresh blocks, is nil.
 	Stored *BlockMetadata
+
+	// dependencies within data; it is set on first access if not
+	// already available.
+	deps *util.StringList
 
 	// Storage this is stored on, if any
 	storage *Storage
@@ -323,7 +327,13 @@ func (self *Block) iterateReferences(cb func(id string)) {
 	if self.storage.IterateReferencesCallback == nil {
 		return
 	}
-	self.storage.IterateReferencesCallback(self.Id, self.GetData(), cb)
+	if self.deps == nil {
+		self.deps = &util.StringList{}
+		self.storage.IterateReferencesCallback(self.Id, self.GetData(), func(id string) {
+			self.deps.PushFront(id)
+		})
+	}
+	self.deps.Iterate(cb)
 }
 
 func (self *Block) shouldHaveStorageDependencies(value bool) bool {

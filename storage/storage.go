@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Jan 18 16:35:44 2018 mstenber
- * Edit time:     620 min
+ * Last modified: Thu Jan 18 17:36:38 2018 mstenber
+ * Edit time:     625 min
  *
  */
 
@@ -14,6 +14,7 @@ package storage
 import (
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util"
 	"github.com/minio/sha256-simd"
 )
 
@@ -230,10 +231,10 @@ func (self *Storage) flush() int {
 	return ops
 }
 
-func (self *Storage) ReferOrStoreBlockBytes0(status BlockStatus, b []byte) *StorageBlock {
+func (self *Storage) ReferOrStoreBlockBytes0(status BlockStatus, b []byte, deps *util.StringList) *StorageBlock {
 	h := sha256.Sum256(b)
 	bid := h[:]
 	id := string(bid)
-	bl := self.ReferOrStoreBlock0(id, status, b)
+	bl := self.ReferOrStoreBlock0(id, status, b, deps)
 	return bl
 }

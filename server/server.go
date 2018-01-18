@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Thu Jan 18 11:13:35 2018 mstenber
- * Edit time:     151 min
+ * Last modified: Thu Jan 18 17:34:29 2018 mstenber
+ * Edit time:     153 min
  *
  */
 
@@ -154,7 +154,7 @@ func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, 
 	}
 	self.Update(func(tr *hugger.Transaction) {
 		st := storage.BlockStatus(req.Block.Status)
-		bl := tr.GetStorageBlock(st, data, nil)
+		bl := tr.GetStorageBlock(st, data, nil, nil)
 		if bl.Id() != bid {
 			err = ErrWrongId
 			return

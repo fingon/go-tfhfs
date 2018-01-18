@@ -8,5 +8,4 @@ coverage.out
 *.prof
 *.test
 /tfhfs
-/tfhfs-darwin
-/tfhfs-linux
+/tfhfs-connector

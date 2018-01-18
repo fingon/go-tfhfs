@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Wed Jan 17 16:34:58 2018 mstenber
- * Edit time:     52 min
+ * Last modified: Thu Jan 18 11:24:18 2018 mstenber
+ * Edit time:     55 min
  *
  */
 
@@ -39,7 +39,7 @@ func main() {
 	memprofile := flag.String("memprofile", "", "Memory profile file")
 	cachesize := flag.Int("cachesize", 10000, "Number of btree nodes to cache (~few k each)")
 	//family := flag.String("family", "tcp", "Address family to use for server")
-	address := flag.String("address", "localhost::12345", "Address to use for server")
+	address := flag.String("address", "", "Address to use for server")
 
 	flag.Parse()
 
@@ -69,21 +69,27 @@ func main() {
 		opts.Debug = true
 	}
 
-	// grpc server
-	rpcServer := (&server.Server{Address: *address, Fs: myfs, Storage: st}).Init()
+	// twirp server
+	var serv *server.Server
+
+	if *address != "" {
+		serv = (&server.Server{Address: *address, Fs: myfs, Storage: st}).Init()
+	}
 
 	// fuse server
-	server, err := fuse.NewServer(&myfs.Ops, mountpoint, opts)
+	fuseServer, err := fuse.NewServer(&myfs.Ops, mountpoint, opts)
 	if err != nil {
 		log.Panic(err)
 	}
 
 	// loop is here
-	server.Serve()
+	fuseServer.Serve()
 
 	// then close things in order (could use defer, but rather get
 	// things cleared before we get out for memory profiling etc)
-	rpcServer.Close()
+	if serv != nil {
+		serv.Close()
+	}
 
 	// myfs will take care of backend clearing as well
 	myfs.Close()

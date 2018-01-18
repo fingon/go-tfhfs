@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Thu Jan 18 10:58:15 2018 mstenber
- * Edit time:     149 min
+ * Last modified: Thu Jan 18 11:13:35 2018 mstenber
+ * Edit time:     151 min
  *
  */
 
@@ -20,6 +20,7 @@ import (
 
 	"github.com/fingon/go-tfhfs/fs"
 	"github.com/fingon/go-tfhfs/ibtree/hugger"
+	"github.com/fingon/go-tfhfs/mlog"
 	. "github.com/fingon/go-tfhfs/pb"
 	"github.com/fingon/go-tfhfs/storage"
 )
@@ -42,6 +43,7 @@ func (self Server) Init() *Server {
 	self.Hugger.Storage = self.Storage
 	(&self.Hugger).Init(0)
 	twirpHandler := NewFsServer(&self, nil)
+	mlog.Printf2("server/server", "Starting server at %s", self.Address)
 	go func() {
 		http.ListenAndServe(self.Address, twirpHandler)
 	}()

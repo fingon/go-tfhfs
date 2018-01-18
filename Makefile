@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Jan 17 16:29:38 2018 mstenber
-# Edit time:     93 min
+# Last modified: Thu Jan 18 11:18:08 2018 mstenber
+# Edit time:     97 min
 #
 #
 
@@ -23,7 +23,7 @@ GENERATED=\
 
 SUBDIRS=codec fs ibtree storage
 
-all: generate test tfhfs
+all: generate test tfhfs tfhfs-connector
 
 bench: .done.buildable
 	go test ./... -bench .
@@ -85,14 +85,11 @@ prof-%: .done.cpuprof.%
 
 test: .done.test
 
-tfhfs: tfhfs.go $(wildcard */*.go)
-	go build -o tfhfs tfhfs.go
+tfhfs: cmd/tfhfs/tfhfs.go $(wildcard */*.go)
+	go build -o ./tfhfs cmd/tfhfs/tfhfs.go
 
-tfhfs-darwin: .done.test tfhfs.go $(wildcard */*.go)
-	GOOS=darwin go build -o tfhfs-darwin tfhfs.go
-
-tfhfs-linux: .done.test tfhfs.go $(wildcard */*.go)
-	GOOS=linux go build -o tfhfs-linux tfhfs.go
+tfhfs-connector: cmd/tfhfs-connector/tfhfs-connector.go $(wildcard */*.go)
+	go build -o ./tfhfs-connector cmd/tfhfs-connector/tfhfs-connector.go
 
 update-deps:
 	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -u . ); done
@@ -138,6 +135,6 @@ update-deps:
 	(cd pb && protoc --go_out=. --twirp_out=. *.proto )
 	touch $@
 
-fstest: tfhfs
+fstest: tfhfs tfhfs-connector
 	./sanitytest.sh d
 	cd /tmp/x && sudo prove -f -o -r ~mstenber/git/fstest/tests && umount /tmp/x

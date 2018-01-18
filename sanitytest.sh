@@ -6,12 +6,14 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Tue Jan  2 15:24:47 2018 mstenber
-# Last modified: Fri Jan 12 12:19:19 2018 mstenber
-# Edit time:     53 min
+# Last modified: Thu Jan 18 11:26:20 2018 mstenber
+# Edit time:     72 min
 #
 
 STORAGEDIR=/tmp/sanity-tfhfs-storage
 MOUNTDIR=/tmp/x
+STORAGEDIR2=/tmp/sanity-tfhfs-storage2
+MOUNTDIR2=/tmp/y
 MLOG=.
 ARGS=${ARGS:-}
 
@@ -24,40 +26,68 @@ out () {
 }
 
 mount2 () {
+    echo "mount2 $*"
+    mountdir=$1
+    shift
+    storagedir=$1
+    shift
     if [ $# == 1 ]; then
         if [ "$1" = "d" ]; then
             # debug
-            MLOG=$MLOG ./tfhfs `echo $ARGS` $MOUNTDIR $STORAGEDIR >& ,log2 &
+            MLOG=$MLOG echocmd ./tfhfs `echo $ARGS` $mountdir $storagedir >& ,log2 &
             # profile
             return
         fi
         if [ "$1" = "p" ]; then
             # profiling
-            ./tfhfs `echo $ARGS` -memprofile mem.prof -cpuprofile cpu.prof $MOUNTDIR $STORAGEDIR >& ,log2 &
+            echocmd ./tfhfs `echo $ARGS` -memprofile mem.prof -cpuprofile cpu.prof $mountdir $storagedir >& ,log2 &
             return
         fi
         if [ "$1" = "r" ]; then
             # race detector
-            go run `echo $ARGS` -race ./tfhfs.go $MOUNTDIR $STORAGEDIR >& ,log2 &
+            echocmd go run `echo $ARGS` -race ./tfhfs.go $mountdir $storagedir >& ,log2 &
             return
         fi
     fi
     # fast
-    ./tfhfs `echo $ARGS` $MOUNTDIR $STORAGEDIR >& ,log2 &
+    echocmd ./tfhfs `echo $ARGS` $mountdir $storagedir >& ,log2 &
+    waitmount $mountdir
+}
+
+echocmd () {
+    echo "# $*" 
+    $*
 }
 
 waitmount () {
-    mount | grep -q $MOUNTDIR && return || (echo "Waiting for mount.."; sleep 1 ; waitmount)
+    mountdir=$1
+
+    mount | grep -q $mountdir && return || (echo "Waiting for mount.."; sleep 1 ; waitmount $mountdir)
 }
 
-make tfhfs
-mount | grep -q $MOUNTDIR && umount $MOUNTDIR || true
-rm -rf $MOUNTDIR
-mkdir -p $MOUNTDIR
-rm -rf $STORAGEDIR
-mkdir -p $STORAGEDIR
-MLOG=$MLOG ./tfhfs `echo $ARGS`  $MOUNTDIR $STORAGEDIR >& ,log &
-waitmount
+mount1 () {
+    echo "mount1 $*"
+    mountdir=$1
+    shift
+    storagedir=$1
+    shift
+    logname=$1
+    shift
+
+    mount | grep -q $mountdir && umount $mountdir || true
+    rm -rf $mountdir
+    mkdir -p $mountdir
+    rm -rf $storagedir
+    mkdir -p $storagedir
+    echocmd ./tfhfs $* `echo $ARGS`  $mountdir $storagedir >& $logname &
+    waitmount $mountdir
+}
+
+make tfhfs tfhfs-connector
+ADDRESS=localhost:12345
+ADDRESS2=localhost:12346
+MLOG=$MLOG mount1 $MOUNTDIR $STORAGEDIR ,log -address $ADDRESS
+MLOG=$MLOG mount1 $MOUNTDIR2 $STORAGEDIR2 ,log1 -address $ADDRESS2
 ORIGDIR=`pwd`
 cd $MOUNTDIR
 mkdir dir
@@ -76,10 +106,16 @@ cp /bin/ls $MOUNTDIR || out "ls cp failed"
 cmp -s /bin/ls $MOUNTDIR/ls || out "copied ls differs"
 ls -l $MOUNTDIR/ls
 cd $ORIGDIR
+
+echocmd ./tfhfs-connector -interval 0s $ADDRESS root s2 $ADDRESS2 root s1  >& ,logc
+[ -f $MOUNTDIR2/ls  ] || out "sync mount: copied ls not present"
+ls -l $MOUNTDIR2/ls
+umount $MOUNTDIR2
+
 umount $MOUNTDIR
 sleep 1
-mount2 $*
-waitmount
+
+mount2 $MOUNTDIR $STORAGEDIR $*
 [ -f $MOUNTDIR/ls  ] || out "second mount: copied ls not present"
 ls -l $MOUNTDIR/ls
 cmp -s /bin/ls $MOUNTDIR/ls || out "second mount:  ls differs"

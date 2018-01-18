@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Jan 18 11:44:26 2018 mstenber
-# Edit time:     99 min
+# Last modified: Thu Jan 18 17:26:06 2018 mstenber
+# Edit time:     101 min
 #
 #
 
@@ -19,6 +19,7 @@ GENERATED=\
 	storage/blockpointerfuture_gen.go \
 	util/byteslicefuture_gen.go \
 	util/byteslicepointer_gen.go \
+	util/stringlist_gen.go \
 	util/maprunnercallbacklist_gen.go
 
 SUBDIRS=codec fs ibtree ibtree/hugger mlog server storage util
@@ -67,6 +68,13 @@ util/byteslicepointer_gen.go: Makefile xxx/pointer.go
 	( echo "package util" ; \
 		egrep -A 9999 '^import' xxx/pointer.go | \
 		sed 's/XXXType/(*[]byte)/g;s/XXX/ByteSlice/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+util/stringlist_gen.go: Makefile xxx/list.go
+	( echo "package util" ; \
+		egrep -A 9999 '^import' xxx/list.go | \
+		sed 's/YYYType/string/g;s/YYY/String/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

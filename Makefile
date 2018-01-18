@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Jan 18 11:18:08 2018 mstenber
-# Edit time:     97 min
+# Last modified: Thu Jan 18 11:44:26 2018 mstenber
+# Edit time:     99 min
 #
 #
 
@@ -21,7 +21,7 @@ GENERATED=\
 	util/byteslicepointer_gen.go \
 	util/maprunnercallbacklist_gen.go
 
-SUBDIRS=codec fs ibtree storage
+SUBDIRS=codec fs ibtree ibtree/hugger mlog server storage util
 
 all: generate test tfhfs tfhfs-connector
 

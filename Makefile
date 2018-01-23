@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Tue Jan 23 13:35:09 2018 mstenber
-# Edit time:     107 min
+# Last modified: Tue Jan 23 16:01:47 2018 mstenber
+# Edit time:     111 min
 #
 #
 
@@ -22,7 +22,9 @@ GENERATED=\
 	util/stringlist_gen.go \
 	util/maprunnercallbacklist_gen.go
 
-SUBDIRS=codec fs ibtree ibtree/hugger mlog server storage util
+SUBDIRS=\
+  codec fs ibtree ibtree/hugger mlog server \
+  storage storage/badger storage/bolt util
 
 all: generate test tfhfs tfhfs-connector
 
@@ -107,7 +109,7 @@ tfhfs-connector: cmd/tfhfs-connector/tfhfs-connector.go $(wildcard */*.go)
 	go build -o ./tfhfs-connector cmd/tfhfs-connector/tfhfs-connector.go
 
 update-deps:
-	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -u . ); done
+	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -t -u . ); done
 	for LINE in `cat go-get-deps.txt`; do go get -u $$LINE; done
 
 .done.cover.%: .done.buildable $(wildcard %/*.go)
@@ -119,12 +121,12 @@ update-deps:
 	(cd $* && go test -cpuprofile=../$@.new)
 	mv $@.new $@
 
-.done.getprebuild: go-get-deps.txt
+.done.getprebuild: Makefile go-get-deps.txt
 	for LINE in `cat go-get-deps.txt`; do go get $$LINE; done
 	touch $@
 
-.done.get2: $(wildcard %/*.go)
-	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get . ); done
+.done.get2: Makefile $(wildcard %/*.go)
+	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -t . ); done
 	touch $@
 
 

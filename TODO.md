@@ -26,6 +26,11 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
   fstest (~50% more LoC); however adding fuse support for it might be big
   task and even default apfs fails some of the cases :p
 
+* figure why dd bugs (EIOs on OS X)
+
+  initially reported this https://github.com/hanwen/go-fuse/issues/201 ;
+  may be osxfuse issue instead
+
 # Pending later TODO #
 
 * add some sort of reasonable caching to Storage, and get rid of gcache;

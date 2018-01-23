@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Jan 18 17:26:06 2018 mstenber
-# Edit time:     101 min
+# Last modified: Tue Jan 23 12:54:01 2018 mstenber
+# Edit time:     106 min
 #
 #
 
@@ -146,3 +146,18 @@ update-deps:
 fstest: tfhfs tfhfs-connector
 	./sanitytest.sh d
 	cd /tmp/x && sudo prove -f -o -r ~mstenber/git/fstest/tests && umount /tmp/x
+
+prep-perf:
+	rm -rf /tmp/perf
+	mkdir -p /tmp/perf/size
+	mkdir -p /tmp/perf/amount
+	cp ~/software/mac/install-highsierra-app.tgz /tmp/perf/size
+	rsync -a ~/share/1/Maildir/.Junk /tmp/perf/amount
+
+perf.md: .done.perf
+	cp .done.perf $@
+
+.done.perf: tfhfs
+	support/perf_fs.py | tee $@.new
+	egrep -q 'Took ' $@.new
+	mv $@.new $@

@@ -9,4 +9,6 @@ coverage.out
 *.test
 /tfhfs
 /tfhfs-connector
+/tfhfs-darwin
+/tfhfs-linux
 __pycache__

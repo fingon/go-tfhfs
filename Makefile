@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Tue Jan 23 12:54:01 2018 mstenber
-# Edit time:     106 min
+# Last modified: Tue Jan 23 13:35:09 2018 mstenber
+# Edit time:     107 min
 #
 #
 
@@ -95,6 +95,13 @@ test: .done.test
 
 tfhfs: cmd/tfhfs/tfhfs.go $(wildcard */*.go)
 	go build -o ./tfhfs cmd/tfhfs/tfhfs.go
+
+
+tfhfs-darwin: .done.test tfhfs
+	GOOS=darwin go build -o tfhfs-darwin cmd/tfhfs/tfhfs.go
+
+tfhfs-linux: .done.test tfhfs
+	GOOS=linux go build -o tfhfs-linux cmd/tfhfs/tfhfs.go
 
 tfhfs-connector: cmd/tfhfs-connector/tfhfs-connector.go $(wildcard */*.go)
 	go build -o ./tfhfs-connector cmd/tfhfs-connector/tfhfs-connector.go

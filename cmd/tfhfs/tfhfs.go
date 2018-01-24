@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Thu Jan 18 11:24:18 2018 mstenber
- * Edit time:     55 min
+ * Last modified: Wed Jan 24 16:41:50 2018 mstenber
+ * Edit time:     61 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"runtime"
 	"runtime/pprof"
 
 	"github.com/fingon/go-tfhfs/fs"
@@ -40,9 +41,14 @@ func main() {
 	cachesize := flag.Int("cachesize", 10000, "Number of btree nodes to cache (~few k each)")
 	//family := flag.String("family", "tcp", "Address family to use for server")
 	address := flag.String("address", "", "Address to use for server")
+	profile := flag.Bool("profile", false, "Whether to enable profiling 'bonus stuff'")
 
 	flag.Parse()
 
+	if *profile {
+		runtime.SetBlockProfileRate(1000)    // microsecond
+		runtime.SetMutexProfileFraction(100) // 1/100 is enough
+	}
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
 		if err != nil {

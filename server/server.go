@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Thu Jan 18 17:34:29 2018 mstenber
- * Edit time:     153 min
+ * Last modified: Wed Jan 24 16:27:55 2018 mstenber
+ * Edit time:     161 min
  *
  */
 
@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/pprof"
 
 	"github.com/fingon/go-tfhfs/fs"
 	"github.com/fingon/go-tfhfs/ibtree/hugger"
@@ -42,10 +43,19 @@ func (self Server) Init() *Server {
 	self.RootName = rootName
 	self.Hugger.Storage = self.Storage
 	(&self.Hugger).Init(0)
+	mux := http.NewServeMux()
 	twirpHandler := NewFsServer(&self, nil)
 	mlog.Printf2("server/server", "Starting server at %s", self.Address)
+	mux.Handle(FsPathPrefix, twirpHandler)
+	// Sigh. I wish there was some 'register to mux' API..
+	mux.Handle("/debug/pprof/", http.HandlerFunc(pprof.Index))
+	mux.Handle("/debug/pprof/cmdline", http.HandlerFunc(pprof.Cmdline))
+	mux.Handle("/debug/pprof/profile", http.HandlerFunc(pprof.Profile))
+	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
+	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
+
 	go func() {
-		http.ListenAndServe(self.Address, twirpHandler)
+		http.ListenAndServe(self.Address, mux)
 	}()
 	// Load the root
 	self.Hugger.RootIsNew()

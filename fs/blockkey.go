@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 00:34:54 2017 mstenber
- * Last modified: Wed Jan 17 12:39:48 2018 mstenber
- * Edit time:     35 min
+ * Last modified: Wed Jan 24 11:49:15 2018 mstenber
+ * Edit time:     36 min
  *
  */
 
@@ -49,6 +49,13 @@ func (self BlockKey) Ino() uint64 {
 
 func (self BlockKey) SubTypeData() string {
 	return string(self[inodeDataLength+1:])
+}
+
+func (self BlockKey) Filename() string {
+	if self.SubType() == BST_DIR_NAME2INODE {
+		return self.SubTypeData()[filenameHashSize:]
+	}
+	return ""
 }
 
 func NewBlockKey(ino uint64, st BlockSubType, data string) BlockKey {

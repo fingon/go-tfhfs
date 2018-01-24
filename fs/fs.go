@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Jan 18 17:49:12 2018 mstenber
- * Edit time:     371 min
+ * Last modified: Wed Jan 24 11:50:09 2018 mstenber
+ * Edit time:     373 min
  *
  */
 
@@ -80,12 +80,13 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 	file := inode.GetFile(uint32(os.O_RDONLY))
 	defer file.Release()
 	for {
-		inode, name := file.ReadNextinode()
+		inode, key := file.ReadNextinode()
 		if inode == nil {
 			return
 		}
 		file.pos++
 		defer inode.Release()
+		name := key.Filename()
 		mlog.Printf2("fs/fs", " %s", name)
 		ret = append(ret, name)
 	}

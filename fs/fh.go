@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Thu Jan 18 17:28:17 2018 mstenber
- * Edit time:     379 min
+ * Last modified: Wed Jan 24 11:53:56 2018 mstenber
+ * Edit time:     401 min
  *
  */
 
@@ -41,7 +41,7 @@ func (self *inodeFH) String() string {
 	return fmt.Sprintf("fh{#%d %v", self.fh, self.inode)
 }
 
-func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
+func (self *inodeFH) ReadNextinode() (inode *inode, nkey BlockKey) {
 	// dentry at lastName (if set) or pos (if not set);
 	// return true if reading was successful (and pos got advanced)
 	tr := self.Fs().GetTransaction()
@@ -54,7 +54,7 @@ func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 			func(key BlockKey) bool {
 				mlog.Printf2("fs/fh", " #%d %v", i, key.SubTypeData()[filenameHashSize:])
 				if i == self.pos {
-					kp = &key
+					nkey = key
 					mlog.Printf2("fs/fh", " found what we looked for")
 					return false
 				}
@@ -66,42 +66,35 @@ func (self *inodeFH) ReadNextinode() (inode *inode, name string) {
 		nkeyp := tr.IB().NextKey(kp.IB())
 		if nkeyp == nil {
 			mlog.Printf2("fs/fh", " next missing")
-			return nil, ""
+			return
 		}
-		nkey := BlockKey(*nkeyp)
-		kp = &nkey
+		nkey = BlockKey(*nkeyp)
 	}
-	if kp == nil {
-		mlog.Printf2("fs/fh", " empty")
-		return nil, ""
+	if nkey == "" || nkey.Ino() != self.inode.ino || nkey.SubType() != BST_DIR_NAME2INODE {
+		mlog.Printf2("fs/fh", " end - %x", nkey)
+		return
 	}
-	if kp.Ino() != self.inode.ino || kp.SubType() != BST_DIR_NAME2INODE {
-		mlog.Printf2("fs/fh", " end - %x", *kp)
-		return nil, ""
-	}
-	inop := tr.IB().Get(kp.IB())
+	inop := tr.IB().Get(nkey.IB())
 	ino := binary.BigEndian.Uint64([]byte(*inop))
-	name = string(kp.SubTypeData()[filenameHashSize:])
-	mlog.Printf2("fs/fh", " got %v %s", ino, name)
 	inode = self.inode.tracker.GetInode(ino)
 	return
 }
 
 func (self *inodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
 	mlog.Printf2("fs/fh", "fh.ReadDirEntry fh:%v inode:%v", self.fh, self.inode.ino)
-	inode, name := self.ReadNextinode()
+	inode, nkey := self.ReadNextinode()
 	defer inode.Release()
 	if inode == nil {
 		mlog.Printf2("fs/fh", " nothing found")
 		return false
 	}
+	name := nkey.Filename()
 	defer inode.Release()
 	meta := inode.Meta()
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
 	ok, _ := l.AddDirEntry(e)
 	if ok {
-		nkey := NewBlockKeyDirFilename(self.inode.ino, name)
-		mlog.Printf2("fs/fh", " #%d %x", self.pos, nkey)
+		mlog.Printf2("fs/fh", " #%d %s", self.pos, name)
 		self.pos++
 		self.lastKey = &nkey
 	} else {
@@ -111,11 +104,12 @@ func (self *inodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
 }
 
 func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool {
-	inode, name := self.ReadNextinode()
+	inode, nkey := self.ReadNextinode()
 	defer inode.Release()
 	if inode == nil {
 		return false
 	}
+	name := nkey.Filename()
 	defer inode.Release()
 	meta := inode.Meta()
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
@@ -129,7 +123,6 @@ func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool 
 
 	// Move on with things
 	self.pos++
-	nkey := NewBlockKeyDirFilename(self.inode.ino, name)
 	self.lastKey = &nkey
 	return true
 }

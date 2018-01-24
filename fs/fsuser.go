@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Thu Jan 11 13:28:21 2018 mstenber
- * Edit time:     213 min
+ * Last modified: Wed Jan 24 13:14:01 2018 mstenber
+ * Edit time:     227 min
  *
  */
 
@@ -139,29 +139,71 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 	if err != nil {
 		return
 	}
+	// Cheat using backdoor API.
+	ret = self.fs.ListDir(eo.Ino)
+
 	var oo fuse.OpenOut
 	err = s2e(self.ops.OpenDir(&fuse.OpenIn{InHeader: self.InHeader}, &oo))
 	if err != nil {
 		return
 	}
-	del := fuse.NewDirEntryList(make([]byte, 1000), 0)
+	ifile := self.fs.GetFileByFh(oo.Fh)
 
-	// Make sure readdir does not blow up
-	err = s2e(self.ops.ReadDir(&fuse.ReadIn{Fh: oo.Fh,
-		InHeader: self.InHeader}, del))
-	if err != nil {
-		return
+	// Make sure readdir does not blow up and pretends to iterate
+	// (greybox due to painful binary semantics involved)
+	lofs := uint64(0)
+	for {
+		del := fuse.NewDirEntryList(make([]byte, 1000), 0)
+		err = s2e(self.ops.ReadDir(&fuse.ReadIn{Fh: oo.Fh,
+			InHeader: self.InHeader, Offset: lofs}, del))
+		if err != nil {
+			return
+		}
+		if lofs < ifile.pos {
+			lofs = ifile.pos
+		} else {
+			if int(lofs) != len(ret) {
+				s := fmt.Sprintf("rd wrong final pos: %v != %v",
+					lofs, len(ret))
+				err = errors.New(s)
+				return
+			}
+			break
+		}
 	}
 
-	// Make sure readdirplus does not blow up
-	err = s2e(self.ops.ReadDirPlus(&fuse.ReadIn{Fh: oo.Fh,
-		InHeader: self.InHeader}, del))
-	if err != nil {
-		return
+	if ifile.readNextInodeBruteForceCount != 1 {
+		log.Panicf("wrong bruteforcecount (!=1): %d",
+			ifile.readNextInodeBruteForceCount)
 	}
+	// Make sure readdirplus does not blow up and pretends to iterate
+	// (greybox due to painful binary semantics involved)
+	lofs = 0
+	for {
+		del := fuse.NewDirEntryList(make([]byte, 1000), 0)
+		err = s2e(self.ops.ReadDirPlus(&fuse.ReadIn{Fh: oo.Fh,
+			InHeader: self.InHeader, Offset: lofs}, del))
+		if err != nil {
+			return
+		}
+		if lofs < ifile.pos {
+			lofs = ifile.pos
+		} else {
+			if int(lofs) != len(ret) {
+				s := fmt.Sprintf("rd+ wrong final pos: %v != %v",
+					lofs, len(ret))
+				err = errors.New(s)
+				return
+			}
+			break
+		}
+	}
+	if ifile.readNextInodeBruteForceCount != 2 {
+		log.Panicf("wrong bruteforcecount (!=2): %d",
+			ifile.readNextInodeBruteForceCount)
+	}
+
 	// We got _something_. No way to make sure it was fine. Oh well.
-	// Cheat using backdoor API.
-	ret = self.fs.ListDir(eo.Ino)
 	self.ops.ReleaseDir(&fuse.ReleaseIn{Fh: oo.Fh, InHeader: self.InHeader})
 	return
 }

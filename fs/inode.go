@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Wed Jan 17 13:18:34 2018 mstenber
- * Edit time:     338 min
+ * Last modified: Wed Jan 24 12:44:00 2018 mstenber
+ * Edit time:     340 min
  *
  */
 
@@ -90,6 +90,9 @@ func unixNanoToFuse(t uint64, seconds *uint64, parts *uint32) {
 
 func (self *inode) addRefCount(refcnt int64) {
 	refcnt = atomic.AddInt64(&self.refcnt, refcnt)
+	if refcnt > 0 {
+		return
+	}
 	if refcnt == 0 {
 		defer self.tracker.inodeLock.Locked()()
 		// was taken by someone
@@ -100,6 +103,10 @@ func (self *inode) addRefCount(refcnt int64) {
 		delete(self.tracker.ino2inode, self.ino)
 
 		// TBD Delete from tree if StNlink == 0
+		return
+	}
+	if refcnt < 0 {
+		log.Panicf("inode refcount below zero")
 	}
 }
 

@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan 24 11:50:09 2018 mstenber
+ * Last modified: Wed Jan 24 13:25:26 2018 mstenber
  * Edit time:     373 min
  *
  */
@@ -85,6 +85,7 @@ func (self *Fs) ListDir(ino uint64) (ret []string) {
 			return
 		}
 		file.pos++
+		file.lastKey = &key
 		defer inode.Release()
 		name := key.Filename()
 		mlog.Printf2("fs/fs", " %s", name)

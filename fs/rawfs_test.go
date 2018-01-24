@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Wed Jan 17 13:19:56 2018 mstenber
- * Edit time:     212 min
+ * Last modified: Wed Jan 24 13:56:25 2018 mstenber
+ * Edit time:     242 min
  *
  */
 
@@ -17,6 +17,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -110,6 +111,37 @@ func ProdFsFile(t *testing.T, u *FSUser) {
 	tn = 3 * dataExtentSize
 	// ProdFsFile1(t, u, tn, 41, 13)
 	ProdFsFile1(t, u, tn, 257, 41)
+}
+
+func ProdFsDir(t *testing.T, u *FSUser) {
+	// Add and remove bunch of files with longer and longer names
+	err := u.Mkdir("/lots", 0777)
+	assert.Nil(t, err)
+	n := 0
+	maxlen := 250
+	lenincr := 1
+	multiplier := 5
+	listdireveryi := 10
+	for i := 1; i <= maxlen; i += lenincr {
+		for j := 0; j < multiplier; j++ {
+			s := fmt.Sprintf("-%d", i)
+			k := strings.Repeat(s, i/len(s)+1)
+			k = fmt.Sprintf("%d%s", j, k)
+			k = k[:i]
+
+			f, err := u.OpenFile(fmt.Sprintf("/lots/%s", k), uint32(os.O_CREATE|os.O_TRUNC|os.O_WRONLY), 0666)
+			assert.Nil(t, err)
+			f.Close()
+			n++
+		}
+
+		if i%listdireveryi == 0 {
+			r, err := u.ListDir("/lots")
+			assert.Nil(t, err)
+			assert.Equal(t, len(r), n)
+
+		}
+	}
 }
 
 // ProdFs exercises filesystem, trying to go for as high coverage as
@@ -331,6 +363,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 	mlog.Printf2("fs/rawfs_test", "ProdFs wait 5")
 	wg.Wait()
 
+	ProdFsDir(t, root)
 	ProdFsFile(t, root)
 }
 
@@ -359,7 +392,7 @@ func TestFs(t *testing.T) {
 				RootName := "toor"
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
-				fs := NewFs(st, RootName, 0)
+				fs := NewFs(st, RootName, 123)
 				defer fs.Close()
 				if gen != nil {
 					fs.generator = gen
@@ -398,7 +431,7 @@ func TestFsParallel(t *testing.T) {
 				RootName := "toor"
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
-				fs := NewFs(st, RootName, 0)
+				fs := NewFs(st, RootName, 123)
 				defer fs.Close()
 
 				randomReaderWriter := func(path string, u *FSUser) {

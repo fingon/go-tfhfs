@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Wed Jan 24 11:53:56 2018 mstenber
- * Edit time:     401 min
+ * Last modified: Wed Jan 24 13:28:29 2018 mstenber
+ * Edit time:     407 min
  *
  */
 
@@ -35,6 +35,9 @@ type inodeFH struct {
 
 	// last key in directory at pos (if any)
 	lastKey *BlockKey
+
+	// statistics for unit tests (these cost some memory but so what)
+	readNextInodeBruteForceCount int
 }
 
 func (self *inodeFH) String() string {
@@ -49,6 +52,7 @@ func (self *inodeFH) ReadNextinode() (inode *inode, nkey BlockKey) {
 	kp := self.lastKey
 	mlog.Printf2("fs/fh", "fh.ReadNextinode %v", kp == nil)
 	if kp == nil {
+		self.readNextInodeBruteForceCount++
 		i := uint64(0)
 		self.inode.IterateSubTypeKeys(BST_DIR_NAME2INODE,
 			func(key BlockKey) bool {
@@ -83,34 +87,32 @@ func (self *inodeFH) ReadNextinode() (inode *inode, nkey BlockKey) {
 func (self *inodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
 	mlog.Printf2("fs/fh", "fh.ReadDirEntry fh:%v inode:%v", self.fh, self.inode.ino)
 	inode, nkey := self.ReadNextinode()
-	defer inode.Release()
 	if inode == nil {
 		mlog.Printf2("fs/fh", " nothing found")
 		return false
 	}
-	name := nkey.Filename()
 	defer inode.Release()
+	name := nkey.Filename()
 	meta := inode.Meta()
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
 	ok, _ := l.AddDirEntry(e)
-	if ok {
-		mlog.Printf2("fs/fh", " #%d %s", self.pos, name)
-		self.pos++
-		self.lastKey = &nkey
-	} else {
+	if !ok {
 		mlog.Printf2("fs/fh", "AddDirEntry failed")
+		return false
 	}
-	return ok
+	mlog.Printf2("fs/fh", " #%d %s", self.pos, name)
+	self.pos++
+	self.lastKey = &nkey
+	return true
 }
 
 func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool {
 	inode, nkey := self.ReadNextinode()
-	defer inode.Release()
 	if inode == nil {
 		return false
 	}
-	name := nkey.Filename()
 	defer inode.Release()
+	name := nkey.Filename()
 	meta := inode.Meta()
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
 	entry, _ := l.AddDirLookupEntry(e)
@@ -118,8 +120,7 @@ func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool 
 		mlog.Printf2("fs/fh", "AddDirLookupEntry failed")
 		return false
 	}
-	*entry = fuse.EntryOut{}
-	self.Ops().Lookup(&input.InHeader, name, entry)
+	inode.FillEntryOut(entry)
 
 	// Move on with things
 	self.pos++

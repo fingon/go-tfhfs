@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Jan 18 18:37:03 2018 mstenber
- * Edit time:     627 min
+ * Last modified: Wed Jan 24 17:11:08 2018 mstenber
+ * Edit time:     633 min
  *
  */
 
@@ -66,6 +66,8 @@ type Storage struct {
 	reads, writes, readbytes, writebytes int
 
 	jobChannel chan *jobIn
+
+	jobCounts map[jobType]int
 }
 
 // Init sets up the default values to be usable
@@ -75,6 +77,7 @@ func (self Storage) Init() *Storage {
 	self.blocks = make(blockMap)
 	self.dirtyBlocks = make(blockObjectMap)
 	self.dirtyStorageRefBlocks = make(blockObjectMap)
+	self.jobCounts = make(map[jobType]int)
 
 	if self.Codec != nil {
 		// No need to care about encoding elsewhere with this
@@ -178,6 +181,17 @@ func (self *Storage) flush() int {
 		len(self.blocks),
 		len(self.dirtyBlocks),
 		self.TransientCount())
+	if mlog.IsEnabled() {
+		total := 0
+		for _, v := range self.jobCounts {
+			total += v
+		}
+		for k, v := range self.jobCounts {
+			if v >= total/20 {
+				mlog.Printf2("storage/storage", " %v %d", k, v)
+			}
+		}
+	}
 	self.reads = 0
 	self.readbytes = 0
 	self.writes = 0

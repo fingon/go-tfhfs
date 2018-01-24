@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Wed Jan 24 13:50:23 2018 mstenber
- * Edit time:     32 min
+ * Last modified: Wed Jan 24 17:09:01 2018 mstenber
+ * Edit time:     44 min
  *
  */
 
@@ -95,6 +95,7 @@ type jobIn struct {
 
 func (self *Storage) run() {
 	for job := range self.jobChannel {
+		self.jobCounts[job.jobType] = self.jobCounts[job.jobType] + 1
 		mlog.Printf2("storage/storagejob", "st.run job %v", job.jobType)
 		switch job.jobType {
 		case jobQuit:

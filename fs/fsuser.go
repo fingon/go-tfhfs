@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Wed Jan 24 13:14:01 2018 mstenber
- * Edit time:     227 min
+ * Last modified: Wed Jan 24 14:08:24 2018 mstenber
+ * Edit time:     231 min
  *
  */
 
@@ -153,7 +153,7 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 	// (greybox due to painful binary semantics involved)
 	lofs := uint64(0)
 	for {
-		del := fuse.NewDirEntryList(make([]byte, 1000), 0)
+		del := fuse.NewDirEntryList(make([]byte, 1000), lofs)
 		err = s2e(self.ops.ReadDir(&fuse.ReadIn{Fh: oo.Fh,
 			InHeader: self.InHeader, Offset: lofs}, del))
 		if err != nil {
@@ -180,7 +180,7 @@ func (self *FSUser) ListDir(name string) (ret []string, err error) {
 	// (greybox due to painful binary semantics involved)
 	lofs = 0
 	for {
-		del := fuse.NewDirEntryList(make([]byte, 1000), 0)
+		del := fuse.NewDirEntryList(make([]byte, 1000), lofs)
 		err = s2e(self.ops.ReadDirPlus(&fuse.ReadIn{Fh: oo.Fh,
 			InHeader: self.InHeader, Offset: lofs}, del))
 		if err != nil {

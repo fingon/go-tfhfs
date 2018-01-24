@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Wed Jan 24 13:28:29 2018 mstenber
- * Edit time:     407 min
+ * Last modified: Wed Jan 24 14:11:04 2018 mstenber
+ * Edit time:     409 min
  *
  */
 
@@ -95,13 +95,13 @@ func (self *inodeFH) ReadDirEntry(l *fuse.DirEntryList) bool {
 	name := nkey.Filename()
 	meta := inode.Meta()
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
-	ok, _ := l.AddDirEntry(e)
+	ok, npos := l.AddDirEntry(e)
 	if !ok {
 		mlog.Printf2("fs/fh", "AddDirEntry failed")
 		return false
 	}
 	mlog.Printf2("fs/fh", " #%d %s", self.pos, name)
-	self.pos++
+	self.pos = npos
 	self.lastKey = &nkey
 	return true
 }
@@ -115,7 +115,7 @@ func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool 
 	name := nkey.Filename()
 	meta := inode.Meta()
 	e := fuse.DirEntry{Mode: meta.StMode, Name: name, Ino: inode.ino}
-	entry, _ := l.AddDirLookupEntry(e)
+	entry, npos := l.AddDirLookupEntry(e)
 	if entry == nil {
 		mlog.Printf2("fs/fh", "AddDirLookupEntry failed")
 		return false
@@ -123,7 +123,7 @@ func (self *inodeFH) ReadDirPlus(input *fuse.ReadIn, l *fuse.DirEntryList) bool 
 	inode.FillEntryOut(entry)
 
 	// Move on with things
-	self.pos++
+	self.pos = npos
 	self.lastKey = &nkey
 	return true
 }

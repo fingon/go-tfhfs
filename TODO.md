@@ -31,6 +31,20 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
   initially reported this https://github.com/hanwen/go-fuse/issues/201 ;
   may be osxfuse issue instead
 
+* figure out the rare race condition(s)
+
+ * sometimes directory torture test in middle has listdir with 0 entries;
+ how?
+
+ * sometimes there is nonexistent block reference under heavy load;
+ related?
+
+* improve performance
+
+ * rewrite so that ReferOrStore is fully async (TBD exact semantics; maybe
+   stick in the block to storageblock, and change it to real block at
+   flush?)
+
 # Pending later TODO #
 
 * add some sort of reasonable caching to Storage, and get rid of gcache;

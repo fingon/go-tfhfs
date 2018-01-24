@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Thu Jan 18 18:10:08 2018 mstenber
- * Edit time:     31 min
+ * Last modified: Wed Jan 24 13:50:23 2018 mstenber
+ * Edit time:     32 min
  *
  */
 
@@ -105,14 +105,14 @@ func (self *Storage) run() {
 			job.out <- nil
 		case jobGetBlockById:
 			b := self.getBlockById(job.id)
-			job.out <- &jobOut{sb: NewStorageBlock(b)}
+			job.out <- &jobOut{sb: newStorageBlock(b)}
 		case jobGetBlockIdByName:
 			job.out <- &jobOut{id: self.getName(job.name).newValue}
 		case jobReferOrStoreBlock:
 			b := self.getBlockById(job.id)
 			if b != nil {
 				b.addRefCount(job.count)
-				job.out <- &jobOut{sb: NewStorageBlock(b)}
+				job.out <- &jobOut{sb: newStorageBlock(b)}
 				continue
 			}
 			mlog.Printf2("storage/storagejob", "fallthrough to storing block")
@@ -130,7 +130,7 @@ func (self *Storage) run() {
 			self.blocks[job.id] = b
 			b.Status = job.status
 			b.addRefCount(job.count)
-			job.out <- &jobOut{sb: NewStorageBlock(b)}
+			job.out <- &jobOut{sb: newStorageBlock(b)}
 		case jobUpdateBlockIdRefCount:
 			b := self.getBlockById(job.id)
 			if b == nil {
@@ -142,7 +142,8 @@ func (self *Storage) run() {
 			if b == nil {
 				log.Panicf("block id %x disappeared", job.id)
 			}
-			b.addExternalStorageRefCount(job.count)
+			// Now handled directly within StorageBlock
+			// b.addExternalStorageRefCount(job.count)
 			b.addStorageRefCount(job.count)
 		case jobSetNameToBlockId:
 			self.setNameToBlockId(job.name, job.id)

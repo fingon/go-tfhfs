@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Thu Jan 18 18:36:18 2018 mstenber
- * Edit time:     315 min
+ * Last modified: Wed Jan 24 13:47:32 2018 mstenber
+ * Edit time:     317 min
  *
  */
 
@@ -14,6 +14,7 @@ package storage
 import (
 	"fmt"
 	"log"
+	"sync/atomic"
 
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/util"
@@ -53,9 +54,12 @@ type Block struct {
 	// In-memory reference count
 	storageRefCount int32
 
-	// In-memory reference count (subset of storageCount that have
-	// come due to serving API (new StorageBlocks) or via
-	// subsequent Open/Close calls of StorageBlocks)
+	// In-memory external reference count (subset of storageCount
+	// that have come due to serving API (new StorageBlocks) or
+	// via subsequent Open/Close calls of StorageBlocks). This is
+	// maintained atomically, and whoever changes it's zero-ness
+	// is responsible for for calling ReferStorageBlockId or
+	// ReleaseStorageBlockId.
 	externalStorageRefCount int32
 
 	// TBD: would flags be better?
@@ -190,12 +194,13 @@ func (self *Block) flushStorageRef() int {
 	return 0
 }
 
-func (self *Block) addExternalStorageRefCount(v int32) {
+func (self *Block) addExternalStorageRefCount(v int32) int32 {
 	mlog.Printf2("storage/block", "%v.addExternalStorageRefCount %v", self, v)
-	self.externalStorageRefCount += v
-	if self.externalStorageRefCount < 0 {
+	nv := atomic.AddInt32(&self.externalStorageRefCount, v)
+	if nv < 0 {
 		log.Panic("Negative reference count", self.externalStorageRefCount)
 	}
+	return nv
 }
 
 func (self *Block) markDirty() {

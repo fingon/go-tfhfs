@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Tue Jan 16 19:18:31 2018 mstenber
- * Edit time:     25 min
+ * Last modified: Wed Jan 24 13:49:19 2018 mstenber
+ * Edit time:     27 min
  *
  */
 
@@ -26,16 +26,17 @@ type StorageBlock struct {
 	closed bool
 }
 
-func NewStorageBlock(b *Block) *StorageBlock {
+func newStorageBlock(b *Block) *StorageBlock {
 	if b == nil {
 		return nil
 	}
 	// These are created only in main goroutine so this is fine;
 	// however, as the objects are passed to clients, see below..
-	b.addStorageRefCount(1)
-	b.addExternalStorageRefCount(1)
+	if b.addExternalStorageRefCount(1) == 1 {
+		b.addStorageRefCount(1)
+	}
 	self := &StorageBlock{block: b}
-	mlog.Printf2("storage/storageblock", "NewStorageBlock:%v", self)
+	mlog.Printf2("storage/storageblock", "newStorageBlock:%v", self)
 	return self
 }
 
@@ -43,9 +44,9 @@ func (self *StorageBlock) Open() *StorageBlock {
 	if self.closed {
 		log.Panic("use after close of ", self)
 	}
+	self.block.addExternalStorageRefCount(1)
 	sb := &StorageBlock{block: self.block}
 	mlog.Printf2("storage/storageblock", "%v.Open => %v", self, sb)
-	self.block.storage.ReferStorageBlockId(self.block.Id)
 	return sb
 }
 
@@ -61,7 +62,11 @@ func (self *StorageBlock) Close() {
 		log.Panic("double close of StorageBlock")
 	}
 	self.closed = true
-	self.block.storage.ReleaseStorageBlockId(self.block.Id)
+	if self.block.addExternalStorageRefCount(-1) == 0 {
+		// We may be in whatever thread -> do final release
+		// through the job mechanism
+		self.block.storage.ReleaseStorageBlockId(self.block.Id)
+	}
 }
 
 func (self *StorageBlock) Id() string {

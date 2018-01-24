@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Tue Jan 23 14:45:39 2018 mstenber
-# Edit time:     87 min
+# Last modified: Wed Jan 24 15:46:21 2018 mstenber
+# Edit time:     88 min
 #
 """This is 'whole'-system benchmark used to gather data for populating
 the 'official' performance figures with.
@@ -73,25 +73,31 @@ if __name__ == '__main__':
             storagedir = '/tmp/sanity-tfhfs-storage'
             m = Mounter(mountpoint, storagedir, clean=True, **opts)
             start_time = time.time()
-            _system(write_cmd)
-            m.close()
-            write_time = time.time() - start_time
-            cnt = units // write_time
-            print()
-            print(f'Took {write_time} seconds')
-            print(f'{cnt} {unit_type}s per second')
-            print()
+            failed = True
+            if m.mounted():
+                _system(write_cmd)
+                if m.mounted():
+                    failed = False
+                    m.close()
+                    write_time = time.time() - start_time
+                    cnt = units // write_time
+                    print()
+                    print(f'Took {write_time} seconds')
+                    print(f'{cnt} {unit_type}s per second')
+                    print()
 
             if opts.get('backend') != 'inmemory':
                 print(f'## Read it back')
                 print(f'Command: {read_cmd}')
                 m = Mounter(mountpoint, storagedir, **opts)
-                start_time = time.time()
-                _system(read_cmd)
-                m.close()
-                read_time = time.time() - start_time
-                cnt = units // read_time
-                print()
-                print(f'Took {read_time} seconds')
-                print(f'{cnt} {unit_type}s per second')
-                print()
+                if m.mounted():
+                    start_time = time.time()
+                    _system(read_cmd)
+                    if m.mounted():
+                        m.close()
+                        read_time = time.time() - start_time
+                        cnt = units // read_time
+                        print()
+                        print(f'Took {read_time} seconds')
+                        print(f'{cnt} {unit_type}s per second')
+                        print()

@@ -7,7 +7,7 @@
 # Copyright (c) 2018 Markus Stenberg
 #
 # Created:       Tue Jan 23 12:36:27 2018 mstenber
-# Last modified: Tue Jan 23 14:54:08 2018 mstenber
+# Last modified: Wed Jan 24 15:47:00 2018 mstenber
 # Edit time:     16 min
 #
 """
@@ -42,6 +42,7 @@ class Mounter:
         if clean:
             if os.path.isdir(storagedir):
                 shutil.rmtree(storagedir)
+                os.mkdir(storagedir)
         args = []
         for k, v in kwargs.items():
             args.extend(['-%s' % k, v])

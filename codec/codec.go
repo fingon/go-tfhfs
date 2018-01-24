@@ -56,11 +56,11 @@ func (self EncryptingCodec) Init(password, salt []byte, iter int) *EncryptingCod
 	self.mk = pbkdf2.Key(password, salt, iter, 32, sha256.New)
 	block, err := aes.NewCipher(self.mk)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	self.gcm = gcm
 	return &self

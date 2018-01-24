@@ -49,7 +49,7 @@ func (self *boltBackend) Init(config storage.BackendConfiguration) {
 	(&self.DirectoryBackendBase).Init(config)
 	db, err := bbolt.Open(fmt.Sprintf("%s/bbolt.db", dir), 0600, nil)
 	if err != nil {
-		log.Fatal("bbolt.Open", err)
+		log.Panic("bbolt.Open", err)
 	}
 	self.db = db
 	err = db.Update(func(tx *bbolt.Tx) error {
@@ -113,7 +113,7 @@ func (self *boltBackend) GetBlockById(id string) *storage.Block {
 	b := &storage.Block{Id: id, Backend: self}
 	_, err := b.BlockMetadata.UnmarshalMsg(bv)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	mlog.Printf2("storage/bolt/bolt", "bbolt.GetBlockById %x", id)
 	return b
@@ -152,7 +152,7 @@ func (self *boltBackend) StoreBlock(b *storage.Block) {
 func (self *boltBackend) updateBlock(b *storage.Block) {
 	buf, err := b.BlockMetadata.MarshalMsg(nil)
 	if err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	bid := []byte(b.Id)
 	self.db.Update(func(tx *bbolt.Tx) error {

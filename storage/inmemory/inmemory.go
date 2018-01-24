@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Wed Jan 10 11:26:57 2018 mstenber
- * Edit time:     73 min
+ * Last modified: Thu Jan 25 00:33:52 2018 mstenber
+ * Edit time:     75 min
  *
  */
 
@@ -55,7 +55,7 @@ func (self *inMemoryBackend) GetBlockData(bl *storage.Block) []byte {
 	defer self.lock.Locked()()
 	b, ok := self.id2Block[bl.Id]
 	if !ok {
-		log.Fatal("Non-existent block id in GetBlockData")
+		log.Panic("Non-existent block id in GetBlockData")
 	}
 	return *b.Data.Get()
 }
@@ -91,7 +91,7 @@ func (self *inMemoryBackend) StoreBlock(b *storage.Block) {
 	defer self.lock.Locked()()
 	_, ok := self.id2Block[b.Id]
 	if ok {
-		log.Fatal("Existing block id in StoreBlock")
+		log.Panic("Existing block id in StoreBlock")
 	}
 	mlog.Printf2("storage/inmemory/inmemory", "im.StoreBlock %x", b.Id)
 	nb := *b
@@ -103,7 +103,7 @@ func (self *inMemoryBackend) UpdateBlock(b *storage.Block) int {
 	defer self.lock.Locked()()
 	_, ok := self.id2Block[b.Id]
 	if !ok {
-		log.Fatal("Non-existent block id in StoreBlock")
+		log.Panic("Non-existent block id in StoreBlock")
 	}
 	mlog.Printf2("storage/inmemory/inmemory", "im.UpdateBlock %x", b.Id)
 	return 1

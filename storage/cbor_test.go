@@ -26,7 +26,7 @@ func BenchmarkCBORDecode(b *testing.B) {
 	enc := codec.NewEncoderBytes(&buf, &bh)
 	md := BlockMetadata{}
 	if err := enc.Encode(md); err != nil {
-		log.Fatal(err)
+		log.Panic(err)
 	}
 	mlog.Printf2("storage/cbor_test", "Encoded length: %d", len(buf))
 	b.ResetTimer()
@@ -34,7 +34,7 @@ func BenchmarkCBORDecode(b *testing.B) {
 		dec := codec.NewDecoderBytes(buf, &bh)
 		var v BlockMetadata
 		if err := dec.Decode(&v); err != nil {
-			log.Fatal(err)
+			log.Panic(err)
 		}
 	}
 }
@@ -47,7 +47,7 @@ func BenchmarkCBOREncode(b *testing.B) {
 		var buf []byte
 		enc := codec.NewEncoderBytes(&buf, &bh)
 		if err := enc.Encode(md); err != nil {
-			log.Fatal(err)
+			log.Panic(err)
 		}
 	}
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Wed Jan 24 16:27:55 2018 mstenber
- * Edit time:     161 min
+ * Last modified: Thu Jan 25 13:34:27 2018 mstenber
+ * Edit time:     162 min
  *
  */
 
@@ -54,7 +54,7 @@ func (self Server) Init() *Server {
 	mux.Handle("/debug/pprof/symbol", http.HandlerFunc(pprof.Symbol))
 	mux.Handle("/debug/pprof/trace", http.HandlerFunc(pprof.Trace))
 
-	go func() {
+	go func() { // ok, singleton per server
 		http.ListenAndServe(self.Address, mux)
 	}()
 	// Load the root

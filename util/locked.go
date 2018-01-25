@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan  4 12:21:40 2018 mstenber
- * Last modified: Tue Jan  9 09:22:31 2018 mstenber
- * Edit time:     29 min
+ * Last modified: Thu Jan 25 13:36:06 2018 mstenber
+ * Edit time:     30 min
  *
  */
 
@@ -133,14 +133,4 @@ func (self *MutexLocked) Do(cb func()) {
 	self.Lock()
 	cb()
 	self.Unlock()
-}
-
-func (self *MutexLocked) Go(cb func()) {
-	self.Lock()
-	self.ClearOwner()
-	go func() {
-		self.UpdateOwner()
-		cb()
-		self.Unlock()
-	}()
 }

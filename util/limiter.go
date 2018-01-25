@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 07:40:22 2018 mstenber
- * Last modified: Wed Jan 17 17:50:26 2018 mstenber
- * Edit time:     13 min
+ * Last modified: Thu Jan 25 13:34:46 2018 mstenber
+ * Edit time:     17 min
  *
  */
 
@@ -72,7 +72,7 @@ func (self *ParallelLimiter) Limited() func() {
 
 func (self *ParallelLimiter) Go(cb func()) {
 	unlock := self.Limited()
-	go func() {
+	go func() { // ok, limited by #LimitTotal
 		defer unlock()
 		cb()
 	}()

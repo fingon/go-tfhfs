@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Tue Jan 23 16:01:47 2018 mstenber
-# Edit time:     111 min
+# Last modified: Thu Jan 25 14:24:01 2018 mstenber
+# Edit time:     113 min
 #
 #
 
@@ -17,6 +17,7 @@ GENERATED=\
 	ibtree/hugger/treerootpointer_gen.go \
 	fs/inodemetapointer_gen.go \
 	storage/blockpointerfuture_gen.go \
+	util/bytesliceatomiclist_gen.go \
 	util/byteslicefuture_gen.go \
 	util/byteslicepointer_gen.go \
 	util/stringlist_gen.go \
@@ -53,6 +54,15 @@ storage/blockpointerfuture_gen.go: Makefile xxx/future.go
 	( echo "package storage" ; \
 		egrep -A 9999 '^import' xxx/future.go | \
 		sed 's/YYYType/*Block/g;s/YYY/BlockPointer/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+
+util/bytesliceatomiclist_gen.go: Makefile xxx/atomiclist.go
+	( echo "package util" ; \
+		egrep -A 9999 '^import' xxx/atomiclist.go | \
+		egrep -v '/util"' | \
+		sed 's/util\.//g;s/XXXType/[]byte/g;s/XXX/ByteSlice/g;s/xxx/byteSlice/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

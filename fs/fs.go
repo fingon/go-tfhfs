@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Jan 24 13:25:26 2018 mstenber
- * Edit time:     373 min
+ * Last modified: Thu Jan 25 14:37:44 2018 mstenber
+ * Edit time:     387 min
  *
  */
 
@@ -46,6 +46,7 @@ type Fs struct {
 	server        *fuse.Server
 	storage       *storage.Storage
 	writeLimiter  util.ParallelLimiter
+	writeBuffers  util.ByteSliceAtomicList
 }
 
 func (self *Fs) Close() {
@@ -124,6 +125,9 @@ func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	fs.flushInterval = 1 * time.Second
 	fs.inodeTracker.Init(fs)
 	fs.writeLimiter.LimitPerCPU = 3 // somewhat IO bound
+	fs.writeBuffers.New = func() []byte {
+		return make([]byte, dataExtentSize+dataHeaderMaximumSize)
+	}
 	st.IterateReferencesCallback = func(id string, data []byte, cb storage.BlockReferenceCallback) {
 		fs.iterateReferencesCallback(id, data, cb)
 	}
@@ -153,6 +157,14 @@ func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	}()
 
 	return fs
+}
+
+func (self *Fs) putWriteBuffer(b []byte) {
+	// Clear it
+	for i := 0; i < len(b); i++ {
+		b[i] = 0
+	}
+	self.writeBuffers.Put(b)
 }
 
 func NewCryptoStorage(password, salt string, backend storage.Backend) *storage.Storage {

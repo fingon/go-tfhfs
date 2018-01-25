@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Thu Jan 25 12:28:55 2018 mstenber
- * Edit time:     438 min
+ * Last modified: Thu Jan 25 15:00:57 2018 mstenber
+ * Edit time:     464 min
  *
  */
 
@@ -294,11 +294,15 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *hugger.Transaction,
 	if meta.StSize <= EmbeddedSize && end <= EmbeddedSize {
 		// in .Data this will live long -> make new copy of
 		// the (small) slice
-		nbuf := bbuf[1:]
+		nbuf := make([]byte, len(bbuf[1:]))
+		copy(nbuf, bbuf[1:])
 		meta.Data = nbuf
 	} else {
 		k := NewBlockKeyOffset(self.inode.ino, offset)
-		bl := tr.GetStorageBlock(storage.BS_NORMAL, bbuf, nil, &util.StringList{})
+
+		nbuf := make([]byte, len(bbuf))
+		copy(nbuf, bbuf)
+		bl := tr.GetStorageBlock(storage.BS_NORMAL, nbuf, nil, &util.StringList{})
 		bid := bl.Id()
 		self.Fs().SetCachedNodeData(ibtree.BlockId(bid), nil)
 		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)
@@ -346,18 +350,14 @@ func (self *inodeFH) write(buf []byte, offset uint64) (written uint32, code fuse
 	}
 
 	done = false
-	need := dataExtentSize + dataHeaderMaximumSize
 	var odata []byte
 	if meta.StSize <= EmbeddedSize && e == 0 {
 		odata = meta.Data
-		if end <= EmbeddedSize {
-			need = EmbeddedSize + 1
-		}
 	}
 
 	// obuf is the master slice to which we gather data, using
 	// wbuf slice which moves gradually onward
-	obuf := make([]byte, need)
+	obuf := self.Fs().writeBuffers.Get()
 	obuf[0] = byte(BDT_EXTENT)
 
 	// wbuf is where we're writing in obuf
@@ -396,6 +396,8 @@ func (self *inodeFH) write(buf []byte, offset uint64) (written uint32, code fuse
 		mlog.Printf2("fs/fh", "%v.Write-2", self)
 		self.inode.metaWriteLock.UpdateOwner()
 		locked.UpdateOwner()
+		// Ensure this gets done last without locks
+		defer self.Fs().putWriteBuffer(obuf)
 		defer unlock()
 		defer tr.Close()
 
@@ -408,10 +410,9 @@ func (self *inodeFH) write(buf []byte, offset uint64) (written uint32, code fuse
 			tr.CommitUntilSucceeds()
 			unlockmeta()
 			return
-		} else {
-			unlockmeta()
-			tr.CommitUntilSucceeds()
 		}
+		unlockmeta()
+		tr.CommitUntilSucceeds()
 
 		// It wasn't small file. Perform write inside transaction, but
 		// do the read + write part ONLY once. The lock we're holding

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Jan 24 17:11:08 2018 mstenber
- * Edit time:     633 min
+ * Last modified: Thu Jan 25 00:56:17 2018 mstenber
+ * Edit time:     643 min
  *
  */
 
@@ -187,7 +187,7 @@ func (self *Storage) flush() int {
 			total += v
 		}
 		for k, v := range self.jobCounts {
-			if v >= total/20 {
+			if v > 0 {
 				mlog.Printf2("storage/storage", " %v %d", k, v)
 			}
 		}

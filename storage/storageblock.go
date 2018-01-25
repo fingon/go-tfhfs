@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Wed Jan 24 13:49:19 2018 mstenber
- * Edit time:     27 min
+ * Last modified: Thu Jan 25 00:43:56 2018 mstenber
+ * Edit time:     35 min
  *
  */
 
@@ -22,20 +22,13 @@ import (
 // world. All provided methods are synchronous, and actually cause
 // changes to be propagated to Storage (eventually) if need be.
 type StorageBlock struct {
-	block  *Block
+	block  *BlockPointerFuture
 	closed bool
+	id     string
 }
 
-func newStorageBlock(b *Block) *StorageBlock {
-	if b == nil {
-		return nil
-	}
-	// These are created only in main goroutine so this is fine;
-	// however, as the objects are passed to clients, see below..
-	if b.addExternalStorageRefCount(1) == 1 {
-		b.addStorageRefCount(1)
-	}
-	self := &StorageBlock{block: b}
+func newStorageBlock(id string) *StorageBlock {
+	self := &StorageBlock{id: id, block: &BlockPointerFuture{}}
 	mlog.Printf2("storage/storageblock", "newStorageBlock:%v", self)
 	return self
 }
@@ -44,8 +37,8 @@ func (self *StorageBlock) Open() *StorageBlock {
 	if self.closed {
 		log.Panic("use after close of ", self)
 	}
-	self.block.addExternalStorageRefCount(1)
-	sb := &StorageBlock{block: self.block}
+	self.block.Get().addExternalStorageRefCount(1)
+	sb := &StorageBlock{id: self.id, block: self.block}
 	mlog.Printf2("storage/storageblock", "%v.Open => %v", self, sb)
 	return sb
 }
@@ -62,10 +55,10 @@ func (self *StorageBlock) Close() {
 		log.Panic("double close of StorageBlock")
 	}
 	self.closed = true
-	if self.block.addExternalStorageRefCount(-1) == 0 {
+	if self.block.Get().addExternalStorageRefCount(-1) == 0 {
 		// We may be in whatever thread -> do final release
 		// through the job mechanism
-		self.block.storage.ReleaseStorageBlockId(self.block.Id)
+		self.block.Get().storage.ReleaseStorageBlockId(self.id)
 	}
 }
 
@@ -73,35 +66,46 @@ func (self *StorageBlock) Id() string {
 	if self.closed {
 		log.Panic("use after close of ", self)
 	}
-	return self.block.Id
+	return self.id
 }
 
 func (self *StorageBlock) IterateReferences(cb func(id string)) {
-	self.block.iterateReferences(cb)
+	self.block.Get().iterateReferences(cb)
 }
 
 func (self *StorageBlock) Data() []byte {
 	if self.closed {
 		log.Panic("use after close  of ", self)
 	}
-	return self.block.GetData()
+	return self.block.Get().GetData()
 }
 
 func (self *StorageBlock) Status() BlockStatus {
 	if self.closed {
 		log.Panic("use after close  of ", self)
 	}
-	return self.block.Status
+	return self.block.Get().Status
 }
 
 func (self *StorageBlock) SetStatus(status BlockStatus) bool {
 	if self.closed {
 		log.Panic("use after close  of ", self)
 	}
-	return self.block.storage.setStorageBlockStatus(self, status)
+	return self.block.Get().storage.setStorageBlockStatus(self, status)
 }
 
 func (self *StorageBlock) String() string {
-	return fmt.Sprintf("SB@%p{%v}", self, self.block)
+	return fmt.Sprintf("SB@%p", self)
+	//return fmt.Sprintf("SB@%p{%v}", self, self.block.Get())
 	// return fmt.Sprintf("SB{%v}", self.block)
+}
+
+func (self *StorageBlock) setBlock(b *Block) {
+	if b != nil {
+		// This is called only within storage goroutine
+		if b.addExternalStorageRefCount(1) == 1 {
+			b.addStorageRefCount(1)
+		}
+	}
+	self.block.Set(b)
 }

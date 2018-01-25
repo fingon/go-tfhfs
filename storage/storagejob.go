@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Wed Jan 24 17:09:01 2018 mstenber
- * Edit time:     44 min
+ * Last modified: Thu Jan 25 00:43:25 2018 mstenber
+ * Edit time:     62 min
  *
  */
 
@@ -105,21 +105,21 @@ func (self *Storage) run() {
 			self.flush()
 			job.out <- nil
 		case jobGetBlockById:
-			b := self.getBlockById(job.id)
-			job.out <- &jobOut{sb: newStorageBlock(b)}
+			b := self.getBlockById(job.sb.id)
+			job.sb.setBlock(b)
 		case jobGetBlockIdByName:
 			job.out <- &jobOut{id: self.getName(job.name).newValue}
 		case jobReferOrStoreBlock:
-			b := self.getBlockById(job.id)
+			b := self.getBlockById(job.sb.id)
 			if b != nil {
 				b.addRefCount(job.count)
-				job.out <- &jobOut{sb: newStorageBlock(b)}
+				job.sb.setBlock(b)
 				continue
 			}
 			mlog.Printf2("storage/storagejob", "fallthrough to storing block")
 			fallthrough
 		case jobStoreBlock:
-			b := &Block{Id: job.id,
+			b := &Block{Id: job.sb.id,
 				storage: self,
 				deps:    job.deps,
 			}
@@ -128,10 +128,10 @@ func (self *Storage) run() {
 			//copy(nd, job.data)
 			//b.Data.Set(&nd)
 			b.Data.Set(&job.data)
-			self.blocks[job.id] = b
+			self.blocks[job.sb.id] = b
 			b.Status = job.status
 			b.addRefCount(job.count)
-			job.out <- &jobOut{sb: newStorageBlock(b)}
+			job.sb.setBlock(b)
 		case jobUpdateBlockIdRefCount:
 			b := self.getBlockById(job.id)
 			if b == nil {
@@ -144,12 +144,11 @@ func (self *Storage) run() {
 				log.Panicf("block id %x disappeared", job.id)
 			}
 			// Now handled directly within StorageBlock
-			// b.addExternalStorageRefCount(job.count)
 			b.addStorageRefCount(job.count)
 		case jobSetNameToBlockId:
 			self.setNameToBlockId(job.name, job.id)
 		case jobSetStorageBlockStatus:
-			jo := &jobOut{ok: job.sb.block.setStatus(job.status)}
+			jo := &jobOut{ok: job.sb.block.Get().setStatus(job.status)}
 			job.out <- jo
 		default:
 			log.Panicf("Unknown job type: %d", job.jobType)
@@ -165,12 +164,15 @@ func (self *Storage) Flush() {
 }
 
 func (self *Storage) GetBlockById(id string) *StorageBlock {
-	out := make(chan *jobOut, 1)
-	self.jobChannel <- &jobIn{jobType: jobGetBlockById, out: out,
-		id: id,
+	sb := newStorageBlock(id)
+	self.jobChannel <- &jobIn{jobType: jobGetBlockById,
+		sb: sb,
 	}
-	jr := <-out
-	return jr.sb
+	b := sb.block.Get()
+	if b == nil {
+		return nil
+	}
+	return sb
 }
 
 func (self *Storage) GetBlockIdByName(name string) string {
@@ -183,15 +185,11 @@ func (self *Storage) GetBlockIdByName(name string) string {
 }
 
 func (self *Storage) storeBlockInternal(jobType jobType, id string, status BlockStatus, data []byte, deps *util.StringList, count int32) *StorageBlock {
-	if data == nil {
-		mlog.Printf2("storage/storagejob", "no data given")
+	sb := newStorageBlock(id)
+	self.jobChannel <- &jobIn{jobType: jobType,
+		sb: sb, data: data, deps: deps, count: count, status: status,
 	}
-	out := make(chan *jobOut, 1)
-	self.jobChannel <- &jobIn{jobType: jobType, out: out,
-		id: id, data: data, deps: deps, count: count, status: status,
-	}
-	jr := <-out
-	return jr.sb
+	return sb
 }
 
 func (self *Storage) ReferOrStoreBlock(id string, status BlockStatus, data []byte) *StorageBlock {

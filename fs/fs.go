@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Jan 25 14:37:44 2018 mstenber
- * Edit time:     387 min
+ * Last modified: Thu Jan 25 15:51:04 2018 mstenber
+ * Edit time:     388 min
  *
  */
 
@@ -157,14 +157,6 @@ func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	}()
 
 	return fs
-}
-
-func (self *Fs) putWriteBuffer(b []byte) {
-	// Clear it
-	for i := 0; i < len(b); i++ {
-		b[i] = 0
-	}
-	self.writeBuffers.Put(b)
 }
 
 func NewCryptoStorage(password, salt string, backend storage.Backend) *storage.Storage {

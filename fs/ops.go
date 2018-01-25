@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Thu Jan 25 12:29:23 2018 mstenber
- * Edit time:     475 min
+ * Last modified: Thu Jan 25 13:10:52 2018 mstenber
+ * Edit time:     478 min
  *
  */
 
@@ -780,13 +780,22 @@ func (self *fsOps) Symlink(input *InHeader, pointedTo string, linkName string, o
 }
 
 func (self *fsOps) Fsync(input *FsyncIn) (code Status) {
-	// TBD
-	return ENOSYS
+	// After this call, everything up to this point has been
+	// committed to disk. Expensive, and potentially time
+	// consuming, but life is.
+	self.fs.WithoutParallelWrites(
+		func() {
+		})
+	// Then, we ensure that the storage has actually flushed
+	// things (this is somewhat expensive, should think if this is
+	// really sane way to handle this)
+	self.fs.storage.Flush()
+	return OK
 }
 
 func (self *fsOps) FsyncDir(input *FsyncIn) (code Status) {
-	// TBD
-	return ENOSYS
+	self.Fsync(nil)
+	return OK
 }
 
 func (self *fsOps) Flush(input *FlushIn) Status {

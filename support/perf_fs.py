@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Wed Jan 24 15:46:21 2018 mstenber
-# Edit time:     88 min
+# Last modified: Thu Jan 25 13:11:37 2018 mstenber
+# Edit time:     93 min
 #
 """This is 'whole'-system benchmark used to gather data for populating
 the 'official' performance figures with.
@@ -59,8 +59,8 @@ if __name__ == '__main__':
     for desc, opts in tests:
         print(f'# {desc}')
         for write_cmd, units, unit_type in [
-                (  # 'dd "if=/tmp/perf/size/install-highsierra-app.tgz" of=/tmp/x/foo.dat bs=1024000',
-                    'rsync /tmp/perf/size/install-highsierra-app.tgz /tmp/x/foo.dat',
+                ('dd "if=/tmp/perf/size/install-highsierra-app.tgz" of=/tmp/x/foo.dat bs=1048576',
+                 # 'rsync /tmp/perf/size/install-highsierra-app.tgz /tmp/x/foo.dat',
                     5078, 'megabyte'),  # 1 file :p
                 ('rsync -a /tmp/perf/amount /tmp/x/',
                  60162, 'file'),  # 1194MB
@@ -72,14 +72,15 @@ if __name__ == '__main__':
             mountpoint = '/tmp/x'
             storagedir = '/tmp/sanity-tfhfs-storage'
             m = Mounter(mountpoint, storagedir, clean=True, **opts)
-            start_time = time.time()
             failed = True
             if m.mounted():
+                start_time = time.time()
                 _system(write_cmd)
+                _system('sync')
                 if m.mounted():
                     failed = False
-                    m.close()
                     write_time = time.time() - start_time
+                    m.close()
                     cnt = units // write_time
                     print()
                     print(f'Took {write_time} seconds')
@@ -94,8 +95,8 @@ if __name__ == '__main__':
                     start_time = time.time()
                     _system(read_cmd)
                     if m.mounted():
-                        m.close()
                         read_time = time.time() - start_time
+                        m.close()
                         cnt = units // read_time
                         print()
                         print(f'Took {read_time} seconds')

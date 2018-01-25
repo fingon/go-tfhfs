@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Wed Jan 24 14:11:04 2018 mstenber
- * Edit time:     409 min
+ * Last modified: Thu Jan 25 12:28:55 2018 mstenber
+ * Edit time:     438 min
  *
  */
 
@@ -152,7 +152,7 @@ func (self *inodeFH) SetPos(pos uint64) {
 	self.lastKey = nil
 }
 
-func (self *inodeFH) read(buf []byte, offset uint64) (rr fuse.ReadResult, code fuse.Status) {
+func (self *inodeFH) read(buf []byte, offset uint64) (r int, code fuse.Status) {
 	mlog.Printf2("fs/fh", "fh.read %v @%v", len(buf), offset)
 	end := offset + uint64(len(buf))
 	meta := self.inode.Meta()
@@ -213,18 +213,40 @@ func (self *inodeFH) read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 
 	if end <= offset {
 		mlog.Printf2("fs/fh", " nothing to read")
-		rr = fuse.ReadResultData(buf[0:0])
+		r = 0
 	} else {
 		mlog.Printf2("fs/fh", " read %v ([%v:%v])", read+zeros, offset, end)
-		rr = fuse.ReadResultData(buf[0 : read+zeros])
+		r = read + zeros
 	}
 	return
 }
 
 func (self *inodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code fuse.Status) {
-	e := offset / dataExtentSize
-	defer self.inode.offsetMap.Locked(e)()
-	return self.read(buf, offset)
+	// ofs == offset in buf, offset == offset in file
+	ofs := 0
+	for ofs < len(buf) {
+		e := offset / dataExtentSize
+		defer self.inode.offsetMap.Locked(e)()
+
+		r, code := self.read(buf[ofs:], offset)
+		if !code.Ok() {
+			return nil, code
+		}
+		if r == 0 {
+			break
+		}
+		offset += uint64(r)
+		ofs += r
+		ne := offset / dataExtentSize
+		// we should hit this only once per extent or bad
+		// things happen with the offsetMap lock (only really
+		// occurs in EOF anyway so it is ok)
+		if e == ne {
+			break
+		}
+	}
+	rr = fuse.ReadResultData(buf[:ofs])
+	return
 
 }
 
@@ -240,7 +262,7 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *hugger.Transaction,
 			if !code.Ok() {
 				return
 			}
-			mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r.Size(), bofs)
+			mlog.Printf2("fs/fh", " read %v bytes to start (wanted %v)", r, bofs)
 		}
 		wbuf = wbuf[bofs:]
 	}
@@ -261,8 +283,7 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *hugger.Transaction,
 		if !code.Ok() {
 			return
 		}
-		tbuf, _ := r.Bytes(nil)
-		wbuf = wbuf[len(tbuf):]
+		wbuf = wbuf[r:]
 	}
 
 	// bbuf is actually what we want to store
@@ -286,8 +307,19 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *hugger.Transaction,
 	}
 
 }
-
 func (self *inodeFH) Write(buf []byte, offset uint64) (written uint32, code fuse.Status) {
+	wwritten := len(buf)
+	for int(written) < wwritten {
+		w, code := self.write(buf[written:], offset+uint64(written))
+		if !code.Ok() {
+			return 0, code
+		}
+		written += w
+	}
+	return
+}
+
+func (self *inodeFH) write(buf []byte, offset uint64) (written uint32, code fuse.Status) {
 	unlockmeta := self.inode.metaWriteLock.Locked()
 	e := offset / dataExtentSize
 	unlock := self.inode.offsetMap.Locked(e)

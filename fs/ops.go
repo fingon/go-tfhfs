@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Wed Jan 17 13:18:51 2018 mstenber
- * Edit time:     458 min
+ * Last modified: Thu Jan 25 12:29:23 2018 mstenber
+ * Edit time:     475 min
  *
  */
 
@@ -714,12 +714,15 @@ func (self *fsOps) Access(input *AccessIn) (code Status) {
 
 func (self *fsOps) Read(input *ReadIn, buf []byte) (ReadResult, Status) {
 	// Check perm?
+	// NOTE: This has to return len(data), less if EOF, or
+	// error. (unlike e.g. C API)
 	file := self.fs.GetFileByFh(input.Fh)
 	return file.Read(buf, input.Offset)
 }
 
 func (self *fsOps) Write(input *WriteIn, data []byte) (written uint32, code Status) {
 	// Check perm?
+	// NOTE: This has to return len(data) or error. (unlike e.g. C API)
 	file := self.fs.GetFileByFh(input.Fh)
 	return file.Write(data, input.Offset)
 }
@@ -776,16 +779,6 @@ func (self *fsOps) Symlink(input *InHeader, pointedTo string, linkName string, o
 	return OK
 }
 
-func (self *fsOps) Flush(input *FlushIn) Status {
-	// TBD
-	return ENOSYS
-}
-
-func (self *fsOps) Flock(input *FlockIn, flags int) Status {
-	// TBD
-	return ENOSYS
-}
-
 func (self *fsOps) Fsync(input *FsyncIn) (code Status) {
 	// TBD
 	return ENOSYS
@@ -796,7 +789,18 @@ func (self *fsOps) FsyncDir(input *FsyncIn) (code Status) {
 	return ENOSYS
 }
 
+func (self *fsOps) Flush(input *FlushIn) Status {
+	// TBD - needed only if we implement locking support someday
+	return ENOSYS
+}
+
+func (self *fsOps) Flock(input *FlockIn, flags int) Status {
+	// TBD - not sure if locking across this is really realistic
+	// as we assume synchronization is going to occur only rarely
+	return ENOSYS
+}
+
 func (self *fsOps) Fallocate(in *FallocateIn) (code Status) {
-	// TBD
+	// TBD - we have rather loose definition of space :p
 	return ENOSYS
 }

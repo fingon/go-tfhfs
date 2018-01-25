@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Wed Jan 24 14:08:24 2018 mstenber
- * Edit time:     231 min
+ * Last modified: Thu Jan 25 12:21:44 2018 mstenber
+ * Edit time:     242 min
  *
  */
 
@@ -25,7 +25,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -572,55 +571,38 @@ func (self *fsFile) Seek(ofs int64, whence int) (ret int64, err error) {
 
 func (self *fsFile) Read(b []byte) (n int, err error) {
 	mlog.Printf2("fs/fsuser", "Read %d bytes @%v", len(b), self.pos)
-	for n < len(b) {
-		ri := fuse.ReadIn{Fh: self.fh,
-			Offset: uint64(self.pos),
-			Size:   uint32(len(b) - n)}
-		r, code := self.u.ops.Read(&ri, b[n:])
-		err = s2e(code)
-		if err != nil {
-			return
-		}
-		rb, _ := r.Bytes(nil)
-		got := len(rb)
-		if got == 0 {
-			mlog.Printf2("fs/fsuser", " nothing was read, abort")
-			break
-		}
-		if len(b[n:]) < got {
-			log.Panicf("Too long read: %v < %v",
-				len(b[n:]), got)
-		}
-		copy(b[n:], rb)
-		n += got
-		self.pos += int64(got)
+	size := uint32(len(b))
+	ri := fuse.ReadIn{Fh: self.fh,
+		Offset: uint64(self.pos),
+		Size:   size}
+	r, code := self.u.ops.Read(&ri, b)
+	err = s2e(code)
+	if err != nil {
+		return
 	}
-	if n == 0 {
-		mlog.Printf2("fs/fsuser", " encountered EOF on first read")
-		err = io.EOF
-	}
+	n = r.Size()
+	self.pos += int64(n)
 	mlog.Printf2("fs/fsuser", " pos now %v", self.pos)
 	return
 }
 
 func (self *fsFile) Write(b []byte) (n int, err error) {
 	mlog.Printf2("fs/fsuser", "%v.Write %d bytes @%v", self, len(b), self.pos)
-	for n < len(b) {
-		wi := fuse.WriteIn{Fh: self.fh,
-			Offset: uint64(self.pos),
-			Size:   uint32(len(b) - n)}
-		n32, code := self.u.ops.Write(&wi, b[n:])
-		if n32 == 0 || !code.Ok() {
-			log.Panic("Write failed: ", n32, " / ", code)
-		}
-		err = s2e(code)
-		if err != nil {
-			return
-		}
-		n += int(n32)
-		self.pos += int64(n32)
-		mlog.Printf2("fs/fsuser", " pos now %v", self.pos)
+	size := uint32(len(b))
+	wi := fuse.WriteIn{Fh: self.fh,
+		Offset: uint64(self.pos),
+		Size:   size}
+	n32, code := self.u.ops.Write(&wi, b[n:])
+	err = s2e(code)
+	if err != nil {
+		return
 	}
+	if n32 != size {
+		log.Panic("Partial write")
+	}
+	self.pos += int64(n32)
+	mlog.Printf2("fs/fsuser", " pos now %v", self.pos)
+	n = len(b)
 	return
 
 }

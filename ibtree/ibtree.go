@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Fri Jan 12 10:20:11 2018 mstenber
- * Edit time:     740 min
+ * Last modified: Tue Jan 30 17:11:19 2018 mstenber
+ * Edit time:     742 min
  *
  */
 
@@ -406,7 +406,7 @@ func (self *Node) nestedNodeCount() int {
 func (self *Node) searchLesser(key IBKey, st *IBStack) {
 	self.search(key, st)
 	c := st.child()
-	if c != nil && c.Key == key {
+	if c == nil || c.Key == key {
 		mlog.Printf2("ibtree/ibtree", "moving to previous leaf from %v", st.indexes)
 		st.goPreviousLeaf()
 	}
@@ -415,7 +415,7 @@ func (self *Node) searchLesser(key IBKey, st *IBStack) {
 func (self *Node) searchGreater(key IBKey, st *IBStack) {
 	self.search(key, st)
 	c := st.child()
-	if c != nil && c.Key == key {
+	if c == nil || c.Key == key {
 		mlog.Printf2("ibtree/ibtree", "moving to next leaf from %v", st.indexes)
 		st.goNextLeaf()
 	}

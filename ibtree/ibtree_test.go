@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Tue Jan  9 20:00:57 2018 mstenber
- * Edit time:     258 min
+ * Last modified: Tue Jan 30 17:05:59 2018 mstenber
+ * Edit time:     274 min
  *
  */
 
@@ -49,8 +49,17 @@ func (self *DummyTree) checkNextKey(t *testing.T, r *Node, n int) {
 		}
 		for _, c := range n.Children {
 			cnt++
+			// Plain 'known next' case
 			nk := r.NextKey(*lk, &IBStack{})
 			assert.Equal(t, *nk, c.Key)
+
+			// Ensure that even in gap between nodes, the
+			// next behaves correctly
+			if lk != &lkv {
+				s := fmt.Sprintf("%s.", string(*lk))
+				nk2 := r.NextKey(IBKey(s), &IBStack{})
+				assert.Equal(t, *nk2, *nk)
+			}
 			lk = nk
 		}
 
@@ -89,11 +98,11 @@ func (self *DummyTree) checkTree(t *testing.T, r *Node, n int) {
 }
 
 func nonpaddedIBKey(n int) IBKey {
-	return IBKey(fmt.Sprintf("nk%d", n))
+	return IBKey(fmt.Sprintf("nk%d.", n))
 }
 
 func paddedIBKey(n int) IBKey {
-	return IBKey(fmt.Sprintf("pk%08d", n))
+	return IBKey(fmt.Sprintf("pk%08d.", n))
 }
 
 func EnsureDelta(t *testing.T, old, new *Node, del, upd, add int) {

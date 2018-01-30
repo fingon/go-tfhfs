@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Wed Jan 24 12:44:00 2018 mstenber
- * Edit time:     340 min
+ * Last modified: Tue Jan 30 10:07:22 2018 mstenber
+ * Edit time:     343 min
  *
  */
 
@@ -17,7 +17,6 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -421,13 +420,12 @@ func (self *randomInodeNumberGenerator) CreateInodeNumber() uint64 {
 }
 
 type inodeTracker struct {
+	fs        *Fs
 	inodeLock util.MutexLocked
 	generator inodeNumberGenerator
 	ino2inode map[uint64]*inode
 	fh2ifile  map[uint64]*inodeFH
-	fs        *Fs
 	nextFh    uint64
-	mu        sync.Mutex
 }
 
 func (self *inodeTracker) Init(fs *Fs) {

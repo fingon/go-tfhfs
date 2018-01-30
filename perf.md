@@ -3,6 +3,9 @@
 **NOTE**: Some results omitted currently as there are bugs that cause
 crashes which give too big numbers. This is just result of one random run. 
 
+All results (including in-memory backend) include deduplication using
+SHA256, and AES256-GCM encryption/decryption.
+
 # In-memory dict
 ## Write 5078 megabytes
 Command: dd "if=/tmp/perf/size/install-highsierra-app.tgz" of=/tmp/x/foo.dat bs=1048576

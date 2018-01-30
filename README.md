@@ -22,6 +22,10 @@ Design is mostly done, I wish I had just few weeks of coding time to
 actually implement this next iteration :) We shall see how long this will
 take. 
 
+![Current components](doc/overview.svg)
+
+[Performance figures](perf.md)
+
 Build
 -----
 

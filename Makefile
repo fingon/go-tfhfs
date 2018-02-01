@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Jan 25 14:24:01 2018 mstenber
-# Edit time:     113 min
+# Last modified: Thu Feb  1 22:19:48 2018 mstenber
+# Edit time:     115 min
 #
 #
 
@@ -17,6 +17,7 @@ GENERATED=\
 	ibtree/hugger/treerootpointer_gen.go \
 	fs/inodemetapointer_gen.go \
 	storage/blockpointerfuture_gen.go \
+	storage/jobtype_string.go \
 	util/bytesliceatomiclist_gen.go \
 	util/byteslicefuture_gen.go \
 	util/byteslicepointer_gen.go \
@@ -35,6 +36,10 @@ bench: .done.buildable
 get: .done.getprebuild
 
 generate: .done.buildable
+
+storage/jobtype_string.go: storage/storagejob.go
+	( cd storage && stringer -type=jobType . )
+
 
 ibtree/hugger/treerootpointer_gen.go: Makefile xxx/pointer.go
 	( echo "package hugger" ; \

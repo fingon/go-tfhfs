@@ -5,6 +5,7 @@ coverage.out
 *.twirp.go
 *_gen.go
 *_gen_test.go
+*_string.go
 *.prof
 *.test
 /tfhfs

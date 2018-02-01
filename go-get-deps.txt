@@ -1,4 +1,5 @@
 golang.org/x/tools/cmd/goimports
+golang.org/x/tools/cmd/stringer
 github.com/glycerine/greenpack
 github.com/golang/protobuf/protoc-gen-go
 github.com/twitchtv/twirp/protoc-gen-twirp

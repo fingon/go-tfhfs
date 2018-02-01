@@ -4,15 +4,14 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Thu Jan 11 08:32:34 2018 mstenber
- * Last modified: Thu Jan 25 00:43:25 2018 mstenber
- * Edit time:     62 min
+ * Last modified: Thu Feb  1 22:20:02 2018 mstenber
+ * Edit time:     65 min
  *
  */
 
 package storage
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/fingon/go-tfhfs/mlog"
@@ -33,33 +32,6 @@ const (
 	jobStoreBlock                   // StoreBlock, StoreBlock0
 	jobQuit
 )
-
-func (self jobType) String() string {
-	switch self {
-	case jobFlush:
-		return "jobFlush"
-	case jobGetBlockById:
-		return "jobGetBlockById"
-	case jobGetBlockIdByName:
-		return "jobGetBlockIdByName"
-	case jobSetStorageBlockStatus:
-		return "jobSetStorageBlockStatus"
-	case jobSetNameToBlockId:
-		return "jobSetNameToBlockId"
-	case jobReferOrStoreBlock:
-		return "jobReferOrStoreBlock"
-	case jobUpdateBlockIdRefCount:
-		return "jobUpdateBlockIdRefCount"
-	case jobUpdateBlockIdStorageRefCount:
-		return "jobUpdateBlockIdStorageRefCount"
-	case jobStoreBlock:
-		return "jobStoreBlock"
-	case jobQuit:
-		return "jobQuit"
-	default:
-		return fmt.Sprintf("%d", int(self))
-	}
-}
 
 type jobOut struct {
 	sb *StorageBlock

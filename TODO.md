@@ -28,17 +28,18 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
 
 * figure out the rare race condition(s)
 
- * sometimes directory torture test in middle has listdir with 0 entries;
- how?
-
  * sometimes there is nonexistent block reference under heavy load;
- related?
+ related? (or already fixed alongside the dir handling bug?)
 
 * improve performance
 
  * rewrite so that ReferOrStore is fully async (TBD exact semantics; maybe
    stick in the block to storageblock, and change it to real block at
    flush?)
+
+ * make hugger actually commit to storage only on flush; that way,
+   especially the root part of the tree will get written just once and not
+   # transactions times (including all the pain with sha256 etc)
 
 # Pending later TODO #
 

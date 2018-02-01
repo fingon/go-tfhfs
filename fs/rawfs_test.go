@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Wed Jan 24 13:56:25 2018 mstenber
- * Edit time:     242 min
+ * Last modified: Thu Feb  1 17:04:03 2018 mstenber
+ * Edit time:     243 min
  *
  */
 
@@ -393,7 +393,7 @@ func TestFs(t *testing.T) {
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
 				fs := NewFs(st, RootName, 123)
-				defer fs.Close()
+				defer fs.closeWithoutTransactions()
 				if gen != nil {
 					fs.generator = gen
 
@@ -432,7 +432,7 @@ func TestFsParallel(t *testing.T) {
 				backend := factory.New("inmemory", "")
 				st := storage.Storage{Backend: backend}.Init()
 				fs := NewFs(st, RootName, 123)
-				defer fs.Close()
+				defer fs.closeWithoutTransactions()
 
 				randomReaderWriter := func(path string, u *FSUser) {
 					f, err := u.OpenFile(path, uint32(os.O_CREATE|os.O_TRUNC|os.O_WRONLY), 0777)

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Thu Jan 18 17:34:10 2018 mstenber
- * Edit time:     29 min
+ * Last modified: Thu Feb  1 17:46:44 2018 mstenber
+ * Edit time:     54 min
  *
  */
 
@@ -13,6 +13,7 @@ package hugger
 
 import (
 	"log"
+	"sync"
 
 	"github.com/bluele/gcache"
 	"github.com/fingon/go-tfhfs/ibtree"
@@ -62,6 +63,12 @@ type Hugger struct {
 	// lock protects transactions and roots
 	lock util.MutexLocked
 
+	// when flushing, new transactions will stall and wait for
+	// Cond
+	flushing bool
+
+	flushed, transactionClosed sync.Cond
+
 	// transactions is the map of active transactions
 	transactions map[*Transaction]bool
 
@@ -75,6 +82,8 @@ func (self *Hugger) Init(cacheSize int) *Hugger {
 	self.tree = ibtree.Tree{NodeMaximumSize: 4096}.Init(self)
 	self.transactions = make(map[*Transaction]bool)
 	self.oldRoots = make(map[*storage.StorageBlock]bool)
+	self.flushed.L = &self.lock
+	self.transactionClosed.L = &self.lock
 	if cacheSize > 0 {
 		self.nodeDataCache = gcache.New(cacheSize).
 			ARC().
@@ -85,7 +94,7 @@ func (self *Hugger) Init(cacheSize int) *Hugger {
 
 func (self *Hugger) GetTransaction() *Transaction {
 	// mlog.Printf2("ibtree/hugger/hugger", "GetTransaction of %p", self.treeRoot)
-	return newTransaction(self)
+	return newTransaction(self, false)
 }
 
 // Update2 (repeatedly) calls cb until it manages to update the global
@@ -159,18 +168,20 @@ func (self *Hugger) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 
 func (self *Hugger) Flush() {
 	defer self.lock.Locked()()
-	if len(self.transactions) > 0 {
-		mlog.Printf2("ibtree/hugger/hugger", " # of transactions active:%d", len(self.transactions))
-	} else {
-		nroots := len(self.oldRoots)
-		if nroots > 0 {
-			for b, _ := range self.oldRoots {
-				b.Close()
-			}
-			self.oldRoots = make(map[*storage.StorageBlock]bool)
-			mlog.Printf2("ibtree/hugger/hugger", " cleared %d roots", nroots)
-		}
+	self.flushing = true
+	for len(self.transactions) > 0 {
+		self.transactionClosed.Wait()
 	}
+	nroots := len(self.oldRoots)
+	if nroots > 0 {
+		for b, _ := range self.oldRoots {
+			b.Close()
+		}
+		self.oldRoots = make(map[*storage.StorageBlock]bool)
+		mlog.Printf2("ibtree/hugger/hugger", " cleared %d roots", nroots)
+	}
+	self.flushing = false
+	self.flushed.Broadcast()
 }
 
 func (self *Hugger) GetCachedNodeData(id ibtree.BlockId) (*ibtree.NodeData, bool) {
@@ -219,6 +230,27 @@ func (self *Hugger) RootIsNew() bool {
 
 func (self *Hugger) NewRootNode() *ibtree.Node {
 	return self.tree.NewRoot()
+}
+
+func (self *Hugger) closedTransaction(tr *Transaction) {
+	defer self.lock.Locked()()
+
+	// -1 ref when transaction expires (old root)
+	if tr.rootBlock != nil {
+		self.oldRoots[tr.rootBlock] = true
+	}
+	delete(self.transactions, tr)
+	if self.flushing {
+		self.transactionClosed.Signal()
+	}
+
+}
+
+func (self *Hugger) AssertNoTransactions() {
+	defer self.lock.Locked()()
+	if len(self.transactions) > 0 {
+		log.Panicf("%d transactions left when assertion says none", len(self.transactions))
+	}
 }
 
 func BytesToNodeData(bd []byte) *ibtree.NodeData {

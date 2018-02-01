@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Jan 25 15:51:04 2018 mstenber
- * Edit time:     388 min
+ * Last modified: Thu Feb  1 17:03:30 2018 mstenber
+ * Edit time:     390 min
  *
  */
 
@@ -203,4 +203,9 @@ func BytesToNodeData(bd []byte) *ibtree.NodeData {
 // persist it eventually).
 func (self *Fs) WithoutParallelWrites(cb func()) {
 	self.writeLimiter.Exclusive(cb)
+}
+
+func (self *Fs) closeWithoutTransactions() {
+	self.AssertNoTransactions()
+	self.Close()
 }

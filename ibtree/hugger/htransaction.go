@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Thu Jan 18 17:35:20 2018 mstenber
- * Edit time:     210 min
+ * Last modified: Thu Feb  1 17:47:03 2018 mstenber
+ * Edit time:     225 min
  *
  */
 
@@ -40,8 +40,11 @@ type Transaction struct {
 	closed    bool
 }
 
-func newTransaction(h *Hugger) *Transaction {
+func newTransaction(h *Hugger, force bool) *Transaction {
 	defer h.lock.Locked()()
+	for !force && h.flushing {
+		h.flushed.Wait()
+	}
 	root := h.root.Get()
 	var rootBlock *storage.StorageBlock
 	// +1 ref when transaction starts
@@ -129,7 +132,7 @@ func (self *Transaction) commit(retryUntilSucceeds, recursed bool) bool {
 		}
 
 		mlog.Printf2("ibtree/hugger/htransaction", " root has changed under us; doing delta")
-		tr := newTransaction(self.hugger)
+		tr := newTransaction(self.hugger, true)
 		defer tr.Close()
 		self.hugger.MergeCallback(tr, self.root.node, node, true)
 		mlog.Printf2("ibtree/hugger/htransaction", " delta done")
@@ -172,13 +175,7 @@ func (self *Transaction) Close() {
 		v.Close()
 	}
 
-	defer self.hugger.lock.Locked()()
-
-	// -1 ref when transaction expires (old root)
-	if self.rootBlock != nil {
-		self.hugger.oldRoots[self.rootBlock] = true
-	}
-	delete(self.hugger.transactions, self)
+	self.hugger.closedTransaction(self)
 }
 
 // getStorageBlock block ids for given bytes/data.

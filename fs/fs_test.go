@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Wed Jan 17 13:19:33 2018 mstenber
- * Edit time:     34 min
+ * Last modified: Thu Feb  1 17:48:15 2018 mstenber
+ * Edit time:     39 min
  *
  */
 
@@ -41,7 +41,7 @@ func TestTransaction(t *testing.T) {
 	backend := factory.New("inmemory", "")
 	st := storage.Storage{Backend: backend}.Init()
 	fs := NewFs(st, RootName, 0)
-	defer fs.Close()
+	defer fs.closeWithoutTransactions()
 
 	st.IterateReferencesCallback = nil
 
@@ -63,6 +63,7 @@ func TestTransaction(t *testing.T) {
 	tr1 = fs.GetTransaction()
 	tr2 = fs.GetTransaction()
 	tr3 = fs.GetTransaction()
+	defer tr3.Close()
 	assert.Equal(t, *tr1.IB().Get("foo1"), "v1")
 	assert.Equal(t, *tr1.IB().Get("foo2"), "v2")
 	assert.Equal(t, *tr1.IB().Get("foo3"), "v3")
@@ -77,6 +78,7 @@ func TestTransaction(t *testing.T) {
 
 	// Most recent write wins in this case -> should have what tr2 did
 	tr1 = fs.GetTransaction()
+	defer tr1.Close()
 	assert.Nil(t, tr1.IB().Get("foo1"))
 	assert.Equal(t, *tr1.IB().Get("foo2"), "v21")
 }
@@ -91,7 +93,7 @@ func BenchmarkBadgerFs(b *testing.B) {
 	backend := factory.New(bename, dir)
 	st := NewCryptoStorage("assword", "alt", backend)
 	fs := NewFs(st, "toor", 0)
-	defer fs.Close()
+	defer fs.closeWithoutTransactions()
 
 	tr := fs.GetTransaction()
 	for i := 0; i < n; i++ {

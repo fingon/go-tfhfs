@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Thu Jan 25 13:34:27 2018 mstenber
- * Edit time:     162 min
+ * Last modified: Tue Feb 13 12:42:42 2018 mstenber
+ * Edit time:     172 min
  *
  */
 
@@ -67,6 +67,7 @@ func (self *Server) Close() {
 }
 
 func (self *Server) ClearBlocksInName(ctx context.Context, n *BlockName) (*ClearResult, error) {
+	mlog.Printf2("server/server", "s.ClearBlocksInName %s", n.Name)
 	self.Update(func(tr *hugger.Transaction) {
 		k1 := fs.NewBlockKeyNameBlock(n.Name, "").IB()
 		k2 := fs.NewBlockKeyNameEnd(n.Name).IB()
@@ -76,6 +77,7 @@ func (self *Server) ClearBlocksInName(ctx context.Context, n *BlockName) (*Clear
 }
 
 func (self *Server) GetBlockIdByName(ctx context.Context, name *BlockName) (*BlockId, error) {
+	mlog.Printf2("server/server", "s.GetBlockIdByName %s", name.Name)
 	if name.Name == self.Fs.RootName {
 		var bid string
 		self.Fs.WithoutParallelWrites(
@@ -83,6 +85,7 @@ func (self *Server) GetBlockIdByName(ctx context.Context, name *BlockName) (*Blo
 				block := self.Fs.RootBlock()
 				if block != nil {
 					bid = block.Id()
+					defer block.Close()
 				}
 			})
 		if bid != "" {
@@ -128,11 +131,13 @@ func (self *Server) getBlock(id string, wantData, wantMissing bool) (*Block, err
 }
 
 func (self *Server) GetBlockById(ctx context.Context, req *GetBlockRequest) (*Block, error) {
+	mlog.Printf2("server/server", "s.GetBlockById %x", req.Id)
 	return self.getBlock(req.Id, req.WantData, req.WantMissing)
 }
 
 func (self *Server) MergeBlockNameTo(ctx context.Context, req *MergeRequest) (*MergeResult, error) {
 	n0 := fmt.Sprintf("%s.%s", req.FromName, req.ToName)
+	mlog.Printf2("server/server", "s.MergeBlockNameTo %s => %s", n0, req.FromName)
 	b0, _, _ := self.Fs.LoadNodeByName(n0)
 	b, _, ok := self.Fs.LoadNodeByName(req.FromName)
 	if !ok {
@@ -145,11 +150,13 @@ func (self *Server) MergeBlockNameTo(ctx context.Context, req *MergeRequest) (*M
 		fs.MergeTo3(tr, b0, b, false)
 	})
 	block := self.Fs.RootBlock()
+	defer block.Close()
 	self.Storage.SetNameToBlockId(n0, block.Id())
 	return &MergeResult{Ok: true}, nil
 }
 
 func (self *Server) SetNameToBlockId(ctx context.Context, req *SetNameRequest) (*SetNameResult, error) {
+	mlog.Printf2("server/server", "s.SetNameToBlockId %s => %x", req.Name, req.Id)
 	res := &SetNameResult{Ok: true}
 	self.Storage.SetNameToBlockId(req.Name, req.Id)
 	return res, nil
@@ -157,6 +164,7 @@ func (self *Server) SetNameToBlockId(ctx context.Context, req *SetNameRequest) (
 
 func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, error) {
 	bid := req.Block.Id
+	mlog.Printf2("server/server", "s.StoreBlock %x", bid)
 	encodedData := []byte(req.Block.Data)
 	data, err := self.Storage.Codec.DecodeBytes(encodedData, []byte(bid))
 	if err != nil {
@@ -164,7 +172,7 @@ func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, 
 	}
 	self.Update(func(tr *hugger.Transaction) {
 		st := storage.BlockStatus(req.Block.Status)
-		bl := tr.GetStorageBlock(st, data, nil, nil)
+		bl := self.GetStorageBlock(st, data, nil, nil)
 		if bl.Id() != bid {
 			err = ErrWrongId
 			return

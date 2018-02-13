@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Jan 30 10:07:22 2018 mstenber
- * Edit time:     343 min
+ * Last modified: Tue Feb  6 17:31:14 2018 mstenber
+ * Edit time:     348 min
  *
  */
 
@@ -164,7 +164,7 @@ func (self *inode) FillEntryOut(out *fuse.EntryOut) fuse.Status {
 func (self *inode) GetChildByName(name string) *inode {
 	mlog.Printf2("fs/inode", "GetChildByName %s", name)
 	k := NewBlockKeyDirFilename(self.ino, name)
-	tr := self.Fs().GetTransaction()
+	tr := self.Fs().GetNestableTransaction()
 	defer tr.Close()
 	v := tr.IB().Get(k.IB())
 	if v == nil {
@@ -187,7 +187,7 @@ func (self *inode) GetFile(flags uint32) *inodeFH {
 func (self *inode) GetXAttr(attr string) (data []byte, code fuse.Status) {
 	defer self.offsetMap.Locked(-1)()
 	k := NewBlockKey(self.ino, BST_XATTR, attr)
-	tr := self.Fs().GetTransaction()
+	tr := self.Fs().GetNestableTransaction()
 	defer tr.Close()
 	v := tr.IB().Get(k.IB())
 	if v == nil {
@@ -219,7 +219,7 @@ func IterateInoSubTypeKeys(t *ibtree.Transaction, ino uint64, bst BlockSubType, 
 }
 
 func (self *inode) IterateSubTypeKeys(bst BlockSubType, keycb func(key BlockKey) bool) {
-	tr := self.Fs().GetTransaction()
+	tr := self.Fs().GetNestableTransaction()
 	defer tr.Close()
 	IterateInoSubTypeKeys(tr.IB(), self.ino, bst, keycb)
 }
@@ -330,7 +330,7 @@ func decodeInodeMeta(v string) *InodeMeta {
 func (self *inode) getMeta() *InodeMeta {
 	mlog.Printf2("fs/inode", "inode.Meta #%d", self.ino)
 	k := NewBlockKey(self.ino, BST_META, "")
-	tr := self.Fs().GetTransaction()
+	tr := self.Fs().GetNestableTransaction()
 	defer tr.Close()
 	v := tr.IB().Get(k.IB())
 	if v == nil {

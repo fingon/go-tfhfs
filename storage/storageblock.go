@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:54:18 2018 mstenber
- * Last modified: Thu Jan 25 00:43:56 2018 mstenber
- * Edit time:     35 min
+ * Last modified: Thu Feb  1 19:34:41 2018 mstenber
+ * Edit time:     44 min
  *
  */
 
@@ -14,6 +14,7 @@ package storage
 import (
 	"fmt"
 	"log"
+	"runtime"
 
 	"github.com/fingon/go-tfhfs/mlog"
 )
@@ -24,6 +25,7 @@ import (
 type StorageBlock struct {
 	block  *BlockPointerFuture
 	closed bool
+	closer []byte
 	id     string
 }
 
@@ -33,10 +35,19 @@ func newStorageBlock(id string) *StorageBlock {
 	return self
 }
 
-func (self *StorageBlock) Open() *StorageBlock {
-	if self.closed {
-		log.Panic("use after close of ", self)
+func (self *StorageBlock) assertNotClosed(what string) {
+	if !self.closed {
+		return
 	}
+	if self.closer != nil {
+		log.Panic(what, " - closed at: ", string(self.closer))
+	} else {
+		log.Panic(what, " - close already")
+	}
+}
+
+func (self *StorageBlock) Open() *StorageBlock {
+	self.assertNotClosed("Open")
 	self.block.Get().addExternalStorageRefCount(1)
 	sb := &StorageBlock{id: self.id, block: self.block}
 	mlog.Printf2("storage/storageblock", "%v.Open => %v", self, sb)
@@ -51,10 +62,12 @@ func (self *StorageBlock) Close() {
 	// self.block.addStorageRefCount(-1)
 
 	mlog.Printf2("storage/storageblock", "%v.Close", self)
-	if self.closed {
-		log.Panic("double close of StorageBlock")
-	}
+	self.assertNotClosed("Close")
 	self.closed = true
+	if mlog.IsEnabled() {
+		self.closer = make([]byte, 1024)
+		self.closer = self.closer[:runtime.Stack(self.closer, false)]
+	}
 	if self.block.Get().addExternalStorageRefCount(-1) == 0 {
 		// We may be in whatever thread -> do final release
 		// through the job mechanism

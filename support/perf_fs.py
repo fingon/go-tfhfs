@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Thu Jan 25 13:11:37 2018 mstenber
+# Last modified: Tue Feb 13 12:59:49 2018 mstenber
 # Edit time:     93 min
 #
 """This is 'whole'-system benchmark used to gather data for populating
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     tests = [
         ('In-memory dict', dict(backend='inmemory')),
         ('Badger', dict()),
-        ('Bolt', dict(backend='bolt')),
+        #  ('Bolt', dict(backend='bolt')), # Too slow, not interesting
         ('File', dict(backend='file')),
     ]
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
                     failed = False
                     write_time = time.time() - start_time
                     m.close()
-                    cnt = units // write_time
+                    cnt = int(units // write_time)
                     print()
                     print(f'Took {write_time} seconds')
                     print(f'{cnt} {unit_type}s per second')

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Thu Jan 25 15:51:40 2018 mstenber
- * Edit time:     466 min
+ * Last modified: Tue Feb  6 17:40:27 2018 mstenber
+ * Edit time:     470 min
  *
  */
 
@@ -47,7 +47,7 @@ func (self *inodeFH) String() string {
 func (self *inodeFH) ReadNextinode() (inode *inode, nkey BlockKey) {
 	// dentry at lastName (if set) or pos (if not set);
 	// return true if reading was successful (and pos got advanced)
-	tr := self.Fs().GetTransaction()
+	tr := self.Fs().GetNestableTransaction()
 	defer tr.Close()
 	kp := self.lastKey
 	mlog.Printf2("fs/fh", "fh.ReadNextinode %v", kp == nil)
@@ -152,7 +152,7 @@ func (self *inodeFH) SetPos(pos uint64) {
 	self.lastKey = nil
 }
 
-func (self *inodeFH) read(buf []byte, offset uint64) (r int, code fuse.Status) {
+func (self *inodeFH) readInTransaction(tr *hugger.Transaction, buf []byte, offset uint64) (r int, code fuse.Status) {
 	mlog.Printf2("fs/fh", "fh.read %v @%v", len(buf), offset)
 	end := offset + uint64(len(buf))
 	meta := self.inode.Meta()
@@ -173,8 +173,6 @@ func (self *inodeFH) read(buf []byte, offset uint64) (r int, code fuse.Status) {
 		if end > dataExtentSize {
 			end = dataExtentSize
 		}
-		tr := self.Fs().GetTransaction()
-		defer tr.Close()
 		bidp := tr.IB().Get(k.IB())
 		if bidp == nil {
 			mlog.Printf2("fs/fh", "Key %x not found at all", k)
@@ -228,7 +226,10 @@ func (self *inodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 		e := offset / dataExtentSize
 		defer self.inode.offsetMap.Locked(e)()
 
-		r, code := self.read(buf[ofs:], offset)
+		tr := self.Fs().GetTransaction()
+		defer tr.Close()
+
+		r, code := self.readInTransaction(tr, buf[ofs:], offset)
 		if !code.Ok() {
 			return nil, code
 		}
@@ -262,7 +263,7 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *hugger.Transaction,
 			}
 			copy(wbuf, odata)
 		} else {
-			r, code := self.read(wbuf[:bofs], offset)
+			r, code := self.readInTransaction(tr, wbuf[:bofs], offset)
 			if !code.Ok() {
 				return
 			}
@@ -283,7 +284,7 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *hugger.Transaction,
 	}
 	if blockend > end {
 		extra := blockend - end
-		r, code := self.read(wbuf[:extra], end)
+		r, code := self.readInTransaction(tr, wbuf[:extra], end)
 		if !code.Ok() {
 			return
 		}
@@ -306,7 +307,7 @@ func (self *inodeFH) writeInTransaction(meta *InodeMeta, tr *hugger.Transaction,
 
 		nbuf := make([]byte, len(bbuf))
 		copy(nbuf, bbuf)
-		bl := tr.GetStorageBlock(storage.BS_NORMAL, nbuf, nil, &util.StringList{})
+		bl := self.Fs().GetStorageBlock(storage.BS_NORMAL, nbuf, nil, &util.StringList{})
 		bid := bl.Id()
 		self.Fs().SetCachedNodeData(ibtree.BlockId(bid), nil)
 		mlog.Printf2("fs/fh", " %x = %d bytes, bid %x", k, len(bbuf), bid)

@@ -4,14 +4,15 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Thu Feb  1 17:46:44 2018 mstenber
- * Edit time:     54 min
+ * Last modified: Tue Feb 13 12:42:17 2018 mstenber
+ * Edit time:     140 min
  *
  */
 
 package hugger
 
 import (
+	"fmt"
 	"log"
 	"sync"
 
@@ -53,7 +54,7 @@ type Hugger struct {
 	MergeCallback MergeCallback
 
 	tree          *ibtree.Tree
-	root          treeRootAtomicPointer
+	root, oldRoot treeRootAtomicPointer
 	nodeDataCache gcache.Cache
 
 	// transactionRetryLock ensures there is only one active
@@ -72,16 +73,19 @@ type Hugger struct {
 	// transactions is the map of active transactions
 	transactions map[*Transaction]bool
 
-	// roots is the map of potentially active root blocks (we
-	// clear them only at flush time, if there are zero active
-	// transactions)
-	oldRoots map[*storage.StorageBlock]bool
+	blocks    map[string]*storage.StorageBlock // map of allocations
+	blockLock util.MutexLocked                 // covers blocks
+
+}
+
+func (self *Hugger) String() string {
+	return fmt.Sprintf("H{rn:%s}", self.RootName)
 }
 
 func (self *Hugger) Init(cacheSize int) *Hugger {
 	self.tree = ibtree.Tree{NodeMaximumSize: 4096}.Init(self)
+	self.blocks = make(map[string]*storage.StorageBlock)
 	self.transactions = make(map[*Transaction]bool)
-	self.oldRoots = make(map[*storage.StorageBlock]bool)
 	self.flushed.L = &self.lock
 	self.transactionClosed.L = &self.lock
 	if cacheSize > 0 {
@@ -92,8 +96,15 @@ func (self *Hugger) Init(cacheSize int) *Hugger {
 	return self
 }
 
+// GetNestableTransaction attempts to provide a transaction even if
+// flush is pending. It should be used only for short-lived things
+// that are done _within_ other transactions (if GetTransaction is
+// used within transactions, deadlock may occur).
+func (self *Hugger) GetNestableTransaction() *Transaction {
+	return newTransaction(self, true)
+}
+
 func (self *Hugger) GetTransaction() *Transaction {
-	// mlog.Printf2("ibtree/hugger/hugger", "GetTransaction of %p", self.treeRoot)
 	return newTransaction(self, false)
 }
 
@@ -106,7 +117,7 @@ func (self *Hugger) Update2(cb func(tr *Transaction) bool) {
 	for {
 		// Initial one we will try without lock, as cb() may
 		// take awhile.
-		tr := self.GetTransaction()
+		tr := self.GetNestableTransaction()
 		defer tr.Close()
 		if !cb(tr) {
 			break
@@ -160,27 +171,64 @@ func (self *Hugger) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 	return v.(*ibtree.NodeData)
 }
 
-// ibtree.TreeBackend API
-func (self *Hugger) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
-	log.Panicf("should be always used via Transaction.SaveNode")
-	return ibtree.BlockId("")
-}
-
 func (self *Hugger) Flush() {
 	defer self.lock.Locked()()
+	mlog.Printf2("ibtree/hugger/hugger", "%v.Flush", self)
 	self.flushing = true
 	for len(self.transactions) > 0 {
+		mlog.Printf2("ibtree/hugger/hugger", "%s.Flush waiting %d transactions", self, len(self.transactions))
 		self.transactionClosed.Wait()
 	}
-	nroots := len(self.oldRoots)
-	if nroots > 0 {
-		for b, _ := range self.oldRoots {
-			b.Close()
+
+	or := self.oldRoot.Get()
+	r := self.root.Get()
+	if or == nil || or.node != r.node {
+		mlog.Printf2("ibtree/hugger/hugger", " Flush calling CommitTo")
+		// Houston, we have new root!
+		node, bid := r.node.CommitTo(self)
+
+		defer self.blockLock.Locked()()
+
+		block, ok := self.blocks[string(bid)]
+
+		if !ok {
+			// Get block ref it refers to (if any)
+			block = self.Storage.GetBlockById(string(bid))
+			if block == nil {
+				mlog.Printf2("ibtree/hugger/hugger", "Non-existent root block %x", bid)
+			}
+		} else {
+			// Remove it from the blocks (sref owned by us)
+			delete(self.blocks, string(bid))
 		}
-		self.oldRoots = make(map[*storage.StorageBlock]bool)
-		mlog.Printf2("ibtree/hugger/hugger", " cleared %d roots", nroots)
+
+		r = &treeRoot{node: node, block: block}
+		self.root.Set(r)
+		self.oldRoot.Set(r)
+
+		self.Storage.SetNameToBlockId(self.RootName, string(bid))
+
+		// If we had 'old root', remove its reference (even if
+		// it was same, CommitTo added one ref to it)
+		if or != nil && or.block != nil {
+			mlog.Printf2("ibtree/hugger/hugger", " Flush letting old root go")
+			or.block.Close()
+		}
+	} else {
+		mlog.Printf2("ibtree/hugger/hugger", " Flush has nothing to do")
+		defer self.blockLock.Locked()()
 	}
+	if len(self.blocks) > 0 {
+		// Remove all temporary blocks acquired during transactions
+		for _, v := range self.blocks {
+			mlog.Printf2("ibtree/hugger/hugger", " Flush closing %v", v)
+			v.Close()
+		}
+		self.blocks = make(map[string]*storage.StorageBlock)
+	}
+
 	self.flushing = false
+	mlog.Printf2("ibtree/hugger/hugger", "%s.Flush done", self)
 	self.flushed.Broadcast()
 }
 
@@ -215,7 +263,13 @@ func (self *Hugger) LoadNodeByName(name string) (*ibtree.Node, string, bool) {
 }
 
 func (self *Hugger) RootBlock() *storage.StorageBlock {
-	return self.root.Get().block
+	self.Flush()
+	defer self.lock.Locked()()
+	bl := self.root.Get().block
+	if bl != nil {
+		bl = bl.Open()
+	}
+	return bl
 }
 
 func (self *Hugger) RootIsNew() bool {
@@ -234,16 +288,10 @@ func (self *Hugger) NewRootNode() *ibtree.Node {
 
 func (self *Hugger) closedTransaction(tr *Transaction) {
 	defer self.lock.Locked()()
-
-	// -1 ref when transaction expires (old root)
-	if tr.rootBlock != nil {
-		self.oldRoots[tr.rootBlock] = true
-	}
 	delete(self.transactions, tr)
 	if self.flushing {
 		self.transactionClosed.Signal()
 	}
-
 }
 
 func (self *Hugger) AssertNoTransactions() {
@@ -251,6 +299,47 @@ func (self *Hugger) AssertNoTransactions() {
 	if len(self.transactions) > 0 {
 		log.Panicf("%d transactions left when assertion says none", len(self.transactions))
 	}
+}
+
+// ibtree.TreeSaver API
+func (self *Hugger) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
+	b := NodeDataToBytes(nd)
+	mlog.Printf2("ibtree/hugger/hugger", "SaveNode %d bytes", len(b))
+	sl := &util.StringList{}
+	if self.IterateReferencesCallback != nil {
+		self.IterateReferencesCallback(nd,
+			func(s string) {
+				sl.PushFront(s)
+			})
+	} else {
+		// Fall back to storage-level reference iteration
+		sl = nil
+	}
+	bl := self.GetStorageBlock(storage.BS_NORMAL, b, nd, sl)
+	bid := ibtree.BlockId(bl.Id())
+	return bid
+}
+
+// GetStorageBlock block ids for given bytes/data.
+//
+// The blocks are expired during flush.
+//
+// nd and deps are optional, but may speed up processing (or not).
+func (self *Hugger) GetStorageBlock(st storage.BlockStatus, b []byte, nd *ibtree.NodeData, deps *util.StringList) *storage.StorageBlock {
+	bl := self.Storage.ReferOrStoreBlockBytes0(st, b, deps)
+	bid := string(bl.Id())
+	mlog.Printf2("ibtree/hugger/hugger", "%v.GetStorageBlock => %x", self, bid)
+	if nd != nil {
+		self.SetCachedNodeData(ibtree.BlockId(bid), nd)
+	}
+	defer self.blockLock.Locked()()
+	oldb, ok := self.blocks[bid]
+	if ok {
+		oldb.Close()
+		mlog.Printf2("ibtree/hugger/hugger", " old one already existed")
+	}
+	self.blocks[bid] = bl
+	return bl
 }
 
 func BytesToNodeData(bd []byte) *ibtree.NodeData {

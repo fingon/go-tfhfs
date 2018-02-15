@@ -4,14 +4,15 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Fri Jan 12 10:13:17 2018 mstenber
- * Edit time:     17 min
+ * Last modified: Thu Feb 15 14:33:22 2018 mstenber
+ * Edit time:     31 min
  *
  */
 
 package ibtree
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/fingon/go-tfhfs/mlog"
@@ -24,17 +25,16 @@ import (
 // maintains its own cache of most recent accesses within the built-in
 // IBStack.
 type Transaction struct {
-	original *Node
-	stack    IBStack
+	stack IBStack
 }
 
 func NewTransaction(root *Node) *Transaction {
-	t := &Transaction{original: root}
-	t.stack.nodes[0] = root
+	self := &Transaction{}
+	self.stack.nodes[0] = root
 	if root == nil {
 		log.Panicf("nil root")
 	}
-	return t
+	return self
 }
 
 func (self *Transaction) Delete(key IBKey) {
@@ -74,4 +74,56 @@ func (self *Transaction) Root() *Node {
 func (self *Transaction) Set(key IBKey, value string) {
 	mlog.Printf2("ibtree/ibtransaction", "tr.Set %x %d bytes", key, len(value))
 	self.Root().Set(key, value, &self.stack)
+}
+
+func (self *Transaction) NewSubTree(treePrefix IBKey) *SubTree {
+	return &SubTree{transaction: self, treePrefix: treePrefix}
+}
+
+// SubTree is convenience API for handling subtree of entries with
+// common key prefix. Using the object, the tree behaves just like
+// normal transaction (modulo few API calls that root transaction has
+// to be used for).
+type SubTree struct {
+	transaction *Transaction
+	treePrefix  IBKey
+}
+
+func (self *SubTree) addTreePrefix(key IBKey) IBKey {
+	return IBKey(fmt.Sprintf("%s%s", self.treePrefix, key))
+}
+
+func (self *SubTree) Delete(key IBKey) {
+	mlog.Printf2("ibtree/ibtransaction", "st.Delete %x", key)
+	key = self.addTreePrefix(key)
+	self.transaction.Delete(key)
+}
+
+func (self *SubTree) DeleteRange(key1, key2 IBKey) {
+	mlog.Printf2("ibtree/ibtransaction", "st.DeleteRange %x-%x", key1, key2)
+	key1 = self.addTreePrefix(key1)
+	key2 = self.addTreePrefix(key2)
+	self.transaction.DeleteRange(key1, key2)
+}
+
+func (self *SubTree) Get(key IBKey) *string {
+	mlog.Printf2("ibtree/ibtransaction", "st.Get")
+	key = self.addTreePrefix(key)
+	return self.transaction.Get(key)
+}
+
+func (self *SubTree) NextKey(key IBKey) *IBKey {
+	mlog.Printf2("ibtree/ibtransaction", "st.NextKey")
+	key = self.addTreePrefix(key)
+	nk := self.transaction.NextKey(key)
+	if nk != nil && string(*nk)[:len(self.treePrefix)] != string(self.treePrefix) {
+		nk = nil
+	}
+	return nk
+}
+
+func (self *SubTree) Set(key IBKey, value string) {
+	mlog.Printf2("ibtree/ibtransaction", "tr.Set %x %d bytes", key, len(value))
+	key = self.addTreePrefix(key)
+	self.transaction.Set(key, value)
 }

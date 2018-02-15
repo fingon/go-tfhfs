@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Fri Feb  9 15:15:10 2018 mstenber
- * Edit time:     252 min
+ * Last modified: Thu Feb 15 14:31:20 2018 mstenber
+ * Edit time:     256 min
  *
  */
 
@@ -40,8 +40,9 @@ func newTransaction(h *Hugger, ignoreFlushing bool) *Transaction {
 		h.flushed.Wait()
 	}
 	root := h.root.Get()
+	t := ibtree.NewTransaction(root.node)
 	tr := &Transaction{hugger: h, root: root,
-		t: ibtree.NewTransaction(root.node), nested: ignoreFlushing}
+		t: t, nested: ignoreFlushing}
 	h.transactions[tr] = true
 	return tr
 }

@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:44:41 2018 mstenber
- * Last modified: Wed Jan 10 11:32:59 2018 mstenber
+ * Last modified: Tue Feb 20 10:35:53 2018 mstenber
  * Edit time:     82 min
  *
  */
@@ -60,6 +60,9 @@ func (self *fileBackend) Init(config storage.BackendConfiguration) {
 	(&self.DirectoryBackendBase).Init(config)
 }
 
+func (self *fileBackend) Flush() {
+
+}
 func (self *fileBackend) delay() {
 	if self.DelayPerOp > 0 {
 		time.Sleep(self.DelayPerOp)

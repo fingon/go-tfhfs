@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Thu Jan 25 00:33:52 2018 mstenber
+ * Last modified: Tue Feb 20 10:36:08 2018 mstenber
  * Edit time:     75 min
  *
  */
@@ -38,6 +38,10 @@ func NewInMemoryBackend() storage.Backend {
 }
 
 func (self *inMemoryBackend) Init(config storage.BackendConfiguration) {
+
+}
+
+func (self *inMemoryBackend) Flush() {
 
 }
 

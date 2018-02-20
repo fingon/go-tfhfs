@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 22:49:15 2018 mstenber
- * Last modified: Wed Jan 10 13:11:41 2018 mstenber
+ * Last modified: Tue Feb 20 10:35:37 2018 mstenber
  * Edit time:     30 min
  *
  */
@@ -72,6 +72,9 @@ func (self *boltBackend) Init(config storage.BackendConfiguration) {
 	}
 }
 
+func (self *boltBackend) Flush() {
+
+}
 func (self *boltBackend) Close() {
 	self.db.Close()
 }

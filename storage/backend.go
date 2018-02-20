@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 11:14:11 2018 mstenber
- * Last modified: Mon Jan 15 18:38:44 2018 mstenber
- * Edit time:     10 min
+ * Last modified: Tue Feb 20 10:32:04 2018 mstenber
+ * Edit time:     11 min
  *
  */
 
@@ -67,6 +67,12 @@ type Backend interface {
 	// is typically called only for real storage backends and not
 	// interim ones (e.g. mapRunnerBackend, codecBackend)
 	Init(config BackendConfiguration)
+
+	// Flush is used to hint that currently is good time to
+	// snapshot state, if any; storage is done with flushing its
+	// current state so e.g. names and block hierarchies are most
+	// consistent right now
+	Flush()
 
 	// Close the backend
 	Close()

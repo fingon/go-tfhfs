@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Wed Jan 10 16:55:37 2018 mstenber
+ * Last modified: Tue Feb 20 10:35:26 2018 mstenber
  * Edit time:     145 min
  *
  */
@@ -50,6 +50,10 @@ func (self *badgerBackend) Init(config storage.BackendConfiguration) {
 		log.Panic("badger.Open", err)
 	}
 	self.db = db
+}
+
+func (self *badgerBackend) Flush() {
+
 }
 
 func (self *badgerBackend) Close() {

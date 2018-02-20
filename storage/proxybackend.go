@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sat Jan  6 00:08:05 2018 mstenber
- * Last modified: Wed Jan 10 16:56:15 2018 mstenber
+ * Last modified: Tue Feb 20 10:34:54 2018 mstenber
  * Edit time:     6 min
  *
  */
@@ -30,6 +30,10 @@ func (self proxyBackend) SetBackend(backend Backend) *proxyBackend {
 func (self *proxyBackend) Init(config BackendConfiguration) {
 	self.BackendConfiguration = config
 	self.Backend.Init(config)
+}
+
+func (self *proxyBackend) Flush() {
+	self.Backend.Flush()
 }
 
 func (self *proxyBackend) Close() {

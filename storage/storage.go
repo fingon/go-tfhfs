@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Jan 25 13:31:27 2018 mstenber
- * Edit time:     644 min
+ * Last modified: Tue Feb 20 10:44:52 2018 mstenber
+ * Edit time:     648 min
  *
  */
 
@@ -242,6 +242,10 @@ func (self *Storage) flush() int {
 			}
 			ops += b.flushStorageRef()
 		}
+	}
+
+	if self.Backend != nil {
+		self.Backend.Flush()
 	}
 
 	mlog.Printf2("storage/storage", " ops:%v", ops)

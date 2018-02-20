@@ -18,12 +18,12 @@ import (
 	"github.com/fingon/go-tfhfs/mlog"
 )
 
-// IBStack is internal utility class which is used to keep trace about
+// Stack is internal utility class which is used to keep trace about
 // stack of nodes on the current immutable tree path (parents mainly).
 //
 // If using lowlevel API (= direct calls to Node), passing empty one
 // may be necessary. Otherwise Transaction should be used.
-type IBStack struct {
+type Stack struct {
 	// Static arrays that are used to store the 'trace' of our
 	// walk in the tre. By backtracking it at 'commit', we can
 	// handle COW of the recursive data structure.
@@ -38,12 +38,12 @@ type IBStack struct {
 	smallCount int
 }
 
-// Reset rests the IBStack to ~factory defaults. It is still tied to
+// Reset rests the Stack to ~factory defaults. It is still tied to
 // particular tree though, and also calling it mid-operation is fatal
 // error.
-func (self *IBStack) Reset() {
+func (self *Stack) Reset() {
 	if self.nodes[0] == nil {
-		log.Panic("Reset() on uninitialized IBStack")
+		log.Panic("Reset() on uninitialized Stack")
 	}
 	if self.top > 0 {
 		log.Panic("uncommitted state in reset")
@@ -51,7 +51,7 @@ func (self *IBStack) Reset() {
 	self.setIndex(0)
 }
 
-func (self *IBStack) setIndex(idx int) {
+func (self *Stack) setIndex(idx int) {
 	if idx == self.indexes[self.top] {
 		return
 	}
@@ -59,14 +59,14 @@ func (self *IBStack) setIndex(idx int) {
 	self.invalidateSubNodes()
 }
 
-func (self *IBStack) invalidateSubNodes() {
+func (self *Stack) invalidateSubNodes() {
 	for i := self.top + 1; i <= self.maxtop; i++ {
 		self.nodes[i] = nil
 	}
 	self.maxtop = self.top
 
 }
-func (self *IBStack) rewriteAtIndex(replace bool, child *NodeDataChild) {
+func (self *Stack) rewriteAtIndex(replace bool, child *NodeDataChild) {
 	n := self.node()
 	idx := self.index()
 
@@ -99,7 +99,7 @@ func (self *IBStack) rewriteAtIndex(replace bool, child *NodeDataChild) {
 	self.rewriteNodeChildren(c)
 }
 
-func (self *IBStack) rewriteNodeChildren(children []*NodeDataChild) {
+func (self *Stack) rewriteNodeChildren(children []*NodeDataChild) {
 	// mlog.Printf2("ibtree/ibstack", "rewriteNodeChildren")
 	n := self.node().copy()
 	n.blockId = nil
@@ -114,7 +114,7 @@ func (self *IBStack) rewriteNodeChildren(children []*NodeDataChild) {
 	n.CheckNodeStructure()
 }
 
-func (self *IBStack) rewriteNodeChildrenWithCopyOf(ochildren []*NodeDataChild) {
+func (self *Stack) rewriteNodeChildrenWithCopyOf(ochildren []*NodeDataChild) {
 	children := make([]*NodeDataChild, len(ochildren))
 	copy(children, ochildren)
 	self.rewriteNodeChildren(children)
@@ -124,7 +124,7 @@ func (self *NodeDataChild) String() string {
 	return fmt.Sprintf("ibnc<%x,%x,%v>", self.Key, self.Value, self.childNode)
 }
 
-func (self *IBStack) child() *NodeDataChild {
+func (self *Stack) child() *NodeDataChild {
 	cl := self.node().Children
 	index := self.index()
 	if index < 0 || index >= len(cl) {
@@ -133,7 +133,7 @@ func (self *IBStack) child() *NodeDataChild {
 	return cl[index]
 }
 
-func (self *IBStack) childNode(idx int) *Node {
+func (self *Stack) childNode(idx int) *Node {
 	n := self.node()
 	if idx < 0 || idx >= len(n.Children) {
 		mlog.Printf2("ibtree/ibstack", "childNode out of bounds (%d out of %d)", idx, len(n.Children))
@@ -145,16 +145,16 @@ func (self *IBStack) childNode(idx int) *Node {
 	return self.node().childNode(idx)
 }
 
-func (self *IBStack) index() int {
+func (self *Stack) index() int {
 	return self.indexes[self.top]
 }
 
-func (self *IBStack) node() *Node {
+func (self *Stack) node() *Node {
 	// mlog.Printf2("ibtree/ibstack", "node() from %v [%d]", self.nodes, self.top)
 	return self.nodes[self.top]
 }
 
-func (self *IBStack) popNode() *Node {
+func (self *Stack) popNode() *Node {
 	n := self.node()
 	self.top--
 	if self.top < 0 {
@@ -163,7 +163,7 @@ func (self *IBStack) popNode() *Node {
 	return n
 }
 
-func (self *IBStack) pop() {
+func (self *Stack) pop() {
 	n := self.popNode()
 	if len(n.Children) > 0 {
 		key := n.Children[0].Key
@@ -176,7 +176,7 @@ func (self *IBStack) pop() {
 	}
 }
 
-func (self *IBStack) push(index int, node *Node) {
+func (self *Stack) push(index int, node *Node) {
 	self.setIndex(index)
 	self.top++
 	if self.maxtop < self.top {
@@ -186,7 +186,7 @@ func (self *IBStack) push(index int, node *Node) {
 	self.setIndex(0)
 }
 
-func (self *IBStack) moveFrom(ofs int, sib *Node) {
+func (self *Stack) moveFrom(ofs int, sib *Node) {
 	// Keep track of which child we are really at
 	node := self.child().childNode
 	oi := self.index()
@@ -223,7 +223,7 @@ func (self *IBStack) moveFrom(ofs int, sib *Node) {
 
 }
 
-func (self *IBStack) mergeTo(ofs int, sib *Node) {
+func (self *Stack) mergeTo(ofs int, sib *Node) {
 	clen1 := len(self.node().Children)
 	oi := self.index()
 	si := ofs + oi
@@ -269,7 +269,7 @@ func (self *IBStack) mergeTo(ofs int, sib *Node) {
 
 // Pop rest of the stack, creating new Nodes as need be, and return
 // the top node.
-func (self *IBStack) commit() *Node {
+func (self *Stack) commit() *Node {
 	for self.top > 0 {
 		self.pop()
 	}
@@ -358,7 +358,7 @@ func (self *IBStack) commit() *Node {
 
 // Go to the first leaf that has been set, going down from the current
 // node.
-func (self *IBStack) goDownLeft() {
+func (self *Stack) goDownLeft() {
 	n := self.node()
 	for i := 0; i < len(n.Children); i++ {
 		cn := n.Children[i].childNode
@@ -372,7 +372,7 @@ func (self *IBStack) goDownLeft() {
 
 // goDownLeftAny goes down any leaf, including clean ones, that are
 // loaded from disk if need be.
-func (self *IBStack) goDownLeftAny() {
+func (self *Stack) goDownLeftAny() {
 	idx := self.index()
 	for {
 		n := self.node()
@@ -385,17 +385,17 @@ func (self *IBStack) goDownLeftAny() {
 	}
 }
 
-func (self *IBStack) pushIndex(idx int) {
+func (self *Stack) pushIndex(idx int) {
 	n := self.childNode(idx)
 	self.push(idx, n)
 }
 
-func (self *IBStack) pushCurrentIndex() {
+func (self *Stack) pushCurrentIndex() {
 	idx := self.index()
 	self.pushIndex(idx)
 }
 
-func (self *IBStack) goPreviousLeaf() bool {
+func (self *Stack) goPreviousLeaf() bool {
 	for {
 		idx := self.index() - 1
 		n := self.node()
@@ -422,7 +422,7 @@ func (self *IBStack) goPreviousLeaf() bool {
 
 }
 
-func (self *IBStack) goNextLeaf() bool {
+func (self *Stack) goNextLeaf() bool {
 	mlog.Printf2("ibtree/ibstack", "goNextLeaf")
 	for {
 		idx := self.index() + 1
@@ -454,7 +454,7 @@ func (self *IBStack) goNextLeaf() bool {
 	}
 }
 
-func (self *IBStack) moveRight() bool {
+func (self *Stack) moveRight() bool {
 	// Current node has been travelled.
 	// Options: go right to node's next child, OR recurse to parent.
 	n := self.node()
@@ -480,7 +480,7 @@ func (self *IBStack) moveRight() bool {
 
 }
 
-func (self *IBStack) iterateMutatingChildLeafFirst(fun func()) *Node {
+func (self *Stack) iterateMutatingChildLeafFirst(fun func()) *Node {
 	self.Reset()
 	n := self.node()
 	if n.Leafy {
@@ -511,7 +511,7 @@ func (self *IBStack) iterateMutatingChildLeafFirst(fun func()) *Node {
 	return self.nodes[0]
 }
 
-func (self *IBStack) addChildAt(child *NodeDataChild) {
+func (self *Stack) addChildAt(child *NodeDataChild) {
 	// Insert child where it belongs
 	self.rewriteAtIndex(false, child)
 
@@ -559,7 +559,7 @@ func (self *IBStack) addChildAt(child *NodeDataChild) {
 	self.invalidateSubNodes()
 }
 
-func (self *IBStack) search(key IBKey) {
+func (self *Stack) search(key Key) {
 	n := self.nodes[0]
 	self.top = 0
 	mlog.Printf2("ibtree/ibstack", "search %x", key)
@@ -608,6 +608,6 @@ func (self *IBStack) search(key IBKey) {
 	}
 }
 
-func (self *IBStack) nextIndex() {
+func (self *Stack) nextIndex() {
 	self.setIndex(self.indexes[self.top] + 1)
 }

@@ -23,8 +23,8 @@ import (
 
 type BlockKey string
 
-func (self BlockKey) IB() ibtree.IBKey {
-	return ibtree.IBKey(self)
+func (self BlockKey) IB() ibtree.Key {
+	return ibtree.Key(self)
 }
 
 func (self BlockKey) String() string {

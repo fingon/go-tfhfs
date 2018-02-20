@@ -20,17 +20,17 @@ import (
 	"github.com/stvp/assert"
 )
 
-type N2IBKeyCallback func(n int) IBKey
+type N2KeyCallback func(n int) Key
 
 type DummyTree struct {
 	Tree
-	idcb N2IBKeyCallback
+	idcb N2KeyCallback
 }
 
 func (self DummyTree) Init(be *DummyBackend) *DummyTree {
 	self.Tree = *(self.Tree.Init(be))
 	if self.idcb == nil {
-		self.idcb = nonpaddedIBKey
+		self.idcb = nonpaddedKey
 	}
 	return &self
 }
@@ -40,7 +40,7 @@ const nodeSize = 256
 
 func (self *DummyTree) checkNextKey(t *testing.T, r *Node, n int) {
 	// check NextKey works
-	lkv := IBKey("")
+	lkv := Key("")
 	lk := &lkv
 	cnt := 0
 	r.iterateLeafFirst(func(n *Node) {
@@ -50,14 +50,14 @@ func (self *DummyTree) checkNextKey(t *testing.T, r *Node, n int) {
 		for _, c := range n.Children {
 			cnt++
 			// Plain 'known next' case
-			nk := r.NextKey(*lk, &IBStack{})
+			nk := r.NextKey(*lk, &Stack{})
 			assert.Equal(t, *nk, c.Key)
 
 			// Ensure that even in gap between nodes, the
 			// next behaves correctly
 			if lk != &lkv {
 				s := fmt.Sprintf("%s.", string(*lk))
-				nk2 := r.NextKey(IBKey(s), &IBStack{})
+				nk2 := r.NextKey(Key(s), &Stack{})
 				assert.Equal(t, *nk2, *nk)
 			}
 			lk = nk
@@ -65,7 +65,7 @@ func (self *DummyTree) checkNextKey(t *testing.T, r *Node, n int) {
 
 	})
 	assert.Equal(t, cnt, n)
-	nk := r.NextKey(*lk, &IBStack{})
+	nk := r.NextKey(*lk, &Stack{})
 	assert.True(t, *lk != "", "did not even get anything?")
 	assert.Nil(t, nk, "weird next for", *lk, nk)
 }
@@ -76,7 +76,7 @@ func (self *DummyTree) checkTree2(t *testing.T, r *Node, n, s int) {
 		mlog.Printf2("ibtree/ibtree_test", "checkTree [%d..%d[\n", s, n)
 	}
 	for i := s - 2; i <= n+1; i++ {
-		var st IBStack
+		var st Stack
 		if debug > 1 {
 			mlog.Printf2("ibtree/ibtree_test", " #%d\n", i)
 		}
@@ -97,12 +97,12 @@ func (self *DummyTree) checkTree(t *testing.T, r *Node, n int) {
 	self.checkTree2(t, r, n, 0)
 }
 
-func nonpaddedIBKey(n int) IBKey {
-	return IBKey(fmt.Sprintf("nk%d.", n))
+func nonpaddedKey(n int) Key {
+	return Key(fmt.Sprintf("nk%d.", n))
 }
 
-func paddedIBKey(n int) IBKey {
-	return IBKey(fmt.Sprintf("pk%08d.", n))
+func paddedKey(n int) Key {
+	return Key(fmt.Sprintf("pk%08d.", n))
 }
 
 func EnsureDelta(t *testing.T, old, new *Node, del, upd, add int) {
@@ -136,10 +136,10 @@ func EnsureDelta2(t *testing.T, old, new *Node, del, upd, add int) {
 	EnsureDelta(t, new, old, add, upd, del)
 }
 func (self *DummyTree) CreateTree(t *testing.T, n int) *Node {
-	var st IBStack
+	var st Stack
 	r0 := self.NewRoot()
 	r := r0
-	v := r0.Get(IBKey("foo"), &st)
+	v := r0.Get(Key("foo"), &st)
 	assert.Nil(t, v)
 	for i := 0; i < n; i++ {
 		if debug > 1 {
@@ -177,14 +177,14 @@ func (self *DummyTree) CreateTree(t *testing.T, n int) *Node {
 		assert.True(t, found)
 	}
 	//EnsureDelta2(t, r0, r, 0, 0, n)
-	//r2 := r0.Set(IBKey("z"), "42")
+	//r2 := r0.Set(Key("z"), "42")
 	//EnsureDelta2(t, r2, r, 1, 0, n)
 
 	return r
 }
 
 func EmptyTreeForward(t *testing.T, dt *DummyTree, r *Node, n int) *Node {
-	var st IBStack
+	var st Stack
 	for i := 0; i < n; i++ {
 		if debug > 1 {
 			dt.checkTree2(t, r, n, i)
@@ -208,7 +208,7 @@ func EmptyTreeForward(t *testing.T, dt *DummyTree, r *Node, n int) *Node {
 }
 
 func EmptyTreeBackward(t *testing.T, dt *DummyTree, r *Node, n int) *Node {
-	var st IBStack
+	var st Stack
 	for i := n - 1; i > 0; i-- {
 		if debug > 2 {
 			dt.checkTree2(t, r, i+1, 0)
@@ -217,7 +217,7 @@ func EmptyTreeBackward(t *testing.T, dt *DummyTree, r *Node, n int) *Node {
 			mlog.Printf2("ibtree/ibtree_test", "Deleting #%d\n", i)
 		}
 		k := dt.idcb(i)
-		r = r.Delete(IBKey(k), &st)
+		r = r.Delete(Key(k), &st)
 	}
 	return r
 }
@@ -225,7 +225,7 @@ func EmptyTreeBackward(t *testing.T, dt *DummyTree, r *Node, n int) *Node {
 func ProdTree(t *testing.T, tree *DummyTree, n int) *Node {
 	r := tree.CreateTree(t, n)
 	// Check forward and backwards iteration
-	var st IBStack
+	var st Stack
 	st.nodes[0] = r
 	st.setIndex(-1)
 	c1 := 0
@@ -252,7 +252,7 @@ func ProdTree(t *testing.T, tree *DummyTree, n int) *Node {
 	k := tree.idcb(0)
 	rr := r.Set(k, "z", &st)
 	assert.Equal(t, "z", *rr.Get(k, &st))
-	assert.Equal(t, "v0", *r.Get(k, &IBStack{}))
+	assert.Equal(t, "v0", *r.Get(k, &Stack{}))
 	tree.checkTree(t, r, n)
 	EmptyTreeForward(t, tree, r, n)
 	EmptyTreeBackward(t, tree, r, n)
@@ -270,18 +270,18 @@ func TestTree(t *testing.T) {
 
 func TestTreeDeleteRange(t *testing.T) {
 	t.Parallel()
-	tree := DummyTree{idcb: paddedIBKey}.Init(nil)
+	tree := DummyTree{idcb: paddedKey}.Init(nil)
 	n := 1000
 	r := tree.CreateTree(t, n)
 	mlog.Printf2("ibtree/ibtree_test", "TestTreeDeleteRange start")
-	r1 := r.DeleteRange(paddedIBKey(-1), paddedIBKey(-1), &IBStack{})
+	r1 := r.DeleteRange(paddedKey(-1), paddedKey(-1), &Stack{})
 	assert.Equal(t, r1, r)
-	r2 := r.DeleteRange(IBKey("z"), IBKey("z"), &IBStack{})
+	r2 := r.DeleteRange(Key("z"), Key("z"), &Stack{})
 	assert.Equal(t, r2, r)
 
 	// We attempt to remove higher bits, as they offend us.
 	for i := 4; i < n; i = i * 4 {
-		var st IBStack
+		var st Stack
 		i0 := i * 3 / 4
 		removed := i - i0 + 1
 		r.checkTreeStructure()

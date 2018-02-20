@@ -115,7 +115,7 @@ func (self *Node) String() string {
 	return fmt.Sprintf("ibn{%p}", self)
 }
 
-func (self *Node) Delete(key IBKey, st *IBStack) *Node {
+func (self *Node) Delete(key Key, st *Stack) *Node {
 	self.search(key, st)
 	c := st.child()
 	if c.Key != key {
@@ -197,7 +197,7 @@ func (self *Node) Commit() (*Node, BlockId) {
 	return self.CommitTo(self.tree.backend)
 }
 
-func (self *Node) DeleteRange(key1, key2 IBKey, st2 *IBStack) *Node {
+func (self *Node) DeleteRange(key1, key2 Key, st2 *Stack) *Node {
 	if key1 > key2 {
 		mlog.Panicf("ibt.DeleteRange: first key more than second key: %x > %x", key1, key2)
 	}
@@ -254,7 +254,7 @@ func (self *Node) DeleteRange(key1, key2 IBKey, st2 *IBStack) *Node {
 	return st2.commit()
 }
 
-func (self *Node) Get(key IBKey, st *IBStack) *string {
+func (self *Node) Get(key Key, st *Stack) *string {
 	self.search(key, st)
 	c := st.child()
 	st.top = 0
@@ -265,7 +265,7 @@ func (self *Node) Get(key IBKey, st *IBStack) *string {
 
 }
 
-func (self *Node) NextKey(key IBKey, st *IBStack) *IBKey {
+func (self *Node) NextKey(key Key, st *Stack) *Key {
 	self.searchGreater(key, st)
 	c := st.child()
 	st.top = 0
@@ -275,7 +275,7 @@ func (self *Node) NextKey(key IBKey, st *IBStack) *IBKey {
 	return &c.Key
 }
 
-func (self *Node) Set(key IBKey, value string, st *IBStack) *Node {
+func (self *Node) Set(key Key, value string, st *Stack) *Node {
 	self.search(key, st)
 	child := &NodeDataChild{Key: key, Value: value}
 	c := st.child()
@@ -291,7 +291,7 @@ func (self *Node) Set(key IBKey, value string, st *IBStack) *Node {
 
 }
 
-func (self *Node) search(key IBKey, st *IBStack) {
+func (self *Node) search(key Key, st *Stack) {
 	if st.nodes[0] == nil {
 		st.nodes[0] = self
 	} else if self != st.nodes[0] {
@@ -403,7 +403,7 @@ func (self *Node) nestedNodeCount() int {
 	return cnt
 }
 
-func (self *Node) searchLesser(key IBKey, st *IBStack) {
+func (self *Node) searchLesser(key Key, st *Stack) {
 	self.search(key, st)
 	c := st.child()
 	if c == nil || c.Key == key {
@@ -412,7 +412,7 @@ func (self *Node) searchLesser(key IBKey, st *IBStack) {
 	}
 }
 
-func (self *Node) searchGreater(key IBKey, st *IBStack) {
+func (self *Node) searchGreater(key Key, st *Stack) {
 	self.search(key, st)
 	c := st.child()
 	if c == nil || c.Key == key {

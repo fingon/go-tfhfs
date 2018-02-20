@@ -11,10 +11,10 @@
 
 package ibtree
 
-type IBKey string
+type Key string
 
 type NodeDataChild struct {
-	Key       IBKey
+	Key       Key
 	Value     string
 	childNode *Node // .. if any loaded ..
 }

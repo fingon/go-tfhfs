@@ -70,7 +70,7 @@ func ProdTree(t *testing.T, rng *rand.Rand) {
 		mlog.Printf2("ibtree/ibtransaction_test", ".. check sanity in %v..", troot)
 		troot.PrintToMLogAll()
 		for k, v := range key2value {
-			vp := tr.Get(ibtree.IBKey(k))
+			vp := tr.Get(ibtree.Key(k))
 			assert.True(t, vp != nil, fmt.Sprintf("missing key %x", k))
 			assert.Equal(t, v, *vp)
 		}
@@ -84,7 +84,7 @@ func ProdTree(t *testing.T, rng *rand.Rand) {
 			key := string(b)
 			value := fmt.Sprintf("%v", i)
 			mlog.Printf2("ibtree/ibtransaction_test", "PT #%d: Set %x=%v", i, key, value)
-			tr.Set(ibtree.IBKey(key), value)
+			tr.Set(ibtree.Key(key), value)
 			if key2value[key] == "" {
 				keys = append(keys, key)
 				sort.Strings(keys)
@@ -103,7 +103,7 @@ func ProdTree(t *testing.T, rng *rand.Rand) {
 				}
 				keys = keys[:len(keys)-1]
 				sort.Strings(keys)
-				tr.Delete(ibtree.IBKey(key))
+				tr.Delete(ibtree.Key(key))
 				delete(key2value, key)
 			}
 			check()

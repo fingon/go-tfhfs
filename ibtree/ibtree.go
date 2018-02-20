@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Tue Jan 30 17:11:19 2018 mstenber
- * Edit time:     742 min
+ * Last modified: Tue Feb 20 12:56:02 2018 mstenber
+ * Edit time:     770 min
  *
  */
 
@@ -244,11 +244,17 @@ func (self *Node) DeleteRange(key1, key2 Key, st2 *Stack) *Node {
 	idx1 := st.indexes[st.top]
 	idx2 := st2.indexes[st.top]
 	mlog.Printf2("ibtree/ibtree", "idx1:%d idx2:%d", idx1, idx2)
-	ncl := make([]*NodeDataChild, len(cl)-(idx2-idx1)+1)
-	copy(ncl, cl[:idx1])
-	ncl[idx1] = st.child()
-	if len(cl) > idx2 {
-		copy(ncl[(idx1+1):], cl[idx2:])
+	var ncl []*NodeDataChild
+	if idx1 < 0 {
+		ncl = make([]*NodeDataChild, len(cl)-idx2)
+		copy(ncl, cl[idx2:])
+	} else {
+		ncl = make([]*NodeDataChild, len(cl)-(idx2-idx1)+1)
+		copy(ncl, cl[:idx1])
+		ncl[idx1] = st.child()
+		if len(cl) > idx2 {
+			copy(ncl[(idx1+1):], cl[idx2:])
+		}
 	}
 	st2.rewriteNodeChildren(ncl)
 	return st2.commit()
@@ -267,6 +273,16 @@ func (self *Node) Get(key Key, st *Stack) *string {
 
 func (self *Node) NextKey(key Key, st *Stack) *Key {
 	self.searchGreater(key, st)
+	c := st.child()
+	st.top = 0
+	if c == nil {
+		return nil
+	}
+	return &c.Key
+}
+
+func (self *Node) PrevKey(key Key, st *Stack) *Key {
+	self.searchLesser(key, st)
 	c := st.child()
 	st.top = 0
 	if c == nil {
@@ -377,6 +393,9 @@ func (self *Node) iterateLeafFirst(fun func(n *Node)) {
 // CheckNodeStructure allows sanity checking a node's content (should not be really used except for debugging)
 func (self *NodeData) CheckNodeStructure() {
 	for i, c := range self.Children {
+		if c == nil {
+			mlog.Panicf("tree broke: nil child at [%d] of %v", i, self)
+		}
 		if c.Key == "" {
 			mlog.Panicf("tree broke: empty key at [%d] of %v", i, self)
 		}
@@ -406,7 +425,7 @@ func (self *Node) nestedNodeCount() int {
 func (self *Node) searchLesser(key Key, st *Stack) {
 	self.search(key, st)
 	c := st.child()
-	if c == nil || c.Key == key {
+	if c == nil || c.Key >= key {
 		mlog.Printf2("ibtree/ibtree", "moving to previous leaf from %v", st.indexes)
 		st.goPreviousLeaf()
 	}

@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Thu Feb 15 14:33:22 2018 mstenber
+ * Last modified: Tue Feb 20 11:40:27 2018 mstenber
  * Edit time:     31 min
  *
  */
@@ -67,6 +67,11 @@ func (self *Transaction) NextKey(key Key) *Key {
 	return self.Root().NextKey(key, &self.stack)
 }
 
+func (self *Transaction) PrevKey(key Key) *Key {
+	mlog.Printf2("ibtree/ibtransaction", "tr.PrevKey")
+	return self.Root().PrevKey(key, &self.stack)
+}
+
 func (self *Transaction) Root() *Node {
 	return self.stack.node()
 }
@@ -122,6 +127,15 @@ func (self *SubTree) NextKey(key Key) *Key {
 	return nk
 }
 
+func (self *SubTree) PrevKey(key Key) *Key {
+	mlog.Printf2("ibtree/ibtransaction", "st.PrevKey")
+	key = self.addTreePrefix(key)
+	nk := self.transaction.PrevKey(key)
+	if nk != nil && string(*nk)[:len(self.treePrefix)] != string(self.treePrefix) {
+		nk = nil
+	}
+	return nk
+}
 func (self *SubTree) Set(key Key, value string) {
 	mlog.Printf2("ibtree/ibtransaction", "tr.Set %x %d bytes", key, len(value))
 	key = self.addTreePrefix(key)

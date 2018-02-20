@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 17:07:23 2017 mstenber
- * Last modified: Tue Jan 30 17:05:59 2018 mstenber
- * Edit time:     274 min
+ * Last modified: Tue Feb 20 12:13:41 2018 mstenber
+ * Edit time:     286 min
  *
  */
 
@@ -38,7 +38,7 @@ func (self DummyTree) Init(be *DummyBackend) *DummyTree {
 const debug = 1
 const nodeSize = 256
 
-func (self *DummyTree) checkNextKey(t *testing.T, r *Node, n int) {
+func (self *DummyTree) checkNextPrevKey(t *testing.T, r *Node, n int) {
 	// check NextKey works
 	lkv := Key("")
 	lk := &lkv
@@ -52,13 +52,20 @@ func (self *DummyTree) checkNextKey(t *testing.T, r *Node, n int) {
 			// Plain 'known next' case
 			nk := r.NextKey(*lk, &Stack{})
 			assert.Equal(t, *nk, c.Key)
+			pk := r.PrevKey(*nk, &Stack{})
 
 			// Ensure that even in gap between nodes, the
-			// next behaves correctly
+			// next/prev behave correctly
 			if lk != &lkv {
-				s := fmt.Sprintf("%s.", string(*lk))
+				assert.Equal(t, *pk, *lk)
+				s := fmt.Sprintf("%s+", string(*lk))
 				nk2 := r.NextKey(Key(s), &Stack{})
+				pk2 := r.PrevKey(Key(s), &Stack{})
 				assert.Equal(t, *nk2, *nk)
+				assert.Equal(t, *pk2, *pk, "wrong prev of ", s, " : ", *pk2)
+			} else {
+				assert.Nil(t, pk)
+
 			}
 			lk = nk
 		}
@@ -98,11 +105,11 @@ func (self *DummyTree) checkTree(t *testing.T, r *Node, n int) {
 }
 
 func nonpaddedKey(n int) Key {
-	return Key(fmt.Sprintf("nk%d.", n))
+	return Key(fmt.Sprintf("nk%d!", n))
 }
 
 func paddedKey(n int) Key {
-	return Key(fmt.Sprintf("pk%08d.", n))
+	return Key(fmt.Sprintf("pk%08d!", n))
 }
 
 func EnsureDelta(t *testing.T, old, new *Node, del, upd, add int) {
@@ -265,7 +272,7 @@ func TestTree(t *testing.T) {
 	tree := DummyTree{}.Init(nil)
 	tree.setNodeMaximumSize(nodeSize) // more depth = smaller examples that blow up
 	r := ProdTree(t, tree, n)
-	tree.checkNextKey(t, r, n)
+	tree.checkNextPrevKey(t, r, n)
 }
 
 func TestTreeDeleteRange(t *testing.T) {

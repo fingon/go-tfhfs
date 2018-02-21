@@ -4,14 +4,18 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 11:14:11 2018 mstenber
- * Last modified: Tue Feb 20 10:32:04 2018 mstenber
+ * Last modified: Wed Feb 21 15:27:05 2018 mstenber
  * Edit time:     11 min
  *
  */
 
 package storage
 
-import "time"
+import (
+	"time"
+
+	"github.com/fingon/go-tfhfs/codec"
+)
 
 type BackendConfiguration struct {
 	// How much delay should there per asynchronous operation
@@ -24,6 +28,10 @@ type BackendConfiguration struct {
 	// ValueUpdateInterval describes how often cached values (e.g.
 	// statfs stuff) are updated.
 	ValueUpdateInterval time.Duration
+
+	// Codec (if the backend actually handles the codec directly,
+	// as opposed to using chaining codec like the rest)
+	Codec codec.Codec
 }
 
 // BlockBackend is subset of the storage Backend which deals with raw

@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Feb 16 10:19:24 2018 mstenber
-# Edit time:     116 min
+# Last modified: Wed Feb 21 17:49:21 2018 mstenber
+# Edit time:     119 min
 #
 #
 
@@ -17,12 +17,12 @@ GENERATED=\
 	ibtree/hugger/treerootpointer_gen.go \
 	fs/inodemetapointer_gen.go \
 	storage/blockpointerfuture_gen.go \
-	storage/jobtype_string.go \
 	util/bytesliceatomiclist_gen.go \
 	util/byteslicefuture_gen.go \
 	util/byteslicepointer_gen.go \
 	util/stringlist_gen.go \
-	util/maprunnercallbacklist_gen.go
+	util/maprunnercallbacklist_gen.go \
+	storage/jobtype_string.go
 
 SUBDIRS=\
   codec fs ibtree ibtree/hugger mlog server \

@@ -4,12 +4,14 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:17:18 2018 mstenber
- * Last modified: Fri Feb 16 11:00:44 2018 mstenber
- * Edit time:     7 min
+ * Last modified: Wed Feb 21 17:38:18 2018 mstenber
+ * Edit time:     9 min
  *
  */
 
 package tree
+
+import "github.com/fingon/go-tfhfs/storage"
 
 type LocationEntry struct {
 	Offset, Size uint64
@@ -18,16 +20,21 @@ type LocationEntry struct {
 type LocationSlice []LocationEntry
 
 type BlockData struct {
+	storage.BlockMetadata
 	Location LocationSlice
-	RefCount int32
-	Status   uint8
 }
 
+type OpEntry struct {
+	Location LocationEntry
+	Free     bool // free / alloc
+}
+
+type OpSlice []OpEntry
+
 type Superblock struct {
-	Generation         uint64
-	Used               uint64
-	Size               uint64
-	RootLocation       LocationSlice
-	PendingAllocations LocationSlice
-	PendingFrees       LocationSlice
+	Generation   uint64
+	BytesUsed    uint64
+	BytesTotal   uint64
+	RootLocation LocationSlice
+	Pending      OpSlice
 }

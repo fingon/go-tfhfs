@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:22:52 2018 mstenber
- * Last modified: Wed Jan 10 11:34:07 2018 mstenber
+ * Last modified: Wed Feb 21 17:47:43 2018 mstenber
  * Edit time:     11 min
  *
  */
@@ -17,11 +17,15 @@ import (
 	"github.com/fingon/go-tfhfs/storage/bolt"
 	"github.com/fingon/go-tfhfs/storage/file"
 	"github.com/fingon/go-tfhfs/storage/inmemory"
+	"github.com/fingon/go-tfhfs/storage/tree"
 )
 
 type factoryCallback func() storage.Backend
 
 var backendFactories = map[string]factoryCallback{
+	"tree": func() storage.Backend {
+		return tree.NewTreeBackend()
+	},
 	"inmemory": func() storage.Backend {
 		return inmemory.NewInMemoryBackend()
 	},

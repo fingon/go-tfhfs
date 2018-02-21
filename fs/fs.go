@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Feb  1 17:03:30 2018 mstenber
+ * Last modified: Wed Feb 21 15:33:06 2018 mstenber
  * Edit time:     390 min
  *
  */
@@ -184,12 +184,12 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 
 func BytesToNodeData(bd []byte) *ibtree.NodeData {
 	mlog.Printf2("fs/fs", "BytesToNodeData - %d bytes", len(bd))
-	dt := hugger.BlockDataType(bd[0])
+	dt := ibtree.BlockDataType(bd[0])
 	switch dt {
 	case BDT_EXTENT:
 		break
-	case hugger.BDT_NODE:
-		nd := hugger.BytesToNodeData(bd)
+	case ibtree.BDT_NODE:
+		nd := ibtree.NewNodeDataFromBytes(bd)
 		return nd
 	default:
 		log.Panicf("BytesToNodeData - wrong dt:%v", dt)

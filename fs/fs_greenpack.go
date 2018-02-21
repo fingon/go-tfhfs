@@ -4,17 +4,17 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Wed Jan 17 13:01:07 2018 mstenber
+ * Last modified: Wed Feb 21 15:33:30 2018 mstenber
  * Edit time:     25 min
  *
  */
 
 package fs
 
-import "github.com/fingon/go-tfhfs/ibtree/hugger"
+import "github.com/fingon/go-tfhfs/ibtree"
 
 const (
-	BDT_EXTENT hugger.BlockDataType = 42
+	BDT_EXTENT ibtree.BlockDataType = 42
 )
 
 type BlockSubType byte

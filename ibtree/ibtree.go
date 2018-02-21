@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Tue Feb 20 12:56:02 2018 mstenber
- * Edit time:     770 min
+ * Last modified: Wed Feb 21 15:29:45 2018 mstenber
+ * Edit time:     771 min
  *
  */
 
@@ -105,10 +105,6 @@ type Node struct {
 	NodeData
 	blockId *BlockId // on disk, if any
 	tree    *Tree
-}
-
-func (self *NodeData) String() string {
-	return fmt.Sprintf("ibnd{%p}", self)
 }
 
 func (self *Node) String() string {
@@ -388,24 +384,6 @@ func (self *Node) iterateLeafFirst(fun func(n *Node)) {
 		}
 	}
 	fun(self)
-}
-
-// CheckNodeStructure allows sanity checking a node's content (should not be really used except for debugging)
-func (self *NodeData) CheckNodeStructure() {
-	for i, c := range self.Children {
-		if c == nil {
-			mlog.Panicf("tree broke: nil child at [%d] of %v", i, self)
-		}
-		if c.Key == "" {
-			mlog.Panicf("tree broke: empty key at [%d] of %v", i, self)
-		}
-		if i > 0 {
-			k0 := self.Children[i-1].Key
-			if k0 >= c.Key {
-				mlog.Panicf("tree broke: '%x'[%d] >= '%x'[%d]", k0, i-1, c.Key, i)
-			}
-		}
-	}
 }
 
 func (self *Node) checkTreeStructure() {

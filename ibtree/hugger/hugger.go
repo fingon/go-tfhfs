@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Tue Feb 13 12:42:17 2018 mstenber
- * Edit time:     140 min
+ * Last modified: Wed Feb 21 15:32:15 2018 mstenber
+ * Edit time:     142 min
  *
  */
 
@@ -21,12 +21,6 @@ import (
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/util"
-)
-
-type BlockDataType byte
-
-const (
-	BDT_NODE BlockDataType = 7
 )
 
 type MergeCallback func(t *Transaction, src, dst *ibtree.Node, local bool)
@@ -160,7 +154,7 @@ func (self *Hugger) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 			log.Panicf("Unable to find node %x", id)
 		}
 		defer b.Close()
-		nd := BytesToNodeData(b.Data())
+		nd := ibtree.NewNodeDataFromBytes(b.Data())
 		if nd == nil {
 			log.Panicf("Unable to find node %x", id)
 		}
@@ -303,7 +297,7 @@ func (self *Hugger) AssertNoTransactions() {
 
 // ibtree.TreeSaver API
 func (self *Hugger) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
-	b := NodeDataToBytes(nd)
+	b := nd.ToBytes()
 	mlog.Printf2("ibtree/hugger/hugger", "SaveNode %d bytes", len(b))
 	sl := &util.StringList{}
 	if self.IterateReferencesCallback != nil {
@@ -340,27 +334,4 @@ func (self *Hugger) GetStorageBlock(st storage.BlockStatus, b []byte, nd *ibtree
 	}
 	self.blocks[bid] = bl
 	return bl
-}
-
-func BytesToNodeData(bd []byte) *ibtree.NodeData {
-	dt := BlockDataType(bd[0])
-	if dt != BDT_NODE {
-		log.Panicf("BytesToNodeData - wrong dt:%v", dt)
-	}
-	nd := &ibtree.NodeData{}
-	_, err := nd.UnmarshalMsg(bd[1:])
-	if err != nil {
-		log.Panic(err)
-	}
-	return nd
-}
-
-func NodeDataToBytes(nd *ibtree.NodeData) []byte {
-	bb := make([]byte, nd.Msgsize()+1)
-	bb[0] = byte(BDT_NODE)
-	b, err := nd.MarshalMsg(bb[1:1])
-	if err != nil {
-		log.Panic(err)
-	}
-	return bb[0 : 1+len(b)]
 }

@@ -4,12 +4,12 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Feb  1 22:19:48 2018 mstenber
-# Edit time:     115 min
+# Last modified: Fri Feb 16 10:19:24 2018 mstenber
+# Edit time:     116 min
 #
 #
 
-GREENPACKS=$(wildcard */*_greenpack.go)
+GREENPACKS=$(wildcard */*_greenpack.go) $(wildcard */*/*_greenpack.go)
 GREENPACK_OPTS=-alltuple
 # ^ remove -alltuple someday if we want to pretend to be compatible over versions
 

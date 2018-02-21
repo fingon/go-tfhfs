@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Wed Feb 21 15:29:45 2018 mstenber
- * Edit time:     771 min
+ * Last modified: Wed Feb 21 17:17:44 2018 mstenber
+ * Edit time:     775 min
  *
  */
 
@@ -114,7 +114,7 @@ func (self *Node) String() string {
 func (self *Node) Delete(key Key, st *Stack) *Node {
 	self.search(key, st)
 	c := st.child()
-	if c.Key != key {
+	if c == nil || c.Key != key {
 		mlog.Panicf("ibp.Delete: Key missing: %x", key)
 	}
 	st.rewriteAtIndex(true, nil)

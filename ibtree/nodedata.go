@@ -59,7 +59,7 @@ func (self *NodeData) ToBytes() []byte {
 func NewNodeDataFromBytes(bd []byte) *NodeData {
 	dt := BlockDataType(bd[0])
 	if dt != BDT_NODE {
-		mlog.Printf("BytesToNodeData - wrong dt:%v", dt)
+		mlog.Printf2("ibtree/nodedata", "BytesToNodeData - wrong dt:%v", dt)
 		return nil
 	}
 	nd := &NodeData{}

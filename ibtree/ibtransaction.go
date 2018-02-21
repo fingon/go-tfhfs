@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 17:05:05 2017 mstenber
- * Last modified: Tue Feb 20 11:40:27 2018 mstenber
- * Edit time:     31 min
+ * Last modified: Wed Feb 21 17:32:51 2018 mstenber
+ * Edit time:     35 min
  *
  */
 
@@ -98,6 +98,18 @@ func (self *SubTree) addTreePrefix(key Key) Key {
 	return Key(fmt.Sprintf("%s%s", self.treePrefix, key))
 }
 
+func (self *SubTree) stripTreePrefix(key *Key) *Key {
+	if key == nil {
+		return nil
+	}
+	s := string(*key)
+	if Key(s[:len(self.treePrefix)]) != self.treePrefix {
+		return nil
+	}
+	k := Key(s[len(self.treePrefix):])
+	return &k
+}
+
 func (self *SubTree) Delete(key Key) {
 	mlog.Printf2("ibtree/ibtransaction", "st.Delete %x", key)
 	key = self.addTreePrefix(key)
@@ -121,20 +133,15 @@ func (self *SubTree) NextKey(key Key) *Key {
 	mlog.Printf2("ibtree/ibtransaction", "st.NextKey")
 	key = self.addTreePrefix(key)
 	nk := self.transaction.NextKey(key)
-	if nk != nil && string(*nk)[:len(self.treePrefix)] != string(self.treePrefix) {
-		nk = nil
-	}
-	return nk
+	return self.stripTreePrefix(nk)
+
 }
 
 func (self *SubTree) PrevKey(key Key) *Key {
 	mlog.Printf2("ibtree/ibtransaction", "st.PrevKey")
 	key = self.addTreePrefix(key)
 	nk := self.transaction.PrevKey(key)
-	if nk != nil && string(*nk)[:len(self.treePrefix)] != string(self.treePrefix) {
-		nk = nil
-	}
-	return nk
+	return self.stripTreePrefix(nk)
 }
 func (self *SubTree) Set(key Key, value string) {
 	mlog.Printf2("ibtree/ibtransaction", "tr.Set %x %d bytes", key, len(value))

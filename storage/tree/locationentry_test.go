@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Feb 21 17:20:58 2018 mstenber
- * Last modified: Wed Feb 21 17:21:42 2018 mstenber
- * Edit time:     1 min
+ * Last modified: Thu Feb 22 10:54:32 2018 mstenber
+ * Edit time:     3 min
  *
  */
 
@@ -20,5 +20,7 @@ import (
 func TestLocationEntryEndecode(t *testing.T) {
 	t.Parallel()
 	le := LocationEntry{Offset: 42, Size: 7}
-	assert.Equal(t, le, NewLocationEntryFromKeySO(le.ToKeySO()))
+	le2 := NewLocationEntryFromKeySO(le.ToKeySO())
+	assert.Equal(t, le.Offset, le2.Offset)
+	assert.Equal(t, le.BlockSize(), le2.BlockSize())
 }

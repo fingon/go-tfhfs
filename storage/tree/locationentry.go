@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Feb 21 15:19:19 2018 mstenber
- * Last modified: Thu Feb 22 09:16:30 2018 mstenber
- * Edit time:     4 min
+ * Last modified: Thu Feb 22 10:53:49 2018 mstenber
+ * Edit time:     5 min
  *
  */
 
@@ -34,14 +34,24 @@ func (self OpEntry) String() string {
 
 // ToKeySO converts LocationEntry to ibtree.Key with size, offset order
 func (self LocationEntry) ToKeySO() ibtree.Key {
-	return ibtree.Key(util.ConcatBytes(util.Uint64Bytes(self.Size),
+	bs := self.BlockSize()
+	return ibtree.Key(util.ConcatBytes(util.Uint64Bytes(bs),
 		util.Uint64Bytes(self.Offset)))
 }
 
 // ToKeyOS converts LocationEntry to ibtree.Key with offset, size order
 func (self LocationEntry) ToKeyOS() ibtree.Key {
+	bs := self.BlockSize()
 	return ibtree.Key(util.ConcatBytes(util.Uint64Bytes(self.Offset),
-		util.Uint64Bytes(self.Size)))
+		util.Uint64Bytes(bs)))
+}
+
+func (self LocationEntry) BlockSize() uint64 {
+	s := self.Size
+	if s%blockSize != 0 {
+		s += blockSize - s%blockSize
+	}
+	return s
 }
 
 // NewLocationEntryFromKeySO decodes ibtree.Key with size, offset order

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Thu Feb 22 10:06:46 2018 mstenber
- * Edit time:     257 min
+ * Last modified: Thu Feb 22 11:14:54 2018 mstenber
+ * Edit time:     284 min
  *
  */
 
@@ -99,8 +99,13 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 		self.rootBlockId = best.RootLocation.ToBlockId()
 		self.root = self.tree.LoadRoot(self.rootBlockId)
 		self.Superblock = *best
+
 	}
 	self.newTransaction(self.root)
+	if best != nil {
+		// Stick stuff in pending to tree, if any
+		self.flushPending()
+	}
 }
 
 func (self *treeBackend) newTransaction(root *ibtree.Node) {
@@ -158,10 +163,16 @@ func (self *treeBackend) appendOp(le LocationEntry, free bool) {
 	mlog.Printf2("storage/tree/tree", "appendOp %v", op)
 }
 
-func (self *treeBackend) appendOps(ls LocationSlice, free bool) {
+func (self *treeBackend) appendFrees(ls LocationSlice) {
 	for _, le := range ls {
-		self.appendOp(le, free)
+		self.appendOp(le, true)
+		self.BytesUsed -= le.BlockSize()
 	}
+}
+
+func (self *treeBackend) addFreeTree(le LocationEntry) {
+	self.freeSize2OffsetTree.Set(le.ToKeySO(), "")
+	self.freeOffset2SizeTree.Set(le.ToKeyOS(), "")
 }
 
 func (self *treeBackend) addFree(le LocationEntry) {
@@ -169,11 +180,14 @@ func (self *treeBackend) addFree(le LocationEntry) {
 		self.appendOp(le, true)
 		// the subsequent .Sets hit temporary tree; ^ is
 		// what gets persisted later on
-	} else {
-		self.BytesUsed -= le.Size
 	}
-	self.freeSize2OffsetTree.Set(le.ToKeySO(), "")
-	self.freeOffset2SizeTree.Set(le.ToKeyOS(), "")
+	self.BytesUsed -= le.BlockSize()
+	self.addFreeTree(le)
+}
+
+func (self *treeBackend) removeFreeTree(le LocationEntry) {
+	self.freeSize2OffsetTree.Delete(le.ToKeySO())
+	self.freeOffset2SizeTree.Delete(le.ToKeyOS())
 }
 
 func (self *treeBackend) removeFree(le LocationEntry) {
@@ -181,12 +195,9 @@ func (self *treeBackend) removeFree(le LocationEntry) {
 		self.appendOp(le, false)
 		// the subsequent .Deletes hit temporary tree; ^ is
 		// what gets persisted later on
-	} else {
-		self.BytesUsed += le.Size
 	}
-	self.freeSize2OffsetTree.Delete(le.ToKeySO())
-	self.freeOffset2SizeTree.Delete(le.ToKeyOS())
-
+	self.BytesUsed += le.BlockSize()
+	self.removeFreeTree(le)
 }
 
 func (self *treeBackend) String() string {
@@ -198,31 +209,27 @@ func (self *treeBackend) allocate(size uint64) LocationSlice {
 	sl := make(LocationSlice, 0, 1)
 	for size > 0 {
 		// [1] single existing allocation if possible
-		// asize = allocation size
-		asize := size
-		if asize%blockSize != 0 {
-			asize += blockSize - asize%blockSize
-			mlog.Printf2("storage/tree/tree", " allocation size %v", asize)
-		}
-		wantkey := LocationEntry{Size: asize}.ToKeySO()
+		want := LocationEntry{Size: size}
+		bsize := want.BlockSize()
+		wantkey := want.ToKeySO()
 		kp := self.freeSize2OffsetTree.NextKey(wantkey)
 		if kp != nil {
 			mlog.Printf2("storage/tree/tree", " [1] found enough")
 			le := NewLocationEntryFromKeySO(*kp)
 			self.removeFree(le)
-			if le.Size != asize {
+			left := le.Size - bsize
+			if left > 0 {
 				// Insert new, smaller entry
-				self.addFree(LocationEntry{Size: le.Size - asize,
-					Offset: le.Offset + asize})
+				self.addFree(LocationEntry{Size: left,
+					Offset: le.Offset + bsize})
 			}
-			self.BytesUsed += superBlockSize
 			sl = append(sl, LocationEntry{Size: size,
 				Offset: le.Offset})
 			return sl
 		}
 
 		// [2] grow if possible
-		if self.grow(asize) {
+		if self.grow(bsize) {
 			mlog.Printf2("storage/tree/tree", " [2] grew")
 			continue
 		}
@@ -240,7 +247,7 @@ func (self *treeBackend) allocate(size uint64) LocationSlice {
 
 		// [4] failure (free done allocations)
 		mlog.Printf2("storage/tree/tree", " [4] failure")
-		self.appendOps(sl, true)
+		self.appendFrees(sl)
 		return nil
 	}
 	return sl
@@ -278,6 +285,8 @@ func (self *treeBackend) grow(asize uint64) bool {
 	// Simple case if even with new size we do not cross
 	// superblock boundary.
 	if oldsbs == newsbs {
+		// addFree implicitly reduces used
+		self.BytesUsed += asize
 		self.addFree(LocationEntry{Offset: self.BytesTotal, Size: asize})
 		self.BytesTotal += asize
 		mlog.Printf2("storage/tree/tree", " BytesTotal=%v", self.BytesTotal)
@@ -292,10 +301,14 @@ func (self *treeBackend) grow(asize uint64) bool {
 		// (but not big enough for what was originally asked
 		// for)
 		mlog.Printf2("storage/tree/tree", " adding small free area %v", ofs-self.BytesTotal)
-		self.addFree(LocationEntry{Offset: self.BytesTotal,
-			Size: ofs - self.BytesTotal})
+		ssize := ofs - self.BytesTotal
+		// addFree implicitly reduces used
+		self.BytesUsed += ssize
+		self.BytesTotal += ssize
+		self.addFree(LocationEntry{Offset: self.BytesTotal, Size: ssize})
 	}
-	self.BytesTotal = ofs + superBlockSize
+	self.BytesTotal += superBlockSize
+	self.BytesUsed += superBlockSize
 	return self.grow(asize)
 }
 
@@ -315,6 +328,7 @@ func (self *treeBackend) writeData(location LocationSlice, data []byte) {
 }
 
 func (self *treeBackend) purgeNonCurrent(nd *ibtree.NodeData, bid ibtree.BlockId) {
+	mlog.Printf2("storage/tree/tree", "purgeNonCurrent %x", bid)
 	// if we don't know its bid, it is probably 'fresh'
 	if bid == "" {
 		return
@@ -323,6 +337,7 @@ func (self *treeBackend) purgeNonCurrent(nd *ibtree.NodeData, bid ibtree.BlockId
 	// any subtree we have seen, we ignore
 	_, ok := self.currentMap[bid]
 	if ok {
+		mlog.Printf2("storage/tree/tree", " current")
 		return
 	}
 
@@ -335,21 +350,41 @@ func (self *treeBackend) purgeNonCurrent(nd *ibtree.NodeData, bid ibtree.BlockId
 	}
 	// This block id is redundant, remove it
 	ls := NewLocationSliceFromBlockId(bid)
-	self.appendOps(ls, true)
+	self.appendFrees(ls)
+	mlog.Printf2("storage/tree/tree", " freeing")
+}
+
+func (self *treeBackend) flushPending() {
+	if self.Pending == nil {
+		return
+	}
+	for _, op := range self.Pending {
+		mlog.Printf2("storage/tree/tree", " flushing %v", op)
+		if op.Free {
+			self.addFreeTree(op.Location)
+		} else {
+			self.removeFreeTree(op.Location)
+		}
+	}
+	self.Pending = nil
 }
 
 func (self *treeBackend) Flush() {
 	defer self.lock.Locked()()
 	mlog.Printf2("storage/tree/tree", "%v.Flush", self)
-	self.flushing = true
 
 	// in flushing mode, we do bonus add-frees, but store those
 	// only in superblock (and at end of flush stick them to the
 	// fresh tree)
 	root := self.t.Root()
-	self.newTransaction(root)
 
-	// commit tree
+	// if no change, just gtfo
+	if root == self.root {
+		return
+	}
+
+	self.flushing = true
+	self.newTransaction(root)
 	newRoot, bid := root.Commit()
 
 	// determine delta in blocks, using currentMap entries as
@@ -362,10 +397,10 @@ func (self *treeBackend) Flush() {
 	self.RootLocation = NewLocationSliceFromBlockId(bid)
 
 	// Write superblock
-	mlog.Printf2("storage/tree/tree", " writing superblock")
 	self.superIndex++
 	si := self.superIndex % numberOfSuperBlocks(self.BytesTotal)
 	ofs := superBlockOffset(si)
+	mlog.Printf2("storage/tree/tree", " writing superblock %d @%d", si, ofs)
 	b, err := self.Superblock.MarshalMsg(nil)
 	if err != nil {
 		log.Panic(err)
@@ -384,23 +419,19 @@ func (self *treeBackend) Flush() {
 	ls := LocationSlice{LocationEntry{Size: uint64(len(b)), Offset: ofs}}
 	self.writeData(ls, b)
 
+	self.rootBlockId = bid
+
 	// Throw away the temporary root
 	self.newTransaction(newRoot)
 
 	self.flushing = false
 
-	// Pending -> alloc/free
-	if self.Pending != nil {
-		for _, op := range self.Pending {
-			mlog.Printf2("storage/tree/tree", " handling %v", op)
-			if op.Free {
-				self.addFree(op.Location)
-			} else {
-				self.removeFree(op.Location)
-			}
-		}
-		self.Pending = nil
-	}
+	// Stick stuff in pending to tree, if any
+	self.flushPending()
+
+	// Clever bit: Use the post-flush root as base so we do not
+	// cause subsequent flushes just based on flushPending
+	self.root = self.t.Root()
 
 	// Definition of 'current' is invalidated by this
 	self.currentMap = make(map[ibtree.BlockId]bool)
@@ -413,7 +444,7 @@ func (self *treeBackend) DeleteBlock(b *storage.Block) {
 	if bd == nil {
 		mlog.Panicf("Nonexistent DeleteBlock: %v", b)
 	}
-	self.appendOps(bd.Location, true)
+	self.appendFrees(bd.Location)
 	self.blockTree.Delete(ibtree.Key(b.Id))
 }
 
@@ -503,4 +534,12 @@ func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 		}
 	}
 	return ibtree.NewNodeDataFromBytes(b)
+}
+
+func (self *treeBackend) GetBytesUsed() uint64 {
+	return self.BytesUsed
+}
+
+func (self *treeBackend) GetBytesAvailable() uint64 {
+	return self.DirectoryBackendBase.GetBytesAvailable() + self.BytesTotal - self.BytesUsed
 }

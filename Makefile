@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Feb 21 17:49:21 2018 mstenber
-# Edit time:     119 min
+# Last modified: Thu Feb 22 11:22:58 2018 mstenber
+# Edit time:     126 min
 #
 #
 
@@ -32,6 +32,11 @@ all: generate test tfhfs tfhfs-connector
 
 bench: .done.buildable
 	go test ./... -bench .
+
+cover: .done.cover
+
+html-cover: .done.cover
+	go tool cover -html=.done.cover
 
 get: .done.getprebuild
 
@@ -102,9 +107,6 @@ util/maprunnercallbacklist_gen.go: Makefile xxx/list.go
 		cat ) > $@.new
 	mv $@.new $@
 
-html-cover-%: .done.cover.%
-	go tool cover -html=$<
-
 prof-%: .done.cpuprof.%
 	go tool pprof $<
 
@@ -127,9 +129,9 @@ update-deps:
 	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -t -u . ); done
 	for LINE in `cat go-get-deps.txt`; do go get -u $$LINE; done
 
-.done.cover.%: .done.buildable $(wildcard %/*.go)
-	(cd $* && go test . -coverprofile=../$@.new)
-	mv $@.new $@
+.done.cover: .done.buildable $(wildcard %/*.go) $(wildcard %/*.go)
+	go test ./... -coverprofile=.done.cover.new
+	mv .done.cover.new .done.cover
 
 
 .done.cpuprof.%: .done.buildable $(wildcard %/*.go)

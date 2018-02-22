@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Feb 21 15:19:19 2018 mstenber
- * Last modified: Wed Feb 21 15:20:34 2018 mstenber
- * Edit time:     1 min
+ * Last modified: Thu Feb 22 09:16:30 2018 mstenber
+ * Edit time:     4 min
  *
  */
 
@@ -13,10 +13,24 @@ package tree
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/util"
 )
+
+func (self LocationEntry) String() string {
+	return fmt.Sprintf("le{%v@%v}", self.Size, self.Offset)
+}
+
+func (self OpEntry) String() string {
+	s := self.Location.String()
+	frees := "-"
+	if self.Free {
+		frees = "+"
+	}
+	return fmt.Sprintf("op{%v%v}", frees, s)
+}
 
 // ToKeySO converts LocationEntry to ibtree.Key with size, offset order
 func (self LocationEntry) ToKeySO() ibtree.Key {

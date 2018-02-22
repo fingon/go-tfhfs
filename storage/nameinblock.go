@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Mon Jan 15 18:39:20 2018 mstenber
- * Last modified: Mon Jan 15 19:03:12 2018 mstenber
- * Edit time:     19 min
+ * Last modified: Thu Feb 22 10:06:27 2018 mstenber
+ * Edit time:     20 min
  *
  */
 
@@ -72,8 +72,7 @@ func (self *NameInBlockBackend) SetNameToBlockId(name, block_id string) {
 	if self.block != nil {
 		self.bb.DeleteBlock(self.block)
 	}
-	b := make([]byte, block.Msgsize())
-	_, err := self.namedMap.MarshalMsg(b)
+	b, err := self.namedMap.MarshalMsg(nil)
 	if err != nil {
 		log.Panic(err)
 	}

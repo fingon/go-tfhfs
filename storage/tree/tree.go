@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Tue Mar 13 13:14:23 2018 mstenber
+ * Last modified: Tue Mar 13 16:00:59 2018 mstenber
  * Edit time:     320 min
  *
  */
@@ -305,7 +305,7 @@ func (self *treeBackend) purgeNonCurrent(nd *ibtree.NodeData, bid ibtree.BlockId
 	if !nd.Leafy {
 		// Recurse
 		for _, c := range nd.Children {
-			mlog.Printf(" child %v", c)
+			mlog.Printf2("storage/tree/tree", " child %v", c)
 			bid2 := ibtree.BlockId(c.Value)
 			self.purgeNonCurrent(self.LoadNode(bid2), bid2)
 		}
@@ -400,6 +400,7 @@ func (self *treeBackend) Flush() {
 
 func (self *treeBackend) DeleteBlock(b *storage.Block) {
 	defer self.lock.Locked()()
+	mlog.Printf2("storage/tree/tree", "%v.DeleteBlock %v", self, b)
 	bd := self.getBlockData(b.Id)
 	if bd == nil {
 		mlog.Panicf("Nonexistent DeleteBlock: %v", b)
@@ -410,6 +411,7 @@ func (self *treeBackend) DeleteBlock(b *storage.Block) {
 
 func (self *treeBackend) GetBlockData(b *storage.Block) []byte {
 	defer self.lock.Locked()()
+	mlog.Printf2("storage/tree/tree", "%v.GetBlockData %v", self, b)
 	bd := self.getBlockData(b.Id)
 	if bd == nil {
 		return nil
@@ -419,6 +421,7 @@ func (self *treeBackend) GetBlockData(b *storage.Block) []byte {
 
 func (self *treeBackend) GetBlockById(id string) *storage.Block {
 	defer self.lock.Locked()()
+	mlog.Printf2("storage/tree/tree", "%v.GetBlockById %x", self, id)
 	bd := self.getBlockData(id)
 	if bd == nil {
 		return nil
@@ -440,6 +443,7 @@ func (self *treeBackend) setBlockData(id string, bdata *BlockData) {
 
 func (self *treeBackend) StoreBlock(bl *storage.Block) {
 	defer self.lock.Locked()()
+	mlog.Printf2("storage/tree/tree", "%v.StoreBlock %v", self, bl)
 	b := *bl.Data.Get()
 	ls := self.allocate(uint64(len(b)))
 	self.p.WriteData(ls, b)
@@ -449,6 +453,7 @@ func (self *treeBackend) StoreBlock(bl *storage.Block) {
 
 func (self *treeBackend) UpdateBlock(bl *storage.Block) int {
 	defer self.lock.Locked()()
+	mlog.Printf2("storage/tree/tree", "%v.UpdateBlock %v", self, bl)
 	bd := self.getBlockData(bl.Id)
 	bd.BlockMetadata = bl.BlockMetadata
 	self.setBlockData(bl.Id, bd)
@@ -471,7 +476,7 @@ func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 	b := nd.ToBytes()
 	b, err := self.Codec.EncodeBytes(b, nil)
 	if err != nil {
-		return ""
+		mlog.Panicf("SaveNode unable to encode data: %v", err)
 	}
 	ls := self.allocate(uint64(len(b)))
 	self.p.WriteData(ls, b)
@@ -481,13 +486,14 @@ func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 }
 
 func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
-	mlog.Printf("t.LoadNode %v", id)
+	mlog.Printf2("storage/tree/tree", "t.LoadNode %v", id)
 	ls := NewLocationSliceFromBlockId(id)
 	b := self.p.ReadData(ls)
 	b, err := self.Codec.DecodeBytes(b, nil)
 	if err != nil {
 		return nil
 	}
+	mlog.Printf2("storage/tree/tree", " got %d bytes in %p", len(b), b)
 	return ibtree.NewNodeDataFromBytes(b)
 }
 
@@ -500,5 +506,8 @@ func (self *treeBackend) GetBytesAvailable() uint64 {
 }
 
 func (self *treeBackend) Supports(feature storage.BackendFeature) bool {
+	if feature == storage.CodecFeature {
+		return true
+	}
 	return false
 }

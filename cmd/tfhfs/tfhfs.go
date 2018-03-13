@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Wed Jan 24 16:41:50 2018 mstenber
- * Edit time:     61 min
+ * Last modified: Tue Mar 13 12:38:47 2018 mstenber
+ * Edit time:     64 min
  *
  */
 
@@ -22,6 +22,7 @@ import (
 	"github.com/fingon/go-tfhfs/fs"
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/server"
+	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/storage/factory"
 	"github.com/hanwen/go-fuse/fuse"
 )
@@ -64,11 +65,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	// storage backend
-	backend := factory.New(*backendp, storedir)
-
 	// actual filesystem
-	st := fs.NewCryptoStorage(*password, *salt, backend)
+	beconf := storage.BackendConfiguration{Directory: storedir}
+	conf := factory.CryptoStorageConfiguration{BackendConfiguration: beconf,
+		BackendName: *backendp, Password: *password, Salt: *salt}
+	st := factory.NewCryptoStorage(conf)
 	myfs := fs.NewFs(st, *rootName, *cachesize)
 	opts := &fuse.MountOptions{AllowOther: true}
 	if mlog.IsEnabled() {

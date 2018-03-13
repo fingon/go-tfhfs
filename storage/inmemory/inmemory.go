@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 17 22:20:08 2017 mstenber
- * Last modified: Tue Feb 20 10:36:08 2018 mstenber
+ * Last modified: Tue Mar 13 12:12:01 2018 mstenber
  * Edit time:     75 min
  *
  */
@@ -111,4 +111,8 @@ func (self *inMemoryBackend) UpdateBlock(b *storage.Block) int {
 	}
 	mlog.Printf2("storage/inmemory/inmemory", "im.UpdateBlock %x", b.Id)
 	return 1
+}
+
+func (self *inMemoryBackend) Supports(feature storage.BackendFeature) bool {
+	return false
 }

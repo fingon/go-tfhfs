@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 15:22:21 2018 mstenber
- * Last modified: Thu Jan 18 10:45:05 2018 mstenber
- * Edit time:     43 min
+ * Last modified: Tue Mar 13 12:37:58 2018 mstenber
+ * Edit time:     45 min
  *
  */
 
@@ -27,7 +27,6 @@ import (
 )
 
 type system struct {
-	be     storage.Backend
 	st     *storage.Storage
 	fs     *fs.Fs
 	server *server.Server
@@ -35,13 +34,14 @@ type system struct {
 
 func newSystem(rootName string, family, address string) *system {
 	mlog.Printf2("connector/connector_test", "newSystem root:%v family:%v address:%v", rootName, family, address)
-	be := factory.New("inmemory", "")
 	//st := storage.Storage{Backend: be}.Init()
-	st := fs.NewCryptoStorage("assword", "alt", be)
+	config := factory.CryptoStorageConfiguration{BackendName: "inmemory",
+		Password: "assword"}
+	st := factory.NewCryptoStorage(config)
 	fs := fs.NewFs(st, rootName, 0)
 	server := server.Server{Address: address, Family: family, Fs: fs,
 		Storage: st}.Init()
-	return &system{be, st, fs, server}
+	return &system{st, fs, server}
 }
 
 func (self *system) Close() {

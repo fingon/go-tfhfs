@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 14:31:48 2017 mstenber
- * Last modified: Thu Feb  1 17:48:15 2018 mstenber
- * Edit time:     39 min
+ * Last modified: Tue Mar 13 12:40:05 2018 mstenber
+ * Edit time:     44 min
  *
  */
 
@@ -89,13 +89,15 @@ func BenchmarkBadgerFs(b *testing.B) {
 	defer os.RemoveAll(dir)
 
 	// Add some items we can access/delete/set
-	n := 100000
-	backend := factory.New(bename, dir)
-	st := NewCryptoStorage("assword", "alt", backend)
+	beconf := storage.BackendConfiguration{Directory: dir}
+	conf := factory.CryptoStorageConfiguration{BackendConfiguration: beconf,
+		BackendName: bename, Password: "assword"}
+	st := factory.NewCryptoStorage(conf)
 	fs := NewFs(st, "toor", 0)
 	defer fs.closeWithoutTransactions()
 
 	tr := fs.GetTransaction()
+	n := 100000
 	for i := 0; i < n; i++ {
 		k := NewBlockKey(uint64(i), BST_META, "").IB()
 		tr.IB().Set(k, fmt.Sprintf("v%d", i))

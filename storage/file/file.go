@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 15:44:41 2018 mstenber
- * Last modified: Tue Feb 20 10:35:53 2018 mstenber
+ * Last modified: Tue Mar 13 12:12:50 2018 mstenber
  * Edit time:     82 min
  *
  */
@@ -223,4 +223,8 @@ func (self *fileBackend) blockPath(b *storage.Block, metadata *storage.BlockMeta
 	full = fmt.Sprintf("%s/%x_%v_%v",
 		dir, b.Id[directoryBytes:], metadata.RefCount, metadata.Status)
 	return
+}
+
+func (self *fileBackend) Supports(feature storage.BackendFeature) bool {
+	return false
 }

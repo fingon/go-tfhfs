@@ -4,14 +4,15 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:22:52 2018 mstenber
- * Last modified: Wed Feb 21 17:47:43 2018 mstenber
- * Edit time:     11 min
+ * Last modified: Tue Mar 13 12:53:18 2018 mstenber
+ * Edit time:     23 min
  *
  */
 
 package factory
 
 import (
+	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/storage/badger"
 	"github.com/fingon/go-tfhfs/storage/bolt"
@@ -57,4 +58,46 @@ func NewWithConfig(name string, config storage.BackendConfiguration) storage.Bac
 	be := backendFactories[name]()
 	be.Init(config)
 	return be
+}
+
+type CryptoStorageConfiguration struct {
+	storage.BackendConfiguration
+	BackendName             string
+	Password, Salt          string
+	Iterations, QueueLength int
+}
+
+func NewCryptoStorage(config CryptoStorageConfiguration) *storage.Storage {
+	iterations := config.Iterations
+	if iterations == 0 {
+		iterations = 12345
+	}
+	queuelength := config.QueueLength
+	if queuelength == 0 {
+		queuelength = 100
+	}
+	salt := config.Salt
+	if salt == "" {
+		salt = "asdf"
+	}
+	beconfig := config.BackendConfiguration
+	c := &codec.CodecChain{}
+	if config.Password != "" {
+		c1 := codec.EncryptingCodec{}.Init([]byte(config.Password), []byte(salt), iterations)
+		c2 := &codec.CompressingCodec{}
+		c = c.Init(c1, c2)
+	} else {
+		c2 := &codec.CompressingCodec{}
+		c = c.Init(c2)
+	}
+	beconfig.Codec = c
+	be := NewWithConfig(config.BackendName, beconfig)
+
+	// If underlying backend takes care of codec, we give nop
+	// codec to storage
+	if be.Supports(storage.CodecFeature) {
+		c = &codec.CodecChain{}
+
+	}
+	return storage.Storage{QueueLength: queuelength, Backend: be, Codec: c}.Init()
 }

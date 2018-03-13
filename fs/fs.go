@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Wed Feb 21 15:33:06 2018 mstenber
- * Edit time:     390 min
+ * Last modified: Tue Mar 13 12:25:59 2018 mstenber
+ * Edit time:     391 min
  *
  */
 
@@ -22,7 +22,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/ibtree/hugger"
 	"github.com/fingon/go-tfhfs/mlog"
@@ -157,14 +156,6 @@ func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	}()
 
 	return fs
-}
-
-func NewCryptoStorage(password, salt string, backend storage.Backend) *storage.Storage {
-	c1 := codec.EncryptingCodec{}.Init([]byte(password), []byte(salt), iterations)
-	c2 := &codec.CompressingCodec{}
-	c := codec.CodecChain{}.Init(c1, c2)
-	st := storage.Storage{Codec: c, Backend: backend, QueueLength: 100}.Init()
-	return st
 }
 
 func (self *Fs) hasExternalReferences(id string) bool {

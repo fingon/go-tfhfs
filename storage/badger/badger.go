@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Tue Feb 20 10:35:26 2018 mstenber
- * Edit time:     145 min
+ * Last modified: Tue Mar 13 12:12:25 2018 mstenber
+ * Edit time:     146 min
  *
  */
 
@@ -164,4 +164,8 @@ func (self *badgerBackend) UpdateBlock(b *storage.Block) int {
 	mlog.Printf2("storage/badger/badger", "bad.UpdateBlock %x", b.Id)
 	self.updateBlock(b)
 	return 1
+}
+
+func (self *badgerBackend) Supports(feature storage.BackendFeature) bool {
+	return false
 }

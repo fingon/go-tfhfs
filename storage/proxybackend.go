@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sat Jan  6 00:08:05 2018 mstenber
- * Last modified: Tue Feb 20 10:34:54 2018 mstenber
- * Edit time:     6 min
+ * Last modified: Tue Mar 13 12:11:26 2018 mstenber
+ * Edit time:     7 min
  *
  */
 
@@ -75,6 +75,10 @@ func (self *proxyBackend) SetNameToBlockId(name, block_id string) {
 
 func (self *proxyBackend) StoreBlock(b *Block) {
 	self.Backend.StoreBlock(b)
+}
+
+func (self *proxyBackend) Supports(feature BackendFeature) bool {
+	return self.Backend.Supports(feature)
 }
 
 func (self *proxyBackend) UpdateBlock(b *Block) int {

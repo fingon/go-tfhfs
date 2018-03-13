@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 11:14:11 2018 mstenber
- * Last modified: Wed Feb 21 15:27:05 2018 mstenber
- * Edit time:     11 min
+ * Last modified: Tue Mar 13 12:13:13 2018 mstenber
+ * Edit time:     13 min
  *
  */
 
@@ -63,6 +63,12 @@ type NameBackend interface {
 	SetNameToBlockId(name, block_id string)
 }
 
+type BackendFeature int
+
+const (
+	CodecFeature BackendFeature = iota
+)
+
 // Backend is the shadow behind the throne; it actually handles the
 // low-level operations of blocks. It provides an API that returns
 // results that are consistent with the previous calls. How it does
@@ -90,6 +96,10 @@ type Backend interface {
 
 	// GetBytesUsed returns number of bytes used.
 	GetBytesUsed() uint64
+
+	// Supports can be used to query if a backend (chain) supports
+	// a particular feature
+	Supports(feature BackendFeature) bool
 
 	BlockBackend
 	NameBackend

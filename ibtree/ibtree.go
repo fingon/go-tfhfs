@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:08:16 2017 mstenber
- * Last modified: Wed Feb 21 17:17:44 2018 mstenber
- * Edit time:     775 min
+ * Last modified: Tue Mar 13 11:27:43 2018 mstenber
+ * Edit time:     776 min
  *
  */
 
@@ -30,6 +30,10 @@ import (
 const hashSize = 32
 
 type BlockId string
+
+func (self BlockId) String() string {
+	return fmt.Sprintf("b{%x}", string(self))
+}
 
 type TreeSaver interface {
 	// SaveNode persists the node, and returns the backend id for it.

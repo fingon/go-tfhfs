@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 22:49:15 2018 mstenber
- * Last modified: Tue Feb 20 10:35:37 2018 mstenber
+ * Last modified: Tue Mar 13 12:12:39 2018 mstenber
  * Edit time:     30 min
  *
  */
@@ -168,4 +168,8 @@ func (self *boltBackend) UpdateBlock(b *storage.Block) int {
 	mlog.Printf2("storage/bolt/bolt", "bbolt.UpdateBlock %x", b.Id)
 	self.updateBlock(b)
 	return 1
+}
+
+func (self *boltBackend) Supports(feature storage.BackendFeature) bool {
+	return false
 }

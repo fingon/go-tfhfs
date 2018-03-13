@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Thu Feb  1 17:04:03 2018 mstenber
- * Edit time:     243 min
+ * Last modified: Tue Mar 13 13:52:03 2018 mstenber
+ * Edit time:     250 min
  *
  */
 
@@ -22,12 +22,15 @@ import (
 	"time"
 
 	"github.com/fingon/go-tfhfs/mlog"
-	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/storage/factory"
 	"github.com/fingon/go-tfhfs/util"
 	"github.com/hanwen/go-fuse/fuse"
 	"github.com/stvp/assert"
 )
+
+const testBackend string = "tree"     // Backend type to use
+const testDirectory string = ""       // If want to persist
+const testPassword string = "assword" // Crypto password
 
 func ProdFsFile1(t *testing.T, u *FSUser, tn, wsize, rsize int) {
 	mlog.Printf2("fs/rawfs_test", "ProdFsFile1 tn:%v", tn)
@@ -390,8 +393,11 @@ func TestFs(t *testing.T) {
 				t.Parallel()
 				mlog.Printf2("fs/rawfs_test", "starting")
 				RootName := "toor"
-				backend := factory.New("inmemory", "")
-				st := storage.Storage{Backend: backend}.Init()
+				conf := factory.CryptoStorageConfiguration{
+					BackendName: testBackend,
+					Password:    testPassword}
+				conf.Directory = testDirectory
+				st := factory.NewCryptoStorage(conf)
 				fs := NewFs(st, RootName, 123)
 				defer fs.closeWithoutTransactions()
 				if gen != nil {
@@ -429,8 +435,11 @@ func TestFsParallel(t *testing.T) {
 				t.Parallel()
 
 				RootName := "toor"
-				backend := factory.New("inmemory", "")
-				st := storage.Storage{Backend: backend}.Init()
+				conf := factory.CryptoStorageConfiguration{
+					BackendName: testBackend,
+					Password:    testPassword}
+				conf.Directory = testDirectory
+				st := factory.NewCryptoStorage(conf)
 				fs := NewFs(st, RootName, 123)
 				defer fs.closeWithoutTransactions()
 

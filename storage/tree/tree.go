@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Tue Mar 13 16:00:59 2018 mstenber
- * Edit time:     320 min
+ * Last modified: Tue Mar 13 16:39:32 2018 mstenber
+ * Edit time:     335 min
  *
  */
 
@@ -40,7 +40,8 @@ type treeBackend struct {
 	storage.NameInBlockBackend
 	lock                util.MutexLocked
 	tree                *ibtree.Tree
-	root                *ibtree.Node
+	savedRoot           *ibtree.Node // what is on disk (+sb)
+	unchangedRoot       *ibtree.Node // what we produced post-flush
 	rootBlockId         ibtree.BlockId
 	t                   *ibtree.Transaction
 	p                   treePersister
@@ -89,16 +90,17 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 	}
 	if best == nil {
 		// New tree
-		self.root = self.tree.NewRoot()
+		self.savedRoot = self.tree.NewRoot()
 		self.rootBlockId = ""
 	} else {
 		// Old tree
 		self.rootBlockId = best.RootLocation.ToBlockId()
-		self.root = self.tree.LoadRoot(self.rootBlockId)
+		self.savedRoot = self.tree.LoadRoot(self.rootBlockId)
 		self.Superblock = *best
 
 	}
-	self.newTransaction(self.root)
+	self.unchangedRoot = self.savedRoot
+	self.newTransaction(self.savedRoot)
 	if best != nil {
 		// Stick stuff in pending to tree, if any
 		self.flushPending()
@@ -294,6 +296,7 @@ func (self *treeBackend) purgeNonCurrent(nd *ibtree.NodeData, bid ibtree.BlockId
 	if bid == "" {
 		return
 	}
+	sanityCheckNodeData(self.p.Size(), nd)
 
 	// any subtree we have seen, we ignore
 	_, ok := self.currentMap[bid]
@@ -342,7 +345,7 @@ func (self *treeBackend) Flush() {
 	root := self.t.Root()
 
 	// if no change, just gtfo
-	if root == self.root {
+	if root == self.unchangedRoot {
 		return
 	}
 
@@ -353,7 +356,7 @@ func (self *treeBackend) Flush() {
 	// determine delta in blocks, using currentMap entries as
 	// 'interesting' border
 	mlog.Printf2("storage/tree/tree", " purging old")
-	self.purgeNonCurrent(&self.root.NodeData, self.rootBlockId)
+	self.purgeNonCurrent(&self.savedRoot.NodeData, self.rootBlockId)
 
 	// update superblock
 	self.Generation++
@@ -380,6 +383,7 @@ func (self *treeBackend) Flush() {
 	self.p.WriteData(ls, b)
 
 	self.rootBlockId = bid
+	self.savedRoot = newRoot
 
 	// Throw away the temporary root
 	self.newTransaction(newRoot)
@@ -391,7 +395,7 @@ func (self *treeBackend) Flush() {
 
 	// Clever bit: Use the post-flush root as base so we do not
 	// cause subsequent flushes just based on flushPending
-	self.root = self.t.Root()
+	self.unchangedRoot = self.t.Root()
 
 	// Definition of 'current' is invalidated by this
 	self.currentMap = make(map[ibtree.BlockId]bool)
@@ -485,6 +489,24 @@ func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 	return bid
 }
 
+func sanityCheckNodeData(s uint64, nd *ibtree.NodeData) {
+	if !mlog.IsEnabled() || nd.Leafy {
+		return
+	}
+	for i, c := range nd.Children {
+		bid := ibtree.BlockId(c.Value)
+		ls := NewLocationSliceFromBlockId(bid)
+		for _, le := range ls {
+			ofs := le.Offset
+			// +le.Size may not be in range, if we're
+			// referring to allocation tree.
+			if ofs > s {
+				mlog.Panicf("Out of bounds location in child %d/%d: %v > %v", i+1, len(nd.Children), ofs, s)
+			}
+		}
+	}
+}
+
 func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 	mlog.Printf2("storage/tree/tree", "t.LoadNode %v", id)
 	ls := NewLocationSliceFromBlockId(id)
@@ -494,7 +516,9 @@ func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 		return nil
 	}
 	mlog.Printf2("storage/tree/tree", " got %d bytes in %p", len(b), b)
-	return ibtree.NewNodeDataFromBytes(b)
+	nd := ibtree.NewNodeDataFromBytes(b)
+	sanityCheckNodeData(self.p.Size(), nd)
+	return nd
 }
 
 func (self *treeBackend) GetBytesUsed() uint64 {

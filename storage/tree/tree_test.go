@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Feb 21 17:11:02 2018 mstenber
- * Last modified: Thu Feb 22 11:16:54 2018 mstenber
- * Edit time:     21 min
+ * Last modified: Sun Feb 25 18:58:50 2018 mstenber
+ * Edit time:     27 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/stvp/assert"
 )
@@ -23,54 +24,67 @@ import (
 func TestTree(t *testing.T) {
 	t.Parallel()
 
-	dir, _ := ioutil.TempDir("", "tree")
-	defer os.RemoveAll(dir)
+	for _, test := range []struct {
+		n     string
+		codec bool
+	}{{"plain", false}, {"encrypted", true}} {
 
-	config := storage.BackendConfiguration{Directory: dir}
+		dir, _ := ioutil.TempDir("", "tree")
+		defer os.RemoveAll(dir)
 
-	be := NewTreeBackend()
-	tbe := be.(*treeBackend)
-	be.Init(config)
+		config := storage.BackendConfiguration{Directory: dir}
 
-	assert.Equal(t, tbe.BytesUsed, uint64(0))
-	assert.Equal(t, tbe.BytesTotal, uint64(0))
-	be.Flush() // empty tree = still no data needed
-	assert.Equal(t, tbe.BytesUsed, uint64(0))
-	assert.Equal(t, tbe.BytesTotal, uint64(0))
+		if test.codec {
+			config.Codec = codec.EncryptingCodec{}.Init([]byte("foo"), []byte("salty"), 123)
+		}
 
-	// Add dummy block
+		t.Run(test.n, func(t *testing.T) {
+			be := NewTreeBackend()
+			tbe := be.(*treeBackend)
+			be.Init(config)
 
-	b := storage.Block{Id: "foo"}
-	//bd := bytes.Repeat([]byte("bar"), 1234)
-	bd := []byte("bar")
-	b.Data.Set(&bd)
-	be.StoreBlock(&b)
-	be.Flush()
-	assert.Equal(t, tbe.BytesTotal, uint64(superBlockSize+2*blockSize), "total")
-	assert.Equal(t, tbe.BytesUsed, uint64(superBlockSize+2*blockSize), "used")
+			assert.Equal(t, tbe.BytesUsed, uint64(0))
+			assert.Equal(t, tbe.BytesTotal, uint64(0))
+			be.Flush() // empty tree = still no data needed
+			assert.Equal(t, tbe.BytesUsed, uint64(0))
+			assert.Equal(t, tbe.BytesTotal, uint64(0))
 
-	bd2 := be.GetBlockData(&b)
-	assert.Equal(t, bd, bd2)
+			// Add dummy block
 
-	be.Flush() // no change -> should stay same
-	assert.Equal(t, tbe.BytesTotal, uint64(superBlockSize+2*blockSize))
-	assert.Equal(t, tbe.BytesUsed, uint64(superBlockSize+2*blockSize))
+			b := storage.Block{Id: "foo"}
+			//bd := bytes.Repeat([]byte("bar"), 1234)
+			bd := []byte("bar")
+			b.Data.Set(&bd)
+			be.StoreBlock(&b)
+			be.Flush()
+			assert.Equal(t, tbe.BytesTotal, uint64(superBlockSize+2*blockSize), "total")
+			assert.Equal(t, tbe.BytesUsed, uint64(superBlockSize+2*blockSize), "used")
 
-	// Update the block; this causes new root, which needs space
-	// to be written in, but used total should stay same
-	b.RefCount = 1
-	be.UpdateBlock(&b)
-	be.Flush()
-	assert.Equal(t, tbe.BytesTotal, uint64(superBlockSize+3*blockSize))
-	assert.Equal(t, tbe.BytesUsed, uint64(superBlockSize+2*blockSize))
+			bd2 := be.GetBlockData(&b)
+			assert.Equal(t, bd, bd2)
 
-	// Delete the block; this should cause us to have only root
-	// tree which is now empty in lone block in addition to
-	// superblock.
-	be.DeleteBlock(&b)
-	be.Flush()
-	assert.Equal(t, tbe.BytesTotal, uint64(superBlockSize+3*blockSize))
-	assert.Equal(t, tbe.BytesUsed, uint64(superBlockSize+1*blockSize))
+			be.Flush() // no change -> should stay same
+			assert.Equal(t, tbe.BytesTotal, uint64(superBlockSize+2*blockSize))
+			assert.Equal(t, tbe.BytesUsed, uint64(superBlockSize+2*blockSize))
 
-	defer be.Close()
+			// Update the block; this causes new root, which needs space
+			// to be written in, but used total should stay same
+			b.RefCount = 1
+			be.UpdateBlock(&b)
+			be.Flush()
+			assert.Equal(t, tbe.BytesTotal, uint64(superBlockSize+3*blockSize))
+			assert.Equal(t, tbe.BytesUsed, uint64(superBlockSize+2*blockSize))
+
+			// Delete the block; this should cause us to have only root
+			// tree which is now empty in lone block in addition to
+			// superblock.
+			be.DeleteBlock(&b)
+			be.Flush()
+			assert.Equal(t, tbe.BytesTotal, uint64(superBlockSize+3*blockSize))
+			assert.Equal(t, tbe.BytesUsed, uint64(superBlockSize+1*blockSize))
+
+			defer be.Close()
+
+		})
+	}
 }

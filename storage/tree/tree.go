@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Thu Feb 22 11:14:54 2018 mstenber
- * Edit time:     284 min
+ * Last modified: Tue Mar 13 10:32:47 2018 mstenber
+ * Edit time:     286 min
  *
  */
 
@@ -16,6 +16,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
@@ -57,6 +58,11 @@ var _ storage.Backend = &treeBackend{}
 func (self *treeBackend) Init(config storage.BackendConfiguration) {
 	self.DirectoryBackendBase.Init(config)
 	self.NameInBlockBackend.Init("names", self)
+
+	if self.Codec == nil {
+		self.Codec = codec.CodecChain{}.Init()
+	}
+
 	filepath := fmt.Sprintf("%s/db", config.Directory)
 	f, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {
@@ -73,16 +79,13 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 	for i := 0; i < numberOfSuperBlocks(uint64(fi.Size())); i++ {
 		ofs := superBlockOffset(i)
 		b := self.readData(LocationSlice{LocationEntry{Offset: ofs, Size: superBlockSize}})
-		if self.Codec != nil {
-			var err error
-			b, err = self.Codec.DecodeBytes(b, nil)
-			if err != nil {
-				// invalid superblocks are ignored
-				continue
-			}
+		b, err := self.Codec.DecodeBytes(b, nil)
+		if err != nil {
+			// invalid superblocks are ignored
+			continue
 		}
 		var sb Superblock
-		_, err := sb.UnmarshalMsg(b)
+		_, err = sb.UnmarshalMsg(b)
 		if err != nil {
 			continue
 		}
@@ -405,12 +408,9 @@ func (self *treeBackend) Flush() {
 	if err != nil {
 		log.Panic(err)
 	}
-	if self.Codec != nil {
-		var err error
-		b, err = self.Codec.EncodeBytes(b, nil)
-		if err != nil {
-			log.Panic(err)
-		}
+	b, err = self.Codec.EncodeBytes(b, nil)
+	if err != nil {
+		log.Panic(err)
 	}
 	if len(b) > superBlockSize {
 		mlog.Panicf("Too large superblock: %v > %v", len(b), superBlockSize)
@@ -509,12 +509,9 @@ func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 		}
 	}
 	b := nd.ToBytes()
-	if self.Codec != nil {
-		var err error
-		b, err = self.Codec.EncodeBytes(b, nil)
-		if err != nil {
-			return ""
-		}
+	b, err := self.Codec.EncodeBytes(b, nil)
+	if err != nil {
+		return ""
 	}
 	ls := self.allocate(uint64(len(b)))
 	self.writeData(ls, b)
@@ -526,12 +523,9 @@ func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 	ls := NewLocationSliceFromBlockId(id)
 	b := self.readData(ls)
-	if self.Codec != nil {
-		var err error
-		b, err = self.Codec.DecodeBytes(b, nil)
-		if err != nil {
-			return nil
-		}
+	b, err := self.Codec.DecodeBytes(b, nil)
+	if err != nil {
+		return nil
 	}
 	return ibtree.NewNodeDataFromBytes(b)
 }

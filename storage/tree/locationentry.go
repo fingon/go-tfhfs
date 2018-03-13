@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Feb 21 15:19:19 2018 mstenber
- * Last modified: Thu Feb 22 10:53:49 2018 mstenber
+ * Last modified: Tue Mar 13 11:48:03 2018 mstenber
  * Edit time:     5 min
  *
  */
@@ -20,7 +20,7 @@ import (
 )
 
 func (self LocationEntry) String() string {
-	return fmt.Sprintf("le{%v@%v}", self.Size, self.Offset)
+	return fmt.Sprintf("le{%x @ %x}", self.Size, self.Offset)
 }
 
 func (self OpEntry) String() string {

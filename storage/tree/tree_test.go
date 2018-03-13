@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Feb 21 17:11:02 2018 mstenber
- * Last modified: Sun Feb 25 18:58:50 2018 mstenber
- * Edit time:     27 min
+ * Last modified: Tue Mar 13 11:11:22 2018 mstenber
+ * Edit time:     28 min
  *
  */
 
@@ -25,12 +25,18 @@ func TestTree(t *testing.T) {
 	t.Parallel()
 
 	for _, test := range []struct {
+		inmem bool
 		n     string
 		codec bool
-	}{{"plain", false}, {"encrypted", true}} {
+	}{{false, "plain", false},
+		{true, "im-plain", false},
+		{false, "encrypted", true}} {
 
-		dir, _ := ioutil.TempDir("", "tree")
-		defer os.RemoveAll(dir)
+		var dir string
+		if !test.inmem {
+			dir, _ = ioutil.TempDir("", "tree")
+			defer os.RemoveAll(dir)
+		}
 
 		config := storage.BackendConfiguration{Directory: dir}
 

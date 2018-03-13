@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Tue Mar 13 10:32:47 2018 mstenber
- * Edit time:     286 min
+ * Last modified: Tue Mar 13 13:14:23 2018 mstenber
+ * Edit time:     320 min
  *
  */
 
@@ -14,7 +14,6 @@ package tree
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/ibtree"
@@ -40,11 +39,11 @@ type treeBackend struct {
 	storage.DirectoryBackendBase
 	storage.NameInBlockBackend
 	lock                util.MutexLocked
-	f                   *os.File
 	tree                *ibtree.Tree
 	root                *ibtree.Node
 	rootBlockId         ibtree.BlockId
 	t                   *ibtree.Transaction
+	p                   treePersister
 	freeSize2OffsetTree *ibtree.SubTree // (size,offset)
 	freeOffset2SizeTree *ibtree.SubTree // (offset, size)
 	blockTree           *ibtree.SubTree // (block id => block data)
@@ -63,22 +62,17 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 		self.Codec = codec.CodecChain{}.Init()
 	}
 
-	filepath := fmt.Sprintf("%s/db", config.Directory)
-	f, err := os.OpenFile(filepath, os.O_RDWR|os.O_CREATE, 0755)
-	if err != nil {
-		mlog.Panicf("Unable to open %s: %s", filepath, err)
-	}
-	self.f = f
-	fi, err := f.Stat()
-	if err != nil {
-		mlog.Panicf("Unable to stat %s: %s", filepath, err)
+	if config.Directory != "" {
+		self.p = systemFile{}.Init(config.Directory)
+	} else {
+		self.p = &inMemoryFile{}
 	}
 
 	self.tree = ibtree.Tree{NodeMaximumSize: treeNodeMaximumSize}.Init(self)
 	var best *Superblock
-	for i := 0; i < numberOfSuperBlocks(uint64(fi.Size())); i++ {
+	for i := 0; i < numberOfSuperBlocks(self.p.Size()); i++ {
 		ofs := superBlockOffset(i)
-		b := self.readData(LocationSlice{LocationEntry{Offset: ofs, Size: superBlockSize}})
+		b := self.p.ReadData(LocationSlice{LocationEntry{Offset: ofs, Size: superBlockSize}})
 		b, err := self.Codec.DecodeBytes(b, nil)
 		if err != nil {
 			// invalid superblocks are ignored
@@ -120,7 +114,7 @@ func (self *treeBackend) newTransaction(root *ibtree.Node) {
 
 func (self *treeBackend) Close() {
 	// assume we've been flushed..
-	self.f.Close()
+	self.p.Close()
 }
 
 func (self *treeBackend) getBlockData(id string) *BlockData {
@@ -137,27 +131,6 @@ func (self *treeBackend) getBlockData(id string) *BlockData {
 		mlog.Panicf("Unable to read %v: %s", k, err)
 	}
 	return &bd
-}
-
-func (self *treeBackend) readData(location LocationSlice) []byte {
-	l := uint64(0)
-	for _, v := range location {
-		l += v.Size
-	}
-	b := make([]byte, l)
-	ofs := uint64(0)
-	for _, v := range location {
-		_, err := self.f.Seek(int64(v.Offset), 0)
-		if err != nil {
-			log.Panic(err)
-		}
-		_, err = self.f.Read(b[ofs : ofs+v.Size])
-		if err != nil {
-			log.Panic(err)
-		}
-		ofs += v.Size
-	}
-	return b
 }
 
 func (self *treeBackend) appendOp(le LocationEntry, free bool) {
@@ -315,23 +288,8 @@ func (self *treeBackend) grow(asize uint64) bool {
 	return self.grow(asize)
 }
 
-func (self *treeBackend) writeData(location LocationSlice, data []byte) {
-	ofs := uint64(0)
-	for _, v := range location {
-		_, err := self.f.Seek(int64(v.Offset), 0)
-		if err != nil {
-			log.Panic(err)
-		}
-		_, err = self.f.Write(data[ofs : ofs+v.Size])
-		if err != nil {
-			log.Panic(err)
-		}
-		ofs += v.Size
-	}
-}
-
 func (self *treeBackend) purgeNonCurrent(nd *ibtree.NodeData, bid ibtree.BlockId) {
-	mlog.Printf2("storage/tree/tree", "purgeNonCurrent %x", bid)
+	mlog.Printf2("storage/tree/tree", "purgeNonCurrent %v", bid)
 	// if we don't know its bid, it is probably 'fresh'
 	if bid == "" {
 		return
@@ -347,14 +305,15 @@ func (self *treeBackend) purgeNonCurrent(nd *ibtree.NodeData, bid ibtree.BlockId
 	if !nd.Leafy {
 		// Recurse
 		for _, c := range nd.Children {
+			mlog.Printf(" child %v", c)
 			bid2 := ibtree.BlockId(c.Value)
 			self.purgeNonCurrent(self.LoadNode(bid2), bid2)
 		}
 	}
 	// This block id is redundant, remove it
 	ls := NewLocationSliceFromBlockId(bid)
+	mlog.Printf2("storage/tree/tree", " freeing %v", ls)
 	self.appendFrees(ls)
-	mlog.Printf2("storage/tree/tree", " freeing")
 }
 
 func (self *treeBackend) flushPending() {
@@ -369,7 +328,8 @@ func (self *treeBackend) flushPending() {
 			self.removeFreeTree(op.Location)
 		}
 	}
-	self.Pending = nil
+	self.Pending = self.Pending[:0]
+	// TBD think if this is better than the constant free+alloc thing..
 }
 
 func (self *treeBackend) Flush() {
@@ -417,7 +377,7 @@ func (self *treeBackend) Flush() {
 	}
 
 	ls := LocationSlice{LocationEntry{Size: uint64(len(b)), Offset: ofs}}
-	self.writeData(ls, b)
+	self.p.WriteData(ls, b)
 
 	self.rootBlockId = bid
 
@@ -454,7 +414,7 @@ func (self *treeBackend) GetBlockData(b *storage.Block) []byte {
 	if bd == nil {
 		return nil
 	}
-	return self.readData(bd.Location)
+	return self.p.ReadData(bd.Location)
 }
 
 func (self *treeBackend) GetBlockById(id string) *storage.Block {
@@ -474,7 +434,7 @@ func (self *treeBackend) setBlockData(id string, bdata *BlockData) {
 	if err != nil {
 		log.Panic(err)
 	}
-	mlog.Printf2("storage/tree/tree", "setBlockData %x", b)
+	mlog.Printf2("storage/tree/tree", "setBlockData %x = %v", id, *bdata)
 	self.blockTree.Set(ibtree.Key(id), string(b))
 }
 
@@ -482,7 +442,7 @@ func (self *treeBackend) StoreBlock(bl *storage.Block) {
 	defer self.lock.Locked()()
 	b := *bl.Data.Get()
 	ls := self.allocate(uint64(len(b)))
-	self.writeData(ls, b)
+	self.p.WriteData(ls, b)
 	bdata := BlockData{Location: ls, BlockMetadata: bl.BlockMetadata}
 	self.setBlockData(bl.Id, &bdata)
 }
@@ -514,15 +474,16 @@ func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 		return ""
 	}
 	ls := self.allocate(uint64(len(b)))
-	self.writeData(ls, b)
+	self.p.WriteData(ls, b)
 	bid := ls.ToBlockId()
 	self.currentMap[bid] = true
 	return bid
 }
 
 func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
+	mlog.Printf("t.LoadNode %v", id)
 	ls := NewLocationSliceFromBlockId(id)
-	b := self.readData(ls)
+	b := self.p.ReadData(ls)
 	b, err := self.Codec.DecodeBytes(b, nil)
 	if err != nil {
 		return nil
@@ -536,4 +497,8 @@ func (self *treeBackend) GetBytesUsed() uint64 {
 
 func (self *treeBackend) GetBytesAvailable() uint64 {
 	return self.DirectoryBackendBase.GetBytesAvailable() + self.BytesTotal - self.BytesUsed
+}
+
+func (self *treeBackend) Supports(feature storage.BackendFeature) bool {
+	return false
 }

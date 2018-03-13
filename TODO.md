@@ -43,10 +43,12 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
 
 # Pending later TODO #
 
-* add some sort of reasonable caching to Storage, and get rid of gcache;
-  something like e.g. CART seems sensible (
+* add some sort of reasonable cache, and use it in storage and
+  storage/tree, and get rid of gcache; something like e.g. CART seems
+  sensible (
   https://www.usenix.org/legacy/events/fast04/tech/full_papers/bansal/bansal.pdf
-  )
+  ); built-in locking in a datastructure is inefficient so rather write
+  non-threadsafe cache and use it with lock held.
 
 * define some way to BlockBackend to index them by Status => can easily get
   blocks with statuses that are awkward (or come up with an algorithm that

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 16:53:09 2018 mstenber
- * Last modified: Thu Jan 18 17:43:22 2018 mstenber
- * Edit time:     22 min
+ * Last modified: Tue Mar 13 15:33:59 2018 mstenber
+ * Edit time:     23 min
  *
  */
 
@@ -40,7 +40,7 @@ func (self *YYYList) Iterate(cb func(v YYYType)) {
 	}
 }
 
-func (self *YYYList) PushBack(v YYYType) {
+func (self *YYYList) PushBack(v YYYType) *YYYListElement {
 	e := self.getElement(v)
 	e.Prev = self.Back
 	if self.Back != nil {
@@ -50,9 +50,10 @@ func (self *YYYList) PushBack(v YYYType) {
 		self.Front = e
 	}
 	self.Back = e
+	return e
 }
 
-func (self *YYYList) PushFront(v YYYType) {
+func (self *YYYList) PushFront(v YYYType) *YYYListElement {
 	e := self.getElement(v)
 	e.Next = self.Front
 	if self.Front != nil {
@@ -62,6 +63,7 @@ func (self *YYYList) PushFront(v YYYType) {
 		self.Back = e
 	}
 	self.Front = e
+	return e
 }
 
 func (self *YYYList) Remove(e *YYYListElement) {

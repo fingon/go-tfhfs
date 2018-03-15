@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Wed Feb 21 15:32:15 2018 mstenber
- * Edit time:     142 min
+ * Last modified: Thu Mar 15 12:26:06 2018 mstenber
+ * Edit time:     147 min
  *
  */
 
@@ -171,6 +171,11 @@ func (self *Hugger) Flush() {
 	self.flushing = true
 	for len(self.transactions) > 0 {
 		mlog.Printf2("ibtree/hugger/hugger", "%s.Flush waiting %d transactions", self, len(self.transactions))
+		if mlog.IsEnabled() {
+			for t, _ := range self.transactions {
+				mlog.Printf2("ibtree/hugger/hugger", " %v", t)
+			}
+		}
 		self.transactionClosed.Wait()
 	}
 

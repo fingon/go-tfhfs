@@ -4,15 +4,17 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 16:40:08 2018 mstenber
- * Last modified: Thu Feb 15 14:31:20 2018 mstenber
- * Edit time:     256 min
+ * Last modified: Thu Mar 15 12:31:13 2018 mstenber
+ * Edit time:     264 min
  *
  */
 
 package hugger
 
 import (
+	"fmt"
 	"log"
+	"runtime"
 
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
@@ -32,17 +34,34 @@ type Transaction struct {
 
 	t              *ibtree.Transaction
 	nested, closed bool
+
+	// only figured if debugging is enabled; where was this
+	// transaction created?
+	createdBy string
+}
+
+func (self *Transaction) String() string {
+	return fmt.Sprintf("t<%s>", self.createdBy)
 }
 
 func newTransaction(h *Hugger, ignoreFlushing bool) *Transaction {
 	defer h.lock.Locked()()
+	var createdBy string
+	if mlog.IsEnabled() {
+		_, file, line, ok := runtime.Caller(2)
+		// ^newTransaction is called in hugger; however, who
+		// calls THAT is interesting.
+		if ok {
+			createdBy = fmt.Sprintf("%s:%d", file, line)
+		}
+	}
 	for !ignoreFlushing && h.flushing {
 		h.flushed.Wait()
 	}
 	root := h.root.Get()
 	t := ibtree.NewTransaction(root.node)
 	tr := &Transaction{hugger: h, root: root,
-		t: t, nested: ignoreFlushing}
+		t: t, nested: ignoreFlushing, createdBy: createdBy}
 	h.transactions[tr] = true
 	return tr
 }

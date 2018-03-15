@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Mar 15 12:23:55 2018 mstenber
- * Edit time:     648 min
+ * Last modified: Thu Mar 15 15:58:44 2018 mstenber
+ * Edit time:     649 min
  *
  */
 
@@ -91,8 +91,7 @@ func (self Storage) Init() *Storage {
 		self.Codec = codec.CodecChain{}.Init()
 	}
 
-	// disable maprunner for now to see things more clearly
-	// self.Backend = mapRunnerBackend{}.SetBackend(self.Backend)
+	self.Backend = mapRunnerBackend{}.SetBackend(self.Backend)
 
 	go func() { // ok, singleton per storage
 		self.run()

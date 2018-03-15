@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Tue Feb  6 17:40:27 2018 mstenber
- * Edit time:     470 min
+ * Last modified: Thu Mar 15 13:10:12 2018 mstenber
+ * Edit time:     479 min
  *
  */
 
@@ -184,7 +184,7 @@ func (self *inodeFH) readInTransaction(tr *hugger.Transaction, buf []byte, offse
 			defer bl.Close()
 			b = bl.Data()
 			if b[0] != byte(BDT_EXTENT) {
-				log.Panicf("Wrong extent type in read - block content: %x", b)
+				log.Panicf("Wrong extent type in read (%x != %x) - block content: %x", b[0], BDT_EXTENT, b)
 			}
 			b = b[1:]
 		}
@@ -226,10 +226,20 @@ func (self *inodeFH) Read(buf []byte, offset uint64) (rr fuse.ReadResult, code f
 		e := offset / dataExtentSize
 		defer self.inode.offsetMap.Locked(e)()
 
+		// Note: If offsetmap is not locked at this point, we
+		// may have duplicate transaction attempting to change
+		// the same thing. So take transaction only when we
+		// know inode offset is locked by us.
+		//
+		// (=> Trivial optimization of having single
+		// transaction for whole Read won't work.)
+		//
+		// Similarly, the transaction close cannot be deferred
+		// as if we keep bunch of transactions open and want
+		// to open more, and hugger flushes, deadlock occurs.
 		tr := self.Fs().GetTransaction()
-		defer tr.Close()
-
 		r, code := self.readInTransaction(tr, buf[ofs:], offset)
+		tr.Close()
 		if !code.Ok() {
 			return nil, code
 		}
@@ -402,7 +412,6 @@ func (self *inodeFH) write(buf []byte, offset uint64) (written uint32, code fuse
 		self.inode.metaWriteLock.UpdateOwner()
 		locked.UpdateOwner()
 		defer unlock()
-		defer tr.Close()
 		defer self.Fs().writeBuffers.Put(obuf)
 
 		// If file data is part of meta, we have to commit it
@@ -413,10 +422,12 @@ func (self *inodeFH) write(buf []byte, offset uint64) (written uint32, code fuse
 		if done {
 			tr.CommitUntilSucceeds()
 			unlockmeta()
+			tr.Close()
 			return
 		}
 		unlockmeta()
 		tr.CommitUntilSucceeds()
+		tr.Close()
 
 		// It wasn't small file. Perform write inside transaction, but
 		// do the read + write part ONLY once. The lock we're holding

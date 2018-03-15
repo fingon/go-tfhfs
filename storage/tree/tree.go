@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Thu Mar 15 15:32:37 2018 mstenber
- * Edit time:     333 min
+ * Last modified: Thu Mar 15 15:56:34 2018 mstenber
+ * Edit time:     343 min
  *
  */
 
@@ -71,7 +71,7 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 
 	self.tree = ibtree.Tree{NodeMaximumSize: treeNodeMaximumSize}.Init(self)
 	var best *Superblock
-	for i := 0; i < numberOfSuperBlocks(self.p.Size()); i++ {
+	for i := 0; i < calculateNumberOfSuperBlocks(self.p.Size()); i++ {
 		ofs := superBlockOffset(i)
 		b := self.p.ReadData(LocationSlice{LocationEntry{Offset: ofs, Size: superBlockSize}})
 		b, err := self.Codec.DecodeBytes(b, nil)
@@ -245,7 +245,7 @@ func superBlockOffset(i int) uint64 {
 	return ofs
 }
 
-func numberOfSuperBlocks(s uint64) int {
+func calculateNumberOfSuperBlocks(s uint64) int {
 	if s == 0 {
 		return 0
 	}
@@ -256,11 +256,15 @@ func numberOfSuperBlocks(s uint64) int {
 	return i
 }
 
+func (self *treeBackend) numberOfSuperBlocks() int {
+	return calculateNumberOfSuperBlocks(self.BytesTotal)
+}
+
 func (self *treeBackend) grow(asize uint64) bool {
 	mlog.Printf2("storage/tree/tree", "%v.grow %v", self, asize)
-	oldsbs := numberOfSuperBlocks(self.BytesTotal)
+	oldsbs := self.numberOfSuperBlocks()
 	nsize := self.BytesTotal + asize
-	newsbs := numberOfSuperBlocks(nsize)
+	newsbs := calculateNumberOfSuperBlocks(nsize)
 	// Simple case if even with new size we do not cross
 	// superblock boundary.
 	if oldsbs == newsbs {
@@ -268,23 +272,23 @@ func (self *treeBackend) grow(asize uint64) bool {
 		self.BytesUsed += asize
 		self.addFree(LocationEntry{Offset: self.BytesTotal, Size: asize})
 		self.BytesTotal += asize
-		mlog.Printf2("storage/tree/tree", " BytesTotal=%v", self.BytesTotal)
+		mlog.Printf2("storage/tree/tree", " BytesTotal=%x", self.BytesTotal)
 		return true
 	}
 
 	// We do; add one superblock and recurse
 	ofs := superBlockOffset(oldsbs)
-	mlog.Printf2("storage/tree/tree", " adding superblock to %v", ofs)
+	mlog.Printf2("storage/tree/tree", " adding superblock to %x", ofs)
 	if ofs > self.BytesTotal {
 		// Add small allocation up to the added superblock
 		// (but not big enough for what was originally asked
 		// for)
-		mlog.Printf2("storage/tree/tree", " adding small free area %v", ofs-self.BytesTotal)
+		mlog.Printf2("storage/tree/tree", " adding small free area %x", ofs-self.BytesTotal)
 		ssize := ofs - self.BytesTotal
 		// addFree implicitly reduces used
+		self.addFree(LocationEntry{Offset: self.BytesTotal, Size: ssize})
 		self.BytesUsed += ssize
 		self.BytesTotal += ssize
-		self.addFree(LocationEntry{Offset: self.BytesTotal, Size: ssize})
 	}
 	self.BytesTotal += superBlockSize
 	self.BytesUsed += superBlockSize
@@ -365,7 +369,7 @@ func (self *treeBackend) Flush() {
 
 	// Write superblock
 	self.superIndex++
-	si := self.superIndex % numberOfSuperBlocks(self.BytesTotal)
+	si := self.superIndex % self.numberOfSuperBlocks()
 	ofs := superBlockOffset(si)
 	mlog.Printf2("storage/tree/tree", " writing superblock %d @%d", si, ofs)
 	b, err := self.Superblock.MarshalMsg(nil)

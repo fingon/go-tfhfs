@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Feb 21 17:11:02 2018 mstenber
- * Last modified: Tue Mar 13 11:11:22 2018 mstenber
- * Edit time:     28 min
+ * Last modified: Thu Mar 15 15:52:19 2018 mstenber
+ * Edit time:     32 min
  *
  */
 
@@ -20,6 +20,33 @@ import (
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/stvp/assert"
 )
+
+func TestTreeGrowShrink(t *testing.T) {
+	t.Parallel()
+
+	be := NewTreeBackend()
+	tbe := be.(*treeBackend)
+	config := storage.BackendConfiguration{}
+	be.Init(config)
+	slices := make([]LocationSlice, 0)
+	for tbe.numberOfSuperBlocks() < 3 {
+		sl := tbe.allocate(42)
+		// Ensure the allocation does not cross superblock boundary
+		for i := 0; i < tbe.numberOfSuperBlocks(); i++ {
+			ofs := superBlockOffset(i)
+			for _, se := range sl {
+				if se.Offset < ofs {
+					e := se.Offset + se.Size
+					assert.True(t, e <= ofs)
+				} else {
+					esb := ofs + superBlockSize
+					assert.True(t, se.Offset >= esb)
+				}
+			}
+		}
+		slices = append(slices, sl)
+	}
+}
 
 func TestTree(t *testing.T) {
 	t.Parallel()

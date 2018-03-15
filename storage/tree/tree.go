@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Tue Mar 13 17:00:32 2018 mstenber
- * Edit time:     332 min
+ * Last modified: Thu Mar 15 15:32:37 2018 mstenber
+ * Edit time:     333 min
  *
  */
 
@@ -94,6 +94,7 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 		self.rootBlockId = ""
 	} else {
 		// Old tree
+		defer self.lock.Locked()()
 		self.rootBlockId = best.RootLocation.ToBlockId()
 		self.savedRoot = self.tree.LoadRoot(self.rootBlockId)
 		self.Superblock = *best

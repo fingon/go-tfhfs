@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Mar 13 10:48:50 2018 mstenber
- * Last modified: Tue Mar 13 11:22:19 2018 mstenber
- * Edit time:     20 min
+ * Last modified: Tue Mar 13 16:51:30 2018 mstenber
+ * Edit time:     24 min
  *
  */
 
@@ -82,6 +82,7 @@ type systemFile struct {
 var _ treePersister = &systemFile{}
 
 func (self systemFile) Init(directory string) *systemFile {
+	os.Mkdir(directory, 0700)
 	self.path = fmt.Sprintf("%s/db", directory)
 	f, err := os.OpenFile(self.path, os.O_RDWR|os.O_CREATE, 0755)
 	if err != nil {

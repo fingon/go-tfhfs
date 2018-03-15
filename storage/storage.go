@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Tue Feb 20 10:44:52 2018 mstenber
+ * Last modified: Thu Mar 15 12:23:55 2018 mstenber
  * Edit time:     648 min
  *
  */
@@ -12,6 +12,8 @@
 package storage
 
 import (
+	"sync/atomic"
+
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/util"
@@ -63,7 +65,7 @@ type Storage struct {
 	// Stuff below here is ~DelayedStorage
 	names map[string]*oldNewStruct
 
-	reads, writes, readbytes, writebytes int
+	reads, writes, readbytes, writebytes int64
 
 	jobChannel chan *jobIn
 
@@ -88,7 +90,10 @@ func (self Storage) Init() *Storage {
 		// assume Codec is present
 		self.Codec = codec.CodecChain{}.Init()
 	}
-	self.Backend = mapRunnerBackend{}.SetBackend(self.Backend)
+
+	// disable maprunner for now to see things more clearly
+	// self.Backend = mapRunnerBackend{}.SetBackend(self.Backend)
+
 	go func() { // ok, singleton per storage
 		self.run()
 	}()
@@ -192,10 +197,10 @@ func (self *Storage) flush() int {
 			}
 		}
 	}
-	self.reads = 0
-	self.readbytes = 0
-	self.writes = 0
-	self.writebytes = 0
+	atomic.StoreInt64(&self.reads, 0)
+	atomic.StoreInt64(&self.readbytes, 0)
+	atomic.StoreInt64(&self.writes, 0)
+	atomic.StoreInt64(&self.writebytes, 0)
 
 	// _flush_names in Python prototype
 	ops := self.flushBlockNames()

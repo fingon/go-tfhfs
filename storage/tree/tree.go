@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Tue Mar 13 16:39:32 2018 mstenber
- * Edit time:     335 min
+ * Last modified: Tue Mar 13 17:00:32 2018 mstenber
+ * Edit time:     332 min
  *
  */
 
@@ -471,6 +471,7 @@ func NewTreeBackend() storage.Backend {
 }
 
 func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
+	self.lock.AssertLocked()
 	if !nd.Leafy {
 		// Note that intermediate nodes we refer to are also 'recent'
 		for _, c := range nd.Children {
@@ -508,6 +509,7 @@ func sanityCheckNodeData(s uint64, nd *ibtree.NodeData) {
 }
 
 func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
+	self.lock.AssertLocked()
 	mlog.Printf2("storage/tree/tree", "t.LoadNode %v", id)
 	ls := NewLocationSliceFromBlockId(id)
 	b := self.p.ReadData(ls)
@@ -522,10 +524,12 @@ func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 }
 
 func (self *treeBackend) GetBytesUsed() uint64 {
+	defer self.lock.Locked()()
 	return self.BytesUsed
 }
 
 func (self *treeBackend) GetBytesAvailable() uint64 {
+	defer self.lock.Locked()()
 	return self.DirectoryBackendBase.GetBytesAvailable() + self.BytesTotal - self.BytesUsed
 }
 

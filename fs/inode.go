@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Feb  6 17:31:14 2018 mstenber
- * Edit time:     348 min
+ * Last modified: Fri Mar 16 10:40:44 2018 mstenber
+ * Edit time:     353 min
  *
  */
 
@@ -40,19 +40,19 @@ type inode struct {
 func (self *inode) AddChild(name string, child *inode) (code fuse.Status) {
 	mlog.Printf2("fs/inode", "inode.AddChild %v = %v", name, child)
 	self.Fs().Update2(func(tr *hugger.Transaction) bool {
-		meta := child.Meta()
-		if meta == nil {
+		cmeta := child.Meta()
+		if cmeta == nil {
 			code = fuse.ENOENT
 			return false
 		}
-		meta.SetCTimeNow()
-		meta.StNlink++
+		cmeta.SetCTimeNow()
+		cmeta.StNlink++
 		if child.IsDir() {
-			meta.ParentIno = self.ino
+			cmeta.ParentIno = self.ino
 		}
-		child.SetMetaInTransaction(meta, tr)
+		child.SetMetaInTransaction(cmeta, tr)
 
-		meta = self.Meta()
+		meta := self.Meta()
 		if meta == nil {
 			code = fuse.ENOENT
 			return false
@@ -284,17 +284,17 @@ func (self *inode) Forget(nlookup uint64) {
 func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 	mlog.Printf2("fs/inode", "inode.RemoveChildByName %v", name)
 	self.Fs().Update2(func(tr *hugger.Transaction) bool {
-		meta := child.Meta()
-		if meta == nil {
+		cmeta := child.Meta()
+		if cmeta == nil {
 			code = fuse.ENOENT
 			return false
 		}
-		meta.StNlink--
-		meta.ParentIno = 0
-		meta.SetCTimeNow()
-		child.SetMetaInTransaction(meta, tr)
+		cmeta.StNlink--
+		cmeta.ParentIno = 0
+		cmeta.SetCTimeNow()
+		child.SetMetaInTransaction(cmeta, tr)
 
-		meta = self.Meta()
+		meta := self.Meta()
 		if meta == nil {
 			code = fuse.ENOENT
 			return false
@@ -541,6 +541,8 @@ func (self *InodeMetaData) setTimeValues(atime, ctime, mtime *time.Time) {
 }
 
 func (self *InodeMetaData) setTimesNow(uatime, uctime, umtime bool) {
+	mlog.Printf2("fs/inode", "%v.setTimesNow(a:%v,c:%v,m:%v)",
+		self, uatime, uctime, umtime)
 	now := time.Now()
 	var atime, ctime, mtime *time.Time
 	if uatime {

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Thu Mar 15 12:26:06 2018 mstenber
- * Edit time:     147 min
+ * Last modified: Fri Mar 16 13:33:16 2018 mstenber
+ * Edit time:     156 min
  *
  */
 
@@ -16,7 +16,6 @@ import (
 	"log"
 	"sync"
 
-	"github.com/bluele/gcache"
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
@@ -49,7 +48,7 @@ type Hugger struct {
 
 	tree          *ibtree.Tree
 	root, oldRoot treeRootAtomicPointer
-	nodeDataCache gcache.Cache
+	nodeDataCache ibtree.NodeDataCart
 
 	// transactionRetryLock ensures there is only one active
 	// retrying transaction.
@@ -57,6 +56,10 @@ type Hugger struct {
 
 	// lock protects transactions and roots
 	lock util.MutexLocked
+
+	// lock protecting nodeDataCache (should be held only very,
+	// very briefly)
+	nodeDataCacheLock util.MutexLocked
 
 	// when flushing, new transactions will stall and wait for
 	// Cond
@@ -82,11 +85,7 @@ func (self *Hugger) Init(cacheSize int) *Hugger {
 	self.transactions = make(map[*Transaction]bool)
 	self.flushed.L = &self.lock
 	self.transactionClosed.L = &self.lock
-	if cacheSize > 0 {
-		self.nodeDataCache = gcache.New(cacheSize).
-			ARC().
-			Build()
-	}
+	self.nodeDataCache.Init(cacheSize)
 	return self
 }
 
@@ -144,25 +143,26 @@ func (self *Hugger) Update(cb func(tr *Transaction)) {
 
 // ibtree.TreeBackend API
 func (self *Hugger) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
-	var v interface{}
-	if self.nodeDataCache != nil {
-		v, _ = self.nodeDataCache.Get(id)
-	}
-	if v == nil {
+	var nd *ibtree.NodeData
+	var found bool
+	self.nodeDataCacheLock.Do(func() {
+		nd, found = self.nodeDataCache.Get(id)
+	})
+	if !found {
 		b := self.Storage.GetBlockById(string(id))
 		if b == nil {
 			log.Panicf("Unable to find node %x", id)
 		}
 		defer b.Close()
-		nd := ibtree.NewNodeDataFromBytes(b.Data())
+		nd = ibtree.NewNodeDataFromBytes(b.Data())
 		if nd == nil {
 			log.Panicf("Unable to find node %x", id)
 		}
 		self.SetCachedNodeData(id, nd)
 		return nd
 	}
-	mlog.Printf2("ibtree/hugger/hugger", "fs.LoadNode found %x in cache: %p", id, v)
-	return v.(*ibtree.NodeData)
+	mlog.Printf2("ibtree/hugger/hugger", "fs.LoadNode found %x in cache: %p", id, nd)
+	return nd
 }
 
 func (self *Hugger) Flush() {
@@ -232,20 +232,12 @@ func (self *Hugger) Flush() {
 }
 
 func (self *Hugger) GetCachedNodeData(id ibtree.BlockId) (*ibtree.NodeData, bool) {
-	if self.nodeDataCache == nil {
-		return nil, false
-	}
-	v, err := self.nodeDataCache.GetIFPresent(id)
-	if err != nil {
-		return nil, false
-	}
-	return v.(*ibtree.NodeData), true
+	defer self.nodeDataCacheLock.Locked()()
+	return self.nodeDataCache.Get(id)
 }
 
 func (self *Hugger) SetCachedNodeData(id ibtree.BlockId, nd *ibtree.NodeData) {
-	if self.nodeDataCache == nil {
-		return
-	}
+	defer self.nodeDataCacheLock.Locked()()
 	self.nodeDataCache.Set(id, nd)
 }
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Thu Mar 15 15:56:34 2018 mstenber
- * Edit time:     343 min
+ * Last modified: Fri Mar 16 14:36:01 2018 mstenber
+ * Edit time:     353 min
  *
  */
 
@@ -48,6 +48,7 @@ type treeBackend struct {
 	freeSize2OffsetTree *ibtree.SubTree // (size,offset)
 	freeOffset2SizeTree *ibtree.SubTree // (offset, size)
 	blockTree           *ibtree.SubTree // (block id => block data)
+	nodeDataCache       ibtree.NodeDataCart
 	currentMap          map[ibtree.BlockId]bool
 	superIndex          int
 	flushing            bool
@@ -58,6 +59,8 @@ var _ storage.Backend = &treeBackend{}
 func (self *treeBackend) Init(config storage.BackendConfiguration) {
 	self.DirectoryBackendBase.Init(config)
 	self.NameInBlockBackend.Init("names", self)
+
+	self.nodeDataCache.Init(1234) // TBD parametrize this somehow someday
 
 	if self.Codec == nil {
 		self.Codec = codec.CodecChain{}.Init()
@@ -492,6 +495,7 @@ func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 	self.p.WriteData(ls, b)
 	bid := ls.ToBlockId()
 	self.currentMap[bid] = true
+	self.nodeDataCache.Set(bid, nd)
 	return bid
 }
 
@@ -516,6 +520,11 @@ func sanityCheckNodeData(s uint64, nd *ibtree.NodeData) {
 func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 	self.lock.AssertLocked()
 	mlog.Printf2("storage/tree/tree", "t.LoadNode %v", id)
+	nd, found := self.nodeDataCache.Get(id)
+	if found {
+		mlog.Printf2("storage/tree/tree", " found from cache")
+		return nd
+	}
 	ls := NewLocationSliceFromBlockId(id)
 	b := self.p.ReadData(ls)
 	b, err := self.Codec.DecodeBytes(b, nil)
@@ -523,8 +532,9 @@ func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 		return nil
 	}
 	mlog.Printf2("storage/tree/tree", " got %d bytes in %p", len(b), b)
-	nd := ibtree.NewNodeDataFromBytes(b)
+	nd = ibtree.NewNodeDataFromBytes(b)
 	sanityCheckNodeData(self.p.Size(), nd)
+	self.nodeDataCache.Set(id, nd)
 	return nd
 }
 

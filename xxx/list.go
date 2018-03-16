@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 16:53:09 2018 mstenber
- * Last modified: Tue Mar 13 15:33:59 2018 mstenber
- * Edit time:     23 min
+ * Last modified: Fri Mar 16 12:47:40 2018 mstenber
+ * Edit time:     36 min
  *
  */
 
@@ -21,6 +21,12 @@ import "fmt"
 type YYYList struct {
 	Back, Front *YYYListElement
 	freeList    *YYYListElement
+	Length      int
+}
+
+type YYYListElement struct {
+	Prev, Next *YYYListElement
+	Value      YYYType
 }
 
 func (self *YYYList) getElement(v YYYType) (e *YYYListElement) {
@@ -29,7 +35,6 @@ func (self *YYYList) getElement(v YYYType) (e *YYYListElement) {
 	}
 	e = self.freeList
 	self.freeList = e.Next
-	e.Next = nil
 	e.Value = v
 	return e
 }
@@ -40,8 +45,8 @@ func (self *YYYList) Iterate(cb func(v YYYType)) {
 	}
 }
 
-func (self *YYYList) PushBack(v YYYType) *YYYListElement {
-	e := self.getElement(v)
+func (self *YYYList) PushBackElement(e *YYYListElement) {
+	e.Next = nil
 	e.Prev = self.Back
 	if self.Back != nil {
 		self.Back.Next = e
@@ -50,11 +55,17 @@ func (self *YYYList) PushBack(v YYYType) *YYYListElement {
 		self.Front = e
 	}
 	self.Back = e
+	self.Length++
+}
+
+func (self *YYYList) PushBack(v YYYType) *YYYListElement {
+	e := self.getElement(v)
+	self.PushBackElement(e)
 	return e
 }
 
-func (self *YYYList) PushFront(v YYYType) *YYYListElement {
-	e := self.getElement(v)
+func (self *YYYList) PushFrontElement(e *YYYListElement) {
+	e.Prev = nil
 	e.Next = self.Front
 	if self.Front != nil {
 		self.Front.Prev = e
@@ -63,10 +74,15 @@ func (self *YYYList) PushFront(v YYYType) *YYYListElement {
 		self.Back = e
 	}
 	self.Front = e
+	self.Length++
+}
+func (self *YYYList) PushFront(v YYYType) *YYYListElement {
+	e := self.getElement(v)
+	self.PushFrontElement(e)
 	return e
 }
 
-func (self *YYYList) Remove(e *YYYListElement) {
+func (self *YYYList) RemoveElement(e *YYYListElement) {
 	if e.Prev != nil {
 		e.Prev.Next = e.Next
 	} else {
@@ -77,6 +93,11 @@ func (self *YYYList) Remove(e *YYYListElement) {
 	} else {
 		self.Back = e.Prev
 	}
+	self.Length--
+}
+
+func (self *YYYList) Remove(e *YYYListElement) {
+	self.RemoveElement(e)
 	e.Prev = nil
 	e.Next = self.freeList
 	self.freeList = e
@@ -93,9 +114,4 @@ func (self *YYYList) String() string {
 
 	return fmt.Sprintf("YYYList<%d entries/%d free>", llen(self.Front), llen(self.freeList))
 
-}
-
-type YYYListElement struct {
-	Prev, Next *YYYListElement
-	Value      YYYType
 }

@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Mar 16 11:09:12 2018 mstenber
- * Last modified: Fri Mar 16 13:46:31 2018 mstenber
- * Edit time:     85 min
+ * Last modified: Fri Mar 16 14:53:54 2018 mstenber
+ * Edit time:     96 min
  *
  */
 
@@ -95,10 +95,16 @@ func (self *XXXCart) Set(key ZZZType, value XXXType) {
 		mlog.Printf2("xxx/cart", " not enabled")
 		return
 	}
+	if value == nil {
+		// nil values are not cached; if it is really desired,
+		// use pointer to pointer or something..
+		return
+	}
 	e, found := self.cache[key]
 	if found && e.value != nil {
 		// cache hit
 		e.refbit = true
+		e.value = value
 		return
 	}
 	if self.t1.Length+self.t2.Length == self.c {

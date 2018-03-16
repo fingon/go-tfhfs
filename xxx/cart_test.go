@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Mar 16 12:24:58 2018 mstenber
- * Last modified: Fri Mar 16 14:23:31 2018 mstenber
- * Edit time:     31 min
+ * Last modified: Fri Mar 16 14:50:21 2018 mstenber
+ * Edit time:     41 min
  *
  */
 
@@ -60,6 +60,11 @@ func TestCart(t *testing.T) {
 	})
 	assert.True(t, !created)
 	assert.Equal(t, string(*v), "10")
+
+	c.Set("10", xxx("11"))
+	v, found := c.Get("10")
+	assert.True(t, found)
+	assert.Equal(t, string(*v), "11")
 }
 
 func sanityCheckCart(t *testing.T, cart XXXCart) {
@@ -84,16 +89,35 @@ func sanityCheckCart(t *testing.T, cart XXXCart) {
 			}
 		}
 	}
-
 	assert.Equal(t, cart.ns, cns)
 	assert.Equal(t, cart.nl, cnl)
 	assert.Equal(t, cart.t1.Length, ct1)
 	assert.Equal(t, cart.t2.Length, ct2)
+	assert.True(t, ct1+ct2 <= cart.c)
 	assert.Equal(t, cart.b1.Length, cb1)
 	assert.Equal(t, cart.b2.Length, cb2)
 
 	assert.True(t, cart.p >= 0)
 	assert.True(t, cart.q >= 0)
+
+	seen := make(map[ZZZType]bool)
+
+	checkList := func(expvalue, expfreq bool, list XXXCartEntryList) {
+		llen := 0
+		list.Iterate(func(e *XXXCartEntry) {
+			seen[e.key] = true
+			assert.Equal(t, cart.cache[e.key], e)
+			assert.Equal(t, expvalue, e.value != nil)
+			assert.Equal(t, expfreq, e.frequentbit)
+			llen++
+		})
+		assert.Equal(t, llen, list.Length)
+	}
+	checkList(true, false, cart.t1)
+	checkList(true, true, cart.t2)
+	checkList(false, false, cart.b1)
+	checkList(false, true, cart.b2)
+	assert.Equal(t, len(seen), len(cart.cache))
 }
 
 func TestCartTorture(t *testing.T) {
@@ -102,8 +126,8 @@ func TestCartTorture(t *testing.T) {
 	c := XXXCart{}
 	size := 123
 	c.Init(size)
+	assert.Equal(t, c.c, size)
 	rng := util.GetSeededRng()
-
 	var hits, misses int
 
 	for i := 0; i < size*100; i++ {

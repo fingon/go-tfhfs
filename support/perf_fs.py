@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Thu Mar 15 18:07:02 2018 mstenber
+# Last modified: Fri Mar 16 15:24:55 2018 mstenber
 # Edit time:     94 min
 #
 """This is 'whole'-system benchmark used to gather data for populating
@@ -98,7 +98,7 @@ if __name__ == '__main__':
                     if m.mounted():
                         read_time = time.time() - start_time
                         m.close()
-                        cnt = units // read_time
+                        cnt = int(units // read_time)
                         print()
                         print(f'Took {read_time} seconds')
                         print(f'{cnt} {unit_type}s per second')

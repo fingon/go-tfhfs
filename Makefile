@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Feb 22 11:22:58 2018 mstenber
-# Edit time:     126 min
+# Last modified: Fri Mar 16 11:23:45 2018 mstenber
+# Edit time:     119 min
 #
 #
 
@@ -104,6 +104,14 @@ util/maprunnercallbacklist_gen.go: Makefile xxx/list.go
 	( echo "package util" ; \
 		egrep -A 9999 '^import' xxx/list.go | \
 		sed 's/YYYType/MapRunnerCallback/g;s/YYY/MapRunnerCallback/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+
+xxx/yyycartentrylist_gen.go: Makefile xxx/list.go
+	( echo "package xxx" ; \
+		egrep -A 9999 '^import' xxx/list.go | \
+		sed 's/YYY/YYYCartEntry/g;s/YYYCartEntryType/*YYYCartEntry/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

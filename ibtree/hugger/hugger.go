@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Fri Mar 16 13:33:16 2018 mstenber
+ * Last modified: Fri Mar 16 14:58:12 2018 mstenber
  * Edit time:     156 min
  *
  */
@@ -143,11 +143,7 @@ func (self *Hugger) Update(cb func(tr *Transaction)) {
 
 // ibtree.TreeBackend API
 func (self *Hugger) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
-	var nd *ibtree.NodeData
-	var found bool
-	self.nodeDataCacheLock.Do(func() {
-		nd, found = self.nodeDataCache.Get(id)
-	})
+	nd, found := self.GetCachedNodeData(id)
 	if !found {
 		b := self.Storage.GetBlockById(string(id))
 		if b == nil {

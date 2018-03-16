@@ -2,62 +2,87 @@
 ## Write 5078 megabytes
 Command: dd "if=/tmp/perf/size/install-highsierra-app.tgz" of=/tmp/x/foo.dat bs=1048576
 
-Took 13.77706503868103 seconds
-368 megabytes per second
+Took 14.746984004974365 seconds
+344 megabytes per second
 
 ## Write 60162 files
 Command: rsync -a /tmp/perf/amount /tmp/x/
 
-Took 126.6615538597107 seconds
-474 files per second
+Took 141.46033692359924 seconds
+425 files per second
+
+# Tree (custom nested btree in one file with superblocks)
+## Write 5078 megabytes
+Command: dd "if=/tmp/perf/size/install-highsierra-app.tgz" of=/tmp/x/foo.dat bs=1048576
+
+Took 28.10564422607422 seconds
+180 megabytes per second
+
+## Read it back
+Command: find /tmp/x -type f | xargs cat > /dev/null
+
+Took 22.570555210113525 seconds
+224.0 megabytes per second
+
+## Write 60162 files
+Command: rsync -a /tmp/perf/amount /tmp/x/
+
+Took 232.61201214790344 seconds
+258 files per second
+
+## Read it back
+Command: find /tmp/x -type f | xargs cat > /dev/null
+
+Took 33.57448077201843 seconds
+1791.0 files per second
 
 # Badger
 ## Write 5078 megabytes
 Command: dd "if=/tmp/perf/size/install-highsierra-app.tgz" of=/tmp/x/foo.dat bs=1048576
 
-Took 52.104098081588745 seconds
-97 megabytes per second
+Took 48.45631814002991 seconds
+104 megabytes per second
 
 ## Read it back
 Command: find /tmp/x -type f | xargs cat > /dev/null
 
-Took 20.546954870224 seconds
-247.0 megabytes per second
+Took 17.043668031692505 seconds
+297.0 megabytes per second
 
 ## Write 60162 files
 Command: rsync -a /tmp/perf/amount /tmp/x/
 
-Took 539.0603127479553 seconds
-111 files per second
+Took 546.862368106842 seconds
+110 files per second
 
 ## Read it back
 Command: find /tmp/x -type f | xargs cat > /dev/null
 
-Took 34.039758920669556 seconds
-1767.0 files per second
+Took 27.841084003448486 seconds
+2160.0 files per second
 
-# File
+# File (raw 64kb blocks on filesystem)
 ## Write 5078 megabytes
 Command: dd "if=/tmp/perf/size/install-highsierra-app.tgz" of=/tmp/x/foo.dat bs=1048576
 
-Took 37.444523096084595 seconds
-135 megabytes per second
+Took 35.19376611709595 seconds
+144 megabytes per second
 
 ## Read it back
 Command: find /tmp/x -type f | xargs cat > /dev/null
 
-Took 24.949825048446655 seconds
-203.0 megabytes per second
+Took 33.84479093551636 seconds
+150.0 megabytes per second
 
 ## Write 60162 files
 Command: rsync -a /tmp/perf/amount /tmp/x/
 
-Took 487.79161500930786 seconds
-123 files per second
+Took 504.9437429904938 seconds
+119 files per second
 
 ## Read it back
 Command: find /tmp/x -type f | xargs cat > /dev/null
 
-Took 39.1469190120697 seconds
-1536.0 files per second
+Took 33.60341715812683 seconds
+1790.0 files per second
 

@@ -37,18 +37,7 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
    stick in the block to storageblock, and change it to real block at
    flush?)
 
- * make hugger actually commit to storage only on flush; that way,
-   especially the root part of the tree will get written just once and not
-   # transactions times (including all the pain with sha256 etc)
-
 # Pending later TODO #
-
-* add some sort of reasonable cache, and use it in storage and
-  storage/tree, and get rid of gcache; something like e.g. CART seems
-  sensible (
-  https://www.usenix.org/legacy/events/fast04/tech/full_papers/bansal/bansal.pdf
-  ); built-in locking in a datastructure is inefficient so rather write
-  non-threadsafe cache and use it with lock held.
 
 * define some way to BlockBackend to index them by Status => can easily get
   blocks with statuses that are awkward (or come up with an algorithm that

@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Mar 16 11:23:45 2018 mstenber
-# Edit time:     119 min
+# Last modified: Fri Mar 16 13:47:04 2018 mstenber
+# Edit time:     133 min
 #
 #
 
@@ -22,7 +22,10 @@ GENERATED=\
 	util/byteslicepointer_gen.go \
 	util/stringlist_gen.go \
 	util/maprunnercallbacklist_gen.go \
-	storage/jobtype_string.go
+	storage/jobtype_string.go \
+	xxx/xxxcartentrylist_gen.go \
+	ibtree/nodedatacartentrylist_gen.go \
+	ibtree/nodedatacart_gen.go
 
 SUBDIRS=\
   codec fs ibtree ibtree/hugger mlog server \
@@ -108,12 +111,28 @@ util/maprunnercallbacklist_gen.go: Makefile xxx/list.go
 	mv $@.new $@
 
 
-xxx/yyycartentrylist_gen.go: Makefile xxx/list.go
+xxx/xxxcartentrylist_gen.go: Makefile xxx/list.go
 	( echo "package xxx" ; \
 		egrep -A 9999 '^import' xxx/list.go | \
-		sed 's/YYY/YYYCartEntry/g;s/YYYCartEntryType/*YYYCartEntry/g' | \
+		sed 's/YYY/XXXCartEntry/g;s/XXXCartEntryType/*XXXCartEntry/g' | \
 		cat ) > $@.new
 	mv $@.new $@
+
+
+ibtree/nodedatacartentrylist_gen.go: Makefile xxx/list.go
+	( echo "package ibtree" ; \
+		egrep -A 9999 '^import' xxx/list.go | \
+		sed 's/YYY/NodeDataCartEntry/g;s/NodeDataCartEntryType/*NodeDataCartEntry/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+ibtree/nodedatacart_gen.go: Makefile xxx/cart.go
+	( echo "package ibtree" ; \
+		egrep -A 9999 '^import' xxx/cart.go | \
+		sed 's/XXX/NodeDataCart/g;s/CartCart/Cart/g;s/NodeDataCartType/*NodeData/g;s/ZZZType/BlockId/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
 
 prof-%: .done.cpuprof.%
 	go tool pprof $<

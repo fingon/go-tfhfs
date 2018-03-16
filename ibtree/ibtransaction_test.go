@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan  9 18:29:10 2018 mstenber
- * Last modified: Tue Jan  9 19:26:45 2018 mstenber
- * Edit time:     33 min
+ * Last modified: Fri Mar 16 13:57:15 2018 mstenber
+ * Edit time:     34 min
  *
  */
 
@@ -13,39 +13,15 @@ package ibtree_test
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
-	"os"
 	"sort"
-	"strconv"
 	"testing"
-	"time"
 
 	"github.com/fingon/go-tfhfs/ibtree"
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/util"
 	"github.com/stvp/assert"
 )
-
-func newRandWithSource(seedvalue int64) *rand.Rand {
-	mlog.Printf2("ibtree/ibtransaction_test", "newRandWithSource %v", seedvalue)
-	source := rand.NewSource(seedvalue)
-	return rand.New(source)
-
-}
-func getSeededRng() *rand.Rand {
-	seed := os.Getenv("SEED")
-
-	seedvalue := time.Now().UnixNano()
-	if seed != "" {
-		v, err := strconv.Atoi(seed)
-		if err != nil {
-			log.Panic(err)
-		}
-		seedvalue = int64(v)
-	}
-	log.Printf("Seed: %v (use SEED= to fix)", seedvalue)
-	return newRandWithSource(seedvalue)
-}
 
 func ProdTree(t *testing.T, rng *rand.Rand) {
 	be := ibtree.DummyBackend{}.Init()
@@ -120,7 +96,6 @@ func ProdTree(t *testing.T, rng *rand.Rand) {
 func TestTransactionRandomTree(t *testing.T) {
 	t.Parallel()
 
-	rng := getSeededRng()
-	// rng := newRandWithSource(1515516631096889000)
+	rng := util.GetSeededRng()
 	ProdTree(t, rng)
 }

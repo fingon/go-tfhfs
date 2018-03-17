@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Mar 16 12:24:58 2018 mstenber
- * Last modified: Fri Mar 16 14:50:21 2018 mstenber
- * Edit time:     41 min
+ * Last modified: Sat Mar 17 11:29:05 2018 mstenber
+ * Edit time:     43 min
  *
  */
 
@@ -145,7 +145,13 @@ func TestCartTorture(t *testing.T) {
 			assert.Equal(t, string(*value), s)
 			hits++
 		} else {
-			c.Set(k, xxx(s))
+			if rng.Int()%100 < 20 {
+				c.Set(k, nil)
+				_, ok := c.Get(k)
+				assert.False(t, ok)
+			} else {
+				c.Set(k, xxx(s))
+			}
 			misses++
 		}
 		if i%100 == 0 {

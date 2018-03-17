@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Mar 16 11:09:12 2018 mstenber
- * Last modified: Fri Mar 16 14:53:54 2018 mstenber
- * Edit time:     96 min
+ * Last modified: Sat Mar 17 11:30:44 2018 mstenber
+ * Edit time:     106 min
  *
  */
 
@@ -61,6 +61,8 @@ func (self *XXXCart) Init(maximumSize int) *XXXCart {
 	return self
 }
 
+// Get retrieves the key, and returns the value if found, and
+// indicates in found if it was found or not.
 func (self *XXXCart) Get(key ZZZType) (value XXXType, found bool) {
 	mlog.Printf2("xxx/cart", "cart.Get %s", key)
 	e, found := self.cache[key]
@@ -79,6 +81,9 @@ func (self *XXXCart) Get(key ZZZType) (value XXXType, found bool) {
 	return
 }
 
+// GetOrCreate uses Get first, and then calls factory if Get
+// fails. The value is returned, as well as whether or not it was
+// created.
 func (self *XXXCart) GetOrCreate(key ZZZType, factory func(key ZZZType) XXXType) (value XXXType, created bool) {
 	value, found := self.Get(key)
 	if found {
@@ -89,18 +94,32 @@ func (self *XXXCart) GetOrCreate(key ZZZType, factory func(key ZZZType) XXXType)
 	return value, true
 }
 
+// Set sets the key to value. If value is nil, the key is cleared
+// instead.
 func (self *XXXCart) Set(key ZZZType, value XXXType) {
 	mlog.Printf2("xxx/cart", "cart.Set %v %v", key, value)
 	if self.c == 0 {
 		mlog.Printf2("xxx/cart", " not enabled")
 		return
 	}
+	e, found := self.cache[key]
 	if value == nil {
-		// nil values are not cached; if it is really desired,
-		// use pointer to pointer or something..
+		// just like in gcache, setting nil = delete.
+		if found && e.value != nil {
+			if e.frequentbit {
+				self.t1.RemoveElement(&e.e)
+			} else {
+				self.t2.RemoveElement(&e.e)
+			}
+			if e.filterlong {
+				self.nl--
+			} else {
+				self.ns--
+			}
+			e.value = nil
+		}
 		return
 	}
-	e, found := self.cache[key]
 	if found && e.value != nil {
 		// cache hit
 		e.refbit = true
@@ -154,6 +173,7 @@ func (self *XXXCart) Set(key ZZZType, value XXXType) {
 			self.q = util.IMin(self.q+1, 2*self.c-self.t1.Length)
 			mlog.Printf2("xxx/cart", "  q = %d", self.q)
 		}
+		// as it comes from b2, it already has filterlong set
 	}
 	self.t1.PushBackElement(&e.e)
 	e.value = value

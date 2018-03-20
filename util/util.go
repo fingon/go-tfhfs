@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 09:03:12 2017 mstenber
- * Last modified: Fri Mar 16 11:40:20 2018 mstenber
+ * Last modified: Tue Mar 20 13:36:02 2018 mstenber
  * Edit time:     4 min
  *
  */
@@ -53,4 +53,22 @@ func IMax(i int, ints ...int) int {
 		}
 	}
 	return i
+}
+
+func IOr(i int, ints ...int) int {
+	for _, v := range ints {
+		if v != 0 {
+			return v
+		}
+	}
+	return 0
+}
+
+func SOr(i string, strings ...string) string {
+	for _, v := range strings {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }

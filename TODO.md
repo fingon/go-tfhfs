@@ -32,23 +32,16 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
   fstest (~50% more LoC); however adding fuse support for it might be big
   task and even default apfs fails some of the cases :p
 
-* figure out the rare race condition(s)
-
- * sometimes there is nonexistent block reference under heavy load;
- related? (or already fixed alongside the dir handling bug?)
-
-* improve performance
-
- * rewrite so that ReferOrStore is fully async (TBD exact semantics; maybe
-   stick in the block to storageblock, and change it to real block at
-   flush?)
-
 # Pending later TODO #
 
 * define some way to BlockBackend to index them by Status => can easily get
   blocks with statuses that are awkward (or come up with an algorithm that
   does not require magic state and instead stores its state outside fs root
   in a different tree)
+
+* could make storage/tree actually do multiple parallel read/writes; given
+  SSDs and kernel buffer cache, it might still be faster than what it is
+  now
 
 # Pending someday todo #
 

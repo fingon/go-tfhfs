@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Feb 21 17:11:02 2018 mstenber
- * Last modified: Thu Mar 15 15:52:19 2018 mstenber
- * Edit time:     32 min
+ * Last modified: Tue Mar 20 13:22:47 2018 mstenber
+ * Edit time:     47 min
  *
  */
 
@@ -21,7 +21,7 @@ import (
 	"github.com/stvp/assert"
 )
 
-func TestTreeGrowShrink(t *testing.T) {
+func TestTreeSuperblockSafety(t *testing.T) {
 	t.Parallel()
 
 	be := NewTreeBackend()
@@ -30,7 +30,7 @@ func TestTreeGrowShrink(t *testing.T) {
 	be.Init(config)
 	slices := make([]LocationSlice, 0)
 	for tbe.numberOfSuperBlocks() < 3 {
-		sl := tbe.allocate(42)
+		sl := tbe.allocateSlice(42)
 		// Ensure the allocation does not cross superblock boundary
 		for i := 0; i < tbe.numberOfSuperBlocks(); i++ {
 			ofs := superBlockOffset(i)
@@ -46,6 +46,53 @@ func TestTreeGrowShrink(t *testing.T) {
 		}
 		slices = append(slices, sl)
 	}
+}
+
+func TestTreeGrowthAndShrinking(t *testing.T) {
+	t.Parallel()
+
+	dir, _ := ioutil.TempDir("", "tree")
+	defer os.RemoveAll(dir)
+
+	// A lot of growth / shrinking in one transaction seems to hit
+	// superblock boundary. This unit test ensures that is no
+	// longer the case.
+	be := NewTreeBackend()
+	tbe := be.(*treeBackend)
+	config := storage.BackendConfiguration{Directory: dir}
+	be.Init(config)
+	slices := make([]LocationSlice, 0)
+	n := 100000
+	for len(slices) < n {
+		sl := tbe.allocateSlice(42)
+		slices = append(slices, sl)
+	}
+	flush := func() {
+		tbe.unchangedRoot = nil
+		tbe.Flush()
+		be2 := NewTreeBackend()
+		tbe2 := be2.(*treeBackend)
+		be2.Init(config)
+		assert.Equal(t, tbe2.Superblock, tbe.Superblock)
+		// TBD: Check also that content matches?
+	}
+	flush()
+	zapIndex := func(ofs, div int) {
+		i := 0
+		for _, sl := range slices {
+			if i%div == ofs {
+				tbe.freeSlice(sl)
+			}
+			i++
+		}
+	}
+	zapIndex(0, 3)
+	flush()
+
+	zapIndex(1, 3)
+	flush()
+	zapIndex(2, 3)
+	flush()
 }
 
 func TestTree(t *testing.T) {

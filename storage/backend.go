@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 11:14:11 2018 mstenber
- * Last modified: Tue Mar 13 12:13:13 2018 mstenber
+ * Last modified: Tue Mar 20 13:32:40 2018 mstenber
  * Edit time:     13 min
  *
  */
@@ -32,6 +32,9 @@ type BackendConfiguration struct {
 	// Codec (if the backend actually handles the codec directly,
 	// as opposed to using chaining codec like the rest)
 	Codec codec.Codec
+
+	// CacheSize (if any) in number of disk pages
+	CacheSize int
 }
 
 // BlockBackend is subset of the storage Backend which deals with raw

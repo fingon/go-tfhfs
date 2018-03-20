@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:11:10 2018 mstenber
- * Last modified: Fri Mar 16 14:36:01 2018 mstenber
- * Edit time:     353 min
+ * Last modified: Tue Mar 20 13:33:16 2018 mstenber
+ * Edit time:     402 min
  *
  */
 
@@ -60,7 +60,7 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 	self.DirectoryBackendBase.Init(config)
 	self.NameInBlockBackend.Init("names", self)
 
-	self.nodeDataCache.Init(1234) // TBD parametrize this somehow someday
+	self.nodeDataCache.Init(util.IOr(config.CacheSize, 1234))
 
 	if self.Codec == nil {
 		self.Codec = codec.CodecChain{}.Init()
@@ -76,20 +76,40 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 	var best *Superblock
 	for i := 0; i < calculateNumberOfSuperBlocks(self.p.Size()); i++ {
 		ofs := superBlockOffset(i)
-		b := self.p.ReadData(LocationSlice{LocationEntry{Offset: ofs, Size: superBlockSize}})
-		b, err := self.Codec.DecodeBytes(b, nil)
-		if err != nil {
+		var sb Superblock
+		b := self.ReadData(LocationSlice{LocationEntry{Offset: ofs, Size: superBlockSize}})
+		if b == nil {
 			// invalid superblocks are ignored
 			continue
 		}
-		var sb Superblock
-		_, err = sb.UnmarshalMsg(b)
+		_, err := sb.UnmarshalMsg(b)
 		if err != nil {
 			continue
 		}
-		if best == nil || sb.Generation > best.Generation {
-			best = &sb
+		if best != nil && sb.Generation < best.Generation {
+			continue
 		}
+		// If pending was too big, load it + add it to freelist
+		if len(sb.PendingLocation) > 0 {
+			b := self.ReadData(sb.PendingLocation)
+			if b == nil {
+				// also invalid secondary things ignored
+				continue
+			}
+			var os OpSlice
+			_, err := os.UnmarshalMsg(b)
+			if err != nil {
+				continue
+			}
+			sb.Pending = os
+			for _, le := range sb.PendingLocation {
+				self.appendOp(le, true)
+				self.BytesUsed -= le.BlockSize()
+			}
+			sb.PendingLocation = nil
+		}
+
+		best = &sb
 	}
 	if best == nil {
 		// New tree
@@ -109,6 +129,16 @@ func (self *treeBackend) Init(config storage.BackendConfiguration) {
 		// Stick stuff in pending to tree, if any
 		self.flushPending()
 	}
+}
+
+func (self *treeBackend) ReadData(location LocationSlice) []byte {
+	b := self.p.ReadData(location)
+	b, err := self.Codec.DecodeBytes(b, nil)
+	if err != nil {
+		return nil
+	}
+	return b
+
 }
 
 func (self *treeBackend) newTransaction(root *ibtree.Node) {
@@ -145,10 +175,9 @@ func (self *treeBackend) appendOp(le LocationEntry, free bool) {
 	mlog.Printf2("storage/tree/tree", "appendOp %v", op)
 }
 
-func (self *treeBackend) appendFrees(ls LocationSlice) {
+func (self *treeBackend) freeSlice(ls LocationSlice) {
 	for _, le := range ls {
-		self.appendOp(le, true)
-		self.BytesUsed -= le.BlockSize()
+		self.addFree(le)
 	}
 }
 
@@ -186,8 +215,8 @@ func (self *treeBackend) String() string {
 	return fmt.Sprintf("tb{%p}", self)
 }
 
-func (self *treeBackend) allocate(size uint64) LocationSlice {
-	mlog.Printf2("storage/tree/tree", "%v.allocate %v", self, size)
+func (self *treeBackend) allocateSlice(size uint64) LocationSlice {
+	mlog.Printf2("storage/tree/tree", "%v.allocateSlice %v", self, size)
 	sl := make(LocationSlice, 0, 1)
 	for size > 0 {
 		// [1] single existing allocation if possible
@@ -229,7 +258,7 @@ func (self *treeBackend) allocate(size uint64) LocationSlice {
 
 		// [4] failure (free done allocations)
 		mlog.Printf2("storage/tree/tree", " [4] failure")
-		self.appendFrees(sl)
+		self.freeSlice(sl)
 		return nil
 	}
 	return sl
@@ -324,7 +353,7 @@ func (self *treeBackend) purgeNonCurrent(nd *ibtree.NodeData, bid ibtree.BlockId
 	// This block id is redundant, remove it
 	ls := NewLocationSliceFromBlockId(bid)
 	mlog.Printf2("storage/tree/tree", " freeing %v", ls)
-	self.appendFrees(ls)
+	self.freeSlice(ls)
 }
 
 func (self *treeBackend) flushPending() {
@@ -375,20 +404,48 @@ func (self *treeBackend) Flush() {
 	si := self.superIndex % self.numberOfSuperBlocks()
 	ofs := superBlockOffset(si)
 	mlog.Printf2("storage/tree/tree", " writing superblock %d @%d", si, ofs)
-	b, err := self.Superblock.MarshalMsg(nil)
-	if err != nil {
-		log.Panic(err)
+	var pending OpSlice
+	for i := 0; i < 2; i++ {
+		b, err := self.Superblock.MarshalMsg(nil)
+		if err != nil {
+			log.Panic(err)
+		}
+		b, err = self.Codec.EncodeBytes(b, nil)
+		if err != nil {
+			log.Panic(err)
+		}
+		if len(b) <= superBlockSize {
+			ls := LocationSlice{LocationEntry{Size: uint64(len(b)), Offset: ofs}}
+			self.p.WriteData(ls, b)
+			break
+		}
+		if i == 0 {
+			s := uint64(len(b)) + 1234
+			var sl LocationSlice
+			for {
+				sl = self.allocateSlice(s)
+				b, err = self.Pending.MarshalMsg(nil)
+				if err != nil {
+					log.Panic(err)
+				}
+				b, err = self.Codec.EncodeBytes(b, nil)
+				if err != nil {
+					log.Panic(err)
+				}
+				if uint64(len(b)) <= s {
+					self.p.WriteData(sl, b)
+					break
+				}
+				self.freeSlice(sl)
+				s = uint64(len(b) + 1234)
+			}
+			pending = self.Pending
+			self.PendingLocation = sl
+			self.Pending = nil
+		} else {
+			mlog.Panicf("Too large superblock: %v > %v", len(b), superBlockSize)
+		}
 	}
-	b, err = self.Codec.EncodeBytes(b, nil)
-	if err != nil {
-		log.Panic(err)
-	}
-	if len(b) > superBlockSize {
-		mlog.Panicf("Too large superblock: %v > %v", len(b), superBlockSize)
-	}
-
-	ls := LocationSlice{LocationEntry{Size: uint64(len(b)), Offset: ofs}}
-	self.p.WriteData(ls, b)
 
 	self.rootBlockId = bid
 	self.savedRoot = newRoot
@@ -398,7 +455,13 @@ func (self *treeBackend) Flush() {
 
 	self.flushing = false
 
-	// Stick stuff in pending to tree, if any
+	// If we offloaded our stuff to pendinglocation, replace it
+	// and also free pendinglocation
+	if self.PendingLocation != nil {
+		self.Pending = pending
+		self.freeSlice(self.PendingLocation)
+		self.PendingLocation = nil
+	}
 	self.flushPending()
 
 	// Clever bit: Use the post-flush root as base so we do not
@@ -417,7 +480,7 @@ func (self *treeBackend) DeleteBlock(b *storage.Block) {
 	if bd == nil {
 		mlog.Panicf("Nonexistent DeleteBlock: %v", b)
 	}
-	self.appendFrees(bd.Location)
+	self.freeSlice(bd.Location)
 	self.blockTree.Delete(ibtree.Key(b.Id))
 }
 
@@ -428,7 +491,7 @@ func (self *treeBackend) GetBlockData(b *storage.Block) []byte {
 	if bd == nil {
 		return nil
 	}
-	return self.p.ReadData(bd.Location)
+	return self.ReadData(bd.Location)
 }
 
 func (self *treeBackend) GetBlockById(id string) *storage.Block {
@@ -457,7 +520,11 @@ func (self *treeBackend) StoreBlock(bl *storage.Block) {
 	defer self.lock.Locked()()
 	mlog.Printf2("storage/tree/tree", "%v.StoreBlock %v", self, bl)
 	b := *bl.Data.Get()
-	ls := self.allocate(uint64(len(b)))
+	b, err := self.Codec.EncodeBytes(b, nil)
+	if err != nil {
+		log.Panic(err)
+	}
+	ls := self.allocateSlice(uint64(len(b)))
 	self.p.WriteData(ls, b)
 	bdata := BlockData{Location: ls, BlockMetadata: bl.BlockMetadata}
 	self.setBlockData(bl.Id, &bdata)
@@ -491,7 +558,7 @@ func (self *treeBackend) SaveNode(nd *ibtree.NodeData) ibtree.BlockId {
 	if err != nil {
 		mlog.Panicf("SaveNode unable to encode data: %v", err)
 	}
-	ls := self.allocate(uint64(len(b)))
+	ls := self.allocateSlice(uint64(len(b)))
 	self.p.WriteData(ls, b)
 	bid := ls.ToBlockId()
 	self.currentMap[bid] = true
@@ -526,11 +593,7 @@ func (self *treeBackend) LoadNode(id ibtree.BlockId) *ibtree.NodeData {
 		return nd
 	}
 	ls := NewLocationSliceFromBlockId(id)
-	b := self.p.ReadData(ls)
-	b, err := self.Codec.DecodeBytes(b, nil)
-	if err != nil {
-		return nil
-	}
+	b := self.ReadData(ls)
 	mlog.Printf2("storage/tree/tree", " got %d bytes in %p", len(b), b)
 	nd = ibtree.NewNodeDataFromBytes(b)
 	sanityCheckNodeData(self.p.Size(), nd)

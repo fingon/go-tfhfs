@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Tue Mar 20 11:25:46 2018 mstenber
- * Edit time:     64 min
+ * Last modified: Tue Mar 20 13:37:56 2018 mstenber
+ * Edit time:     67 min
  *
  */
 
@@ -39,7 +39,7 @@ func main() {
 		fmt.Sprintf("Backend to use (possible: %v)", factory.List()))
 	cpuprofile := flag.String("cpuprofile", "", "CPU profile file")
 	memprofile := flag.String("memprofile", "", "Memory profile file")
-	cachesize := flag.Int("cachesize", 10000, "Number of btree nodes to cache (~few k each)")
+	cachesize := flag.Int("cachesize", 10000, "Number of btree nodes to cache (~few k each, may be up to 2x this due to 2 places using same variable)")
 	//family := flag.String("family", "tcp", "Address family to use for server")
 	address := flag.String("address", "", "Address to use for server")
 	profile := flag.Bool("profile", false, "Whether to enable profiling 'bonus stuff'")
@@ -66,7 +66,7 @@ func main() {
 	}
 
 	// actual filesystem
-	beconf := storage.BackendConfiguration{Directory: storedir}
+	beconf := storage.BackendConfiguration{Directory: storedir, CacheSize: *cachesize}
 	conf := factory.CryptoStorageConfiguration{BackendConfiguration: beconf,
 		BackendName: *backendp, Password: *password, Salt: *salt}
 	st := factory.NewCryptoStorage(conf)

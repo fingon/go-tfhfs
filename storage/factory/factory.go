@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:22:52 2018 mstenber
- * Last modified: Tue Mar 13 15:46:50 2018 mstenber
- * Edit time:     25 min
+ * Last modified: Tue Mar 20 13:35:41 2018 mstenber
+ * Edit time:     26 min
  *
  */
 
@@ -20,6 +20,7 @@ import (
 	"github.com/fingon/go-tfhfs/storage/file"
 	"github.com/fingon/go-tfhfs/storage/inmemory"
 	"github.com/fingon/go-tfhfs/storage/tree"
+	"github.com/fingon/go-tfhfs/util"
 )
 
 type factoryCallback func() storage.Backend
@@ -71,18 +72,9 @@ type CryptoStorageConfiguration struct {
 
 func NewCryptoStorage(config CryptoStorageConfiguration) *storage.Storage {
 	mlog.Printf2("storage/factory/factory", "f.NewCryptoStorage")
-	iterations := config.Iterations
-	if iterations == 0 {
-		iterations = 12345
-	}
-	queuelength := config.QueueLength
-	if queuelength == 0 {
-		queuelength = 100
-	}
-	salt := config.Salt
-	if salt == "" {
-		salt = "asdf"
-	}
+	iterations := util.IOr(config.Iterations, 12345)
+	queuelength := util.IOr(config.QueueLength, 100)
+	salt := util.SOr(config.Salt, "asdf")
 	beconfig := config.BackendConfiguration
 	c := &codec.CodecChain{}
 	if config.Password != "" {

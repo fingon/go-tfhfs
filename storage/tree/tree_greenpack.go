@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Feb 16 10:17:18 2018 mstenber
- * Last modified: Wed Feb 21 17:38:18 2018 mstenber
- * Edit time:     9 min
+ * Last modified: Tue Mar 20 12:48:39 2018 mstenber
+ * Edit time:     10 min
  *
  */
 
@@ -32,9 +32,10 @@ type OpEntry struct {
 type OpSlice []OpEntry
 
 type Superblock struct {
-	Generation   uint64
-	BytesUsed    uint64
-	BytesTotal   uint64
-	RootLocation LocationSlice
-	Pending      OpSlice
+	Generation      uint64
+	BytesUsed       uint64
+	BytesTotal      uint64
+	RootLocation    LocationSlice
+	Pending         OpSlice
+	PendingLocation LocationSlice
 }

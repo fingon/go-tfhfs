@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Fri Mar 16 15:24:55 2018 mstenber
-# Edit time:     94 min
+# Last modified: Tue Mar 20 16:01:06 2018 mstenber
+# Edit time:     95 min
 #
 """This is 'whole'-system benchmark used to gather data for populating
 the 'official' performance figures with.
@@ -44,8 +44,8 @@ if __name__ == '__main__':
     read_cmd = 'find /tmp/x -type f | xargs cat > /dev/null'
     tests = [
         ('In-memory dict', dict(backend='inmemory')),
+        ('Badger', dict(backend='badger')),
         ('Tree (custom nested btree in one file with superblocks)', dict(backend='tree')),
-        ('Badger', dict()),
         #  ('Bolt', dict(backend='bolt')), # Too slow, not interesting
         ('File (raw 64kb blocks on filesystem)', dict(backend='file')),
     ]

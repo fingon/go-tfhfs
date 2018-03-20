@@ -17,6 +17,12 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
 * fix above 5 testfs failures if I feel like it (rename I do not
   understand, NXIO would be trivial to return)
 
+  sudo prove -f -o -r ~/git/fstest/tests/rename
+
+  => no errors; only when all tests are run it does error out. This implies
+  that there is some timing constraint (possibly flush? parallel write from
+  previous tests? that interferes)
+
 * test harder (?)
 
   https://stackoverflow.com/questions/21565865/filesystem-test-suites has

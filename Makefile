@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Fri Mar 16 13:47:04 2018 mstenber
-# Edit time:     133 min
+# Last modified: Tue Mar 20 10:32:14 2018 mstenber
+# Edit time:     137 min
 #
 #
 
@@ -31,7 +31,11 @@ SUBDIRS=\
   codec fs ibtree ibtree/hugger mlog server \
   storage storage/badger storage/bolt util
 
-all: generate test tfhfs tfhfs-connector
+BINARIES=tfhfs tfhfs-connector
+
+all: generate test binaries
+
+binaries: $(BINARIES)
 
 bench: .done.buildable
 	go test ./... -bench .
@@ -196,10 +200,6 @@ update-deps:
 	(cd pb && protoc --go_out=. --twirp_out=. *.proto )
 	touch $@
 
-fstest: tfhfs tfhfs-connector
-	./sanitytest.sh d
-	cd /tmp/x && sudo prove -f -o -r ~mstenber/git/fstest/tests && umount /tmp/x
-
 prep-perf:
 	rm -rf /tmp/perf
 	mkdir -p /tmp/perf/size
@@ -214,3 +214,17 @@ perf.md: .done.perf
 	support/perf_fs.py | tee $@.new
 	egrep -q 'Took ' $@.new
 	mv $@.new $@
+
+# System test targets
+
+# https://github.com/fingon/fstest [fuse branch]
+fstest: binaries
+	./sanitytest.sh d
+	cd /tmp/x && sudo prove -f -o -r ~/git/fstest/tests && umount /tmp/x
+
+# https://github.com/macosforge/fstools
+fstorture: binaries
+	./sanitytest.sh d
+	mkdir -p /tmp/x/d1
+	mkdir -p /tmp/x/d2
+	~/git/fstools/src/fstorture/fstorture /tmp/d[12] 123 -t 1m

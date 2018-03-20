@@ -81,3 +81,10 @@ Internet will have only not particularly bad outcomes:
 roots, but typically merge routine should simply ignore this.
 
 
+Used tests to verify sanity
+---------------------------
+
+- My FUSE oriented variant of fstest: https://github.com/fingon/fstest (fuse
+branch)
+
+- fstorture from Apple fstools: https://github.com/macosforge/fstools

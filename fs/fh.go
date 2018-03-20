@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Tue Mar 20 11:17:21 2018 mstenber
+ * Last modified: Tue Mar 20 12:10:07 2018 mstenber
  * Edit time:     482 min
  *
  */
@@ -136,8 +136,7 @@ func (self *inodeFH) Ops() *fsOps {
 }
 
 func (self *inodeFH) Release() {
-	delete(self.inode.tracker.fh2ifile, self.fh)
-	self.inode.Release()
+	self.inode.tracker.RemoveFile(self)
 }
 
 func (self *inodeFH) SetPos(pos uint64) {

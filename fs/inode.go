@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Mar 20 11:17:13 2018 mstenber
- * Edit time:     367 min
+ * Last modified: Tue Mar 20 12:25:48 2018 mstenber
+ * Edit time:     395 min
  *
  */
 
@@ -86,8 +86,9 @@ func unixNanoToFuse(t uint64, seconds *uint64, parts *uint32) {
 	*parts = uint32(t % uint64(time.Second))
 }
 
-func (self *inode) addRefCount(refcnt int64) {
-	refcnt = atomic.AddInt64(&self.refcnt, refcnt)
+func (self *inode) addRefCount(delta int64) {
+	refcnt := atomic.AddInt64(&self.refcnt, delta)
+	mlog.Printf2("fs/inode", "%v.addRefCount %v => %v", self, delta, refcnt)
 	if refcnt > 0 {
 		return
 	}
@@ -95,6 +96,7 @@ func (self *inode) addRefCount(refcnt int64) {
 		defer self.tracker.inodeLock.Locked()()
 		// was taken by someone
 		if self.refcnt > 0 {
+			mlog.Printf2("fs/inode", " someone else had ref")
 			return
 		}
 		delete(self.tracker.ino2inode, self.ino)
@@ -102,13 +104,10 @@ func (self *inode) addRefCount(refcnt int64) {
 		// if we were removed from somewhere, ensure we're
 		// still ongoing business
 		if self.removed {
-			self.removed = false
-			if !self.HasSubTypeKey(BST_FILE_INODEFILENAME) {
-				// file is gone; can remove everything with
-				// that particular inode prefix from the tree
-				self.deleteInode()
-
-			}
+			mlog.Printf2("fs/inode", " removed?")
+			// file is gone; can remove everything with
+			// that particular inode prefix from the tree
+			self.deleteInode()
 		}
 
 		return
@@ -119,19 +118,26 @@ func (self *inode) addRefCount(refcnt int64) {
 }
 
 func (self *inode) deleteInode() {
+	mlog.Printf2("fs/inode", "%v.deleteInode", self)
 	// We are called with inodeLock held
 	self.tracker.inodeLock.AssertLocked()
 
-	self.Fs().Update2(func(tr *hugger.Transaction) bool {
+	if self.Fs().Update2(func(tr *hugger.Transaction) bool {
 		t := tr.IB()
-		if !self.HasSubTypeKey(BST_FILE_INODEFILENAME) {
+		if self.HasSubTypeKey(BST_FILE_INODEFILENAME) {
+			mlog.Printf2("fs/inode", "have reference now?!?")
 			return false
 		}
+		mlog.Printf2("fs/inode", "trying to delete")
 		k1 := NewBlockKey(self.ino, BST_NONE, "").IB()
 		k2 := NewBlockKey(self.ino, BST_LAST, "").IB()
 		t.DeleteRange(k1, k2)
 		return true
-	})
+	}) {
+		// Don't try to remove again, we're already gone
+		self.removed = false
+		mlog.Printf2("fs/inode", " great success deleting inode")
+	}
 }
 
 func (self *inode) FillAttr(out *fuse.Attr) fuse.Status {
@@ -205,7 +211,6 @@ func (self *inode) GetChildByName(name string) *inode {
 func (self *inode) GetFile(flags uint32) *inodeFH {
 	file := &inodeFH{inode: self, flags: flags}
 	self.tracker.AddFile(file)
-	self.Refer()
 	return file
 }
 
@@ -301,6 +306,7 @@ func (self *inode) Release() {
 
 func (self *inode) Forget(nlookup uint64) {
 	if self == nil {
+		mlog.Printf2("fs/inode", "Forget at non-existent inode?!?")
 		return
 	}
 	self.addRefCount(-int64(nlookup))
@@ -334,7 +340,18 @@ func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 		return true
 	}) {
 		defer self.tracker.inodeLock.Locked()()
+
+		// If there are open filehandles on the particular
+		// inode, we mark it to be removed once last one goes;
+		// otherwise we remove it immediately.
+		count, found := self.tracker.ino2fhcount[child.ino]
 		child.removed = true
+		if !found {
+			mlog.Printf2("fs/inode", " no active fh(s)")
+			child.deleteInode()
+		} else {
+			mlog.Printf2("fs/inode", " %d active fh(s), delaying removal", count)
+		}
 	}
 	mlog.Printf2("fs/inode", " Removed %v", child)
 	if self.Fs().server != nil {
@@ -458,16 +475,18 @@ func (self *randomInodeNumberGenerator) CreateInodeNumber() uint64 {
 }
 
 type inodeTracker struct {
-	fs        *Fs
-	inodeLock util.MutexLocked
-	generator inodeNumberGenerator
-	ino2inode map[uint64]*inode
-	fh2ifile  map[uint64]*inodeFH
-	nextFh    uint64
+	fs          *Fs
+	inodeLock   util.MutexLocked
+	generator   inodeNumberGenerator
+	ino2inode   map[uint64]*inode
+	ino2fhcount map[uint64]int
+	fh2ifile    map[uint64]*inodeFH
+	nextFh      uint64
 }
 
 func (self *inodeTracker) Init(fs *Fs) {
 	self.ino2inode = make(map[uint64]*inode)
+	self.ino2fhcount = make(map[uint64]int)
 	self.fh2ifile = make(map[uint64]*inodeFH)
 	self.fs = fs
 	self.nextFh = 1
@@ -482,6 +501,32 @@ func (self *inodeTracker) AddFile(file *inodeFH) {
 	fh := self.nextFh
 	file.fh = fh
 	self.fh2ifile[fh] = file
+	file.inode.Refer()
+
+	// update ino2fhcount
+	count, found := self.ino2fhcount[file.inode.ino]
+	if found {
+		count++
+	} else {
+		count = 1
+	}
+	self.ino2fhcount[file.inode.ino] = count
+}
+
+func (self *inodeTracker) RemoveFile(file *inodeFH) {
+	self.inodeLock.Do(func() {
+		delete(self.fh2ifile, file.fh)
+		count := self.ino2fhcount[file.inode.ino]
+		if count > 1 {
+			self.ino2fhcount[file.inode.ino] = count - 1
+		} else {
+			delete(self.ino2fhcount, file.inode.ino)
+			if file.inode.removed {
+				file.inode.deleteInode()
+			}
+		}
+	})
+	file.inode.Release()
 }
 
 func (self *inodeTracker) getInode(ino uint64) *inode {

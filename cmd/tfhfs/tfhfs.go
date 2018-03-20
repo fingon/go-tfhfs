@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Tue Mar 13 12:38:47 2018 mstenber
+ * Last modified: Tue Mar 20 11:25:46 2018 mstenber
  * Edit time:     64 min
  *
  */
@@ -35,7 +35,7 @@ func main() {
 	password := flag.String("password", "siikret", "Password")
 	salt := flag.String("salt", "salt", "Salt")
 	rootName := flag.String("rootname", "root", "Name of the root reference")
-	backendp := flag.String("backend", "badger",
+	backendp := flag.String("backend", "tree",
 		fmt.Sprintf("Backend to use (possible: %v)", factory.List()))
 	cpuprofile := flag.String("cpuprofile", "", "CPU profile file")
 	memprofile := flag.String("memprofile", "", "Memory profile file")

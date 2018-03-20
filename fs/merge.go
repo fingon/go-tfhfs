@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 10:43:03 2018 mstenber
- * Last modified: Wed Jan 17 13:47:08 2018 mstenber
- * Edit time:     56 min
+ * Last modified: Tue Mar 20 11:18:03 2018 mstenber
+ * Edit time:     58 min
  *
  */
 
@@ -157,13 +157,6 @@ func MergeTo3(tr *hugger.Transaction, src, dst *ibtree.Node, local bool) {
 		})
 	for ino, v := range m {
 		if v == MV_NONE {
-			// TBD: Should we iterate through children to
-			// keep nlinks up to date?
-			//IterateInoSubTypeKeys(t, ino, fs.DIR_NAME2INODE,
-			// func(key BlockKey) bool {
-			// ..
-			// })
-
 			k1 := NewBlockKey(ino, BST_NONE, "").IB()
 			k2 := NewBlockKey(ino, BST_LAST, "").IB()
 			t.DeleteRange(k1, k2)

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Tue Mar 20 10:25:59 2018 mstenber
- * Edit time:     482 min
+ * Last modified: Tue Mar 20 11:19:34 2018 mstenber
+ * Edit time:     486 min
  *
  */
 
@@ -39,7 +39,7 @@ func (self *fsOps) String() string {
 }
 
 func (self *fsOps) SetDebug(dbg bool) {
-	// TBD - do we need debug functionality someday?
+	// debug is covered by mlog
 }
 
 func (self *fsOps) StatFs(input *InHeader, out *StatfsOut) Status {
@@ -445,13 +445,7 @@ func (self *fsOps) unlinkInodeInInode(inode, child *inode, name string, isdir *b
 		return ENOENT
 	}
 	if isdir != nil && *isdir {
-		found := false
-		child.IterateSubTypeKeys(BST_DIR_NAME2INODE,
-			func(key BlockKey) bool {
-				found = true
-				return false // one child is enough
-			})
-		if found {
+		if child.HasSubTypeKey(BST_DIR_NAME2INODE) {
 			// Had child -> not empty
 			return Status(syscall.ENOTEMPTY)
 		}
@@ -596,9 +590,6 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 		return OK
 	}
 
-	// TBD: In theory this may trip on its own cleverness if lock
-	// order fails somehow.
-
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
 
@@ -635,7 +626,8 @@ func (self *fsOps) Rename(input *RenameIn, oldName string, newName string) (code
 		return
 	}
 
-	// Scary bit starts here; take locks in id order (of directories)
+	// Scary bit starts here; take locks in id order (of
+	// directories' inode numbers)
 	if input.NodeId < input.Newdir {
 		defer inode.metaWriteLock.Locked()()
 		defer new_inode.metaWriteLock.Locked()()

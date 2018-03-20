@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 30 13:41:33 2017 mstenber
- * Last modified: Tue Jan  9 14:33:28 2018 mstenber
+ * Last modified: Tue Mar 20 11:20:30 2018 mstenber
  * Edit time:     100 min
  *
  */
@@ -203,7 +203,6 @@ func Printf2(file string, format string, args ...interface{}) {
 		}
 		depth -= minDepth
 
-		// TBD: something like this worth it, or not?
 		if depth > 0 {
 			format = fmt.Sprint(strings.Repeat(".", depth), format)
 		}

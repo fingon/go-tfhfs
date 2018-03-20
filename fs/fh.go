@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Tue Jan  2 10:07:37 2018 mstenber
- * Last modified: Fri Mar 16 15:01:33 2018 mstenber
- * Edit time:     481 min
+ * Last modified: Tue Mar 20 11:17:21 2018 mstenber
+ * Edit time:     482 min
  *
  */
 
@@ -147,7 +147,6 @@ func (self *inodeFH) SetPos(pos uint64) {
 	}
 	mlog.Printf2("fs/fh", "inodeFH.SetPos %d", pos)
 	self.pos = pos
-	// TBD - does this need something else too?
 	self.lastKey = nil
 }
 

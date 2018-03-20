@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Tue Mar 20 10:21:56 2018 mstenber
- * Edit time:     25 min
+ * Last modified: Tue Mar 20 11:04:51 2018 mstenber
+ * Edit time:     26 min
  *
  */
 
@@ -38,6 +38,8 @@ const (
 	// key: 8 byte offset, value: data block id (for data @ offset)
 	BST_FILE_OFFSET2EXTENT BlockSubType = 0x21
 
+	// should not occur in real world
+	// (can be used as end-of-range marker)
 	BST_LAST = 0x2f
 
 	// value: FsData

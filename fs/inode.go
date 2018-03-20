@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Mar 20 10:22:12 2018 mstenber
- * Edit time:     353 min
+ * Last modified: Tue Mar 20 11:17:13 2018 mstenber
+ * Edit time:     367 min
  *
  */
 
@@ -28,11 +28,11 @@ import (
 )
 
 type inode struct {
-	ino       uint64
-	tracker   *inodeTracker
-	refcnt    int64
-	offsetMap util.MutexLockedMap
-
+	ino           uint64
+	tracker       *inodeTracker
+	refcnt        int64
+	offsetMap     util.MutexLockedMap
+	removed       bool
 	meta          InodeMetaAtomicPointer
 	metaWriteLock util.MutexLocked
 }
@@ -97,15 +97,41 @@ func (self *inode) addRefCount(refcnt int64) {
 		if self.refcnt > 0 {
 			return
 		}
-		// TBD if there's something else that should be done?
 		delete(self.tracker.ino2inode, self.ino)
 
-		// TBD Delete from tree if StNlink == 0
+		// if we were removed from somewhere, ensure we're
+		// still ongoing business
+		if self.removed {
+			self.removed = false
+			if !self.HasSubTypeKey(BST_FILE_INODEFILENAME) {
+				// file is gone; can remove everything with
+				// that particular inode prefix from the tree
+				self.deleteInode()
+
+			}
+		}
+
 		return
 	}
 	if refcnt < 0 {
 		log.Panicf("inode refcount below zero")
 	}
+}
+
+func (self *inode) deleteInode() {
+	// We are called with inodeLock held
+	self.tracker.inodeLock.AssertLocked()
+
+	self.Fs().Update2(func(tr *hugger.Transaction) bool {
+		t := tr.IB()
+		if !self.HasSubTypeKey(BST_FILE_INODEFILENAME) {
+			return false
+		}
+		k1 := NewBlockKey(self.ino, BST_NONE, "").IB()
+		k2 := NewBlockKey(self.ino, BST_LAST, "").IB()
+		t.DeleteRange(k1, k2)
+		return true
+	})
 }
 
 func (self *inode) FillAttr(out *fuse.Attr) fuse.Status {
@@ -282,7 +308,7 @@ func (self *inode) Forget(nlookup uint64) {
 
 func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 	mlog.Printf2("fs/inode", "inode.RemoveChildByName %v", name)
-	self.Fs().Update2(func(tr *hugger.Transaction) bool {
+	if self.Fs().Update2(func(tr *hugger.Transaction) bool {
 		cmeta := child.Meta()
 		if cmeta == nil {
 			code = fuse.ENOENT
@@ -306,7 +332,10 @@ func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 		tr.IB().Delete(k.IB())
 		tr.IB().Delete(rk.IB())
 		return true
-	})
+	}) {
+		defer self.tracker.inodeLock.Locked()()
+		child.removed = true
+	}
 	mlog.Printf2("fs/inode", " Removed %v", child)
 	if self.Fs().server != nil {
 		self.Fs().server.DeleteNotify(self.ino, child.ino, name)
@@ -336,6 +365,17 @@ func (self *inode) getMeta() *InodeMeta {
 		return nil
 	}
 	return decodeInodeMeta(*v)
+}
+
+func (self *inode) HasSubTypeKey(subtype BlockSubType) bool {
+	found := false
+	self.IterateSubTypeKeys(subtype,
+		func(key BlockKey) bool {
+			found = true
+			return false // one child is enough
+		})
+	return found
+
 }
 
 // Meta returns a copy of current inode metadata. If the inode in

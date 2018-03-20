@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:39:36 2017 mstenber
- * Last modified: Thu Jan 25 12:21:44 2018 mstenber
+ * Last modified: Tue Mar 20 11:16:29 2018 mstenber
  * Edit time:     242 min
  *
  */
@@ -18,7 +18,6 @@
 // (parallel testing, arbitrary permission simulation with nonroot
 // user)
 //
-// TBD: do something about
 package fs
 
 import (

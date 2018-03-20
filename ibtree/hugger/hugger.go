@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 12:37:08 2018 mstenber
- * Last modified: Fri Mar 16 14:58:12 2018 mstenber
- * Edit time:     156 min
+ * Last modified: Tue Mar 20 11:11:09 2018 mstenber
+ * Edit time:     157 min
  *
  */
 
@@ -104,7 +104,9 @@ func (self *Hugger) GetTransaction() *Transaction {
 // Update2 (repeatedly) calls cb until it manages to update the global
 // state with the content of the transaction. Therefore cb should be
 // idempotent. If cb returns false, the transaction will not be committed.
-func (self *Hugger) Update2(cb func(tr *Transaction) bool) {
+//
+// The return value is the return value of the last cb call.
+func (self *Hugger) Update2(cb func(tr *Transaction) bool) bool {
 	mlog.Printf2("ibtree/hugger/hugger", "fs.Update")
 	first := true
 	for {
@@ -113,11 +115,11 @@ func (self *Hugger) Update2(cb func(tr *Transaction) bool) {
 		tr := self.GetNestableTransaction()
 		defer tr.Close()
 		if !cb(tr) {
-			break
+			return false
 		}
 
 		if tr.TryCommit() {
-			return
+			return true
 		}
 		if first {
 			// Subsequent ones we want lock for, as we do

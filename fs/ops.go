@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Thu Jan 25 13:10:52 2018 mstenber
- * Edit time:     478 min
+ * Last modified: Tue Mar 20 10:25:59 2018 mstenber
+ * Edit time:     482 min
  *
  */
 
@@ -444,8 +444,17 @@ func (self *fsOps) unlinkInodeInInode(inode, child *inode, name string, isdir *b
 	if meta == nil {
 		return ENOENT
 	}
-	if isdir != nil && *isdir && meta.Nchildren > 0 {
-		return Status(syscall.ENOTEMPTY)
+	if isdir != nil && *isdir {
+		found := false
+		child.IterateSubTypeKeys(BST_DIR_NAME2INODE,
+			func(key BlockKey) bool {
+				found = true
+				return false // one child is enough
+			})
+		if found {
+			// Had child -> not empty
+			return Status(syscall.ENOTEMPTY)
+		}
 	}
 	if isdir != nil && *isdir != child.IsDir() {
 		code = EPERM

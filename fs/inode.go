@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Fri Mar 16 10:40:44 2018 mstenber
+ * Last modified: Tue Mar 20 10:22:12 2018 mstenber
  * Edit time:     353 min
  *
  */
@@ -58,7 +58,6 @@ func (self *inode) AddChild(name string, child *inode) (code fuse.Status) {
 			return false
 		}
 		meta.SetMTimeNow()
-		meta.Nchildren++
 		self.SetMetaInTransaction(meta, tr)
 
 		k := NewBlockKeyDirFilename(self.ino, name).IB()
@@ -299,7 +298,6 @@ func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 			code = fuse.ENOENT
 			return false
 		}
-		meta.Nchildren--
 		meta.SetMTimeNow()
 		self.SetMetaInTransaction(meta, tr)
 

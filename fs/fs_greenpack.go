@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Wed Mar 14 14:41:00 2018 mstenber
+ * Last modified: Tue Mar 20 10:21:56 2018 mstenber
  * Edit time:     25 min
  *
  */
@@ -61,8 +61,6 @@ type InodeMetaData struct {
 	StNlink   uint32
 
 	// Non-visible things
-	// How many children do we have (BST_DIR_NAME2INODE entries)
-	Nchildren uint32
 
 	// What is ino of our parent (directory-only)
 	ParentIno uint64

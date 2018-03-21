@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 11:14:11 2018 mstenber
- * Last modified: Tue Mar 20 13:32:40 2018 mstenber
- * Edit time:     13 min
+ * Last modified: Wed Mar 21 12:20:55 2018 mstenber
+ * Edit time:     14 min
  *
  */
 
@@ -35,6 +35,9 @@ type BackendConfiguration struct {
 
 	// CacheSize (if any) in number of disk pages
 	CacheSize int
+
+	// Unsafe mode (if possible) ; non-sync writes mostly
+	Unsafe bool
 }
 
 // BlockBackend is subset of the storage Backend which deals with raw

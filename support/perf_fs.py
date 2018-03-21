@@ -9,7 +9,7 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Tue Mar 20 16:01:06 2018 mstenber
+# Last modified: Wed Mar 21 12:23:36 2018 mstenber
 # Edit time:     95 min
 #
 """This is 'whole'-system benchmark used to gather data for populating
@@ -44,6 +44,7 @@ if __name__ == '__main__':
     read_cmd = 'find /tmp/x -type f | xargs cat > /dev/null'
     tests = [
         ('In-memory dict', dict(backend='inmemory')),
+        ('Badger (unsafe)', dict(backend='badger', unsafe=True)),
         ('Badger', dict(backend='badger')),
         ('Tree (custom nested btree in one file with superblocks)', dict(backend='tree')),
         #  ('Bolt', dict(backend='bolt')), # Too slow, not interesting

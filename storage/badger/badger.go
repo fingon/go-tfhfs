@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Wed Mar 21 11:26:50 2018 mstenber
- * Edit time:     163 min
+ * Last modified: Wed Mar 21 12:22:14 2018 mstenber
+ * Edit time:     173 min
  *
  */
 
@@ -45,6 +45,9 @@ func (self *badgerBackend) Init(config storage.BackendConfiguration) {
 	opts := badger.DefaultOptions
 	opts.Dir = dir
 	opts.ValueDir = dir
+	if config.Unsafe {
+		opts.SyncWrites = false
+	}
 	db, err := badger.Open(opts)
 	if err != nil {
 		log.Panic("badger.Open", err)

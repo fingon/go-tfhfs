@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 13:18:26 2017 mstenber
- * Last modified: Tue Mar 20 16:00:57 2018 mstenber
+ * Last modified: Wed Mar 21 12:21:43 2018 mstenber
  * Edit time:     68 min
  *
  */
@@ -43,6 +43,7 @@ func main() {
 	//family := flag.String("family", "tcp", "Address family to use for server")
 	address := flag.String("address", "", "Address to use for server")
 	profile := flag.Bool("profile", false, "Whether to enable profiling 'bonus stuff'")
+	unsafe := flag.Bool("unsafe", false, "Whether to opt for speed instead of safety (bad things happen if machine crashes)")
 
 	flag.Parse()
 
@@ -66,7 +67,7 @@ func main() {
 	}
 
 	// actual filesystem
-	beconf := storage.BackendConfiguration{Directory: storedir, CacheSize: *cachesize}
+	beconf := storage.BackendConfiguration{Directory: storedir, CacheSize: *cachesize, Unsafe: *unsafe}
 	conf := factory.CryptoStorageConfiguration{BackendConfiguration: beconf,
 		BackendName: *backendp, Password: *password, Salt: *salt}
 	st := factory.NewCryptoStorage(conf)

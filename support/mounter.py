@@ -7,8 +7,8 @@
 # Copyright (c) 2018 Markus Stenberg
 #
 # Created:       Tue Jan 23 12:36:27 2018 mstenber
-# Last modified: Wed Jan 24 15:47:00 2018 mstenber
-# Edit time:     16 min
+# Last modified: Wed Mar 21 12:23:23 2018 mstenber
+# Edit time:     17 min
 #
 """
 
@@ -45,7 +45,10 @@ class Mounter:
                 os.mkdir(storagedir)
         args = []
         for k, v in kwargs.items():
-            args.extend(['-%s' % k, v])
+            if v is True:
+                args.append('-%s' % k)
+            else:
+                args.extend(['-%s' % k, v])
         args.extend([self.mountpoint, self.storagedir])
         self.p = subprocess.Popen([_tfhfs] + list(args), stdout=2)
         self.wait()

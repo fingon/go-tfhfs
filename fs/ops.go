@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Tue Mar 20 11:19:34 2018 mstenber
- * Edit time:     486 min
+ * Last modified: Wed Mar 21 13:40:13 2018 mstenber
+ * Edit time:     494 min
  *
  */
 
@@ -451,6 +451,7 @@ func (self *fsOps) unlinkInodeInInode(inode, child *inode, name string, isdir *b
 		}
 	}
 	if isdir != nil && *isdir != child.IsDir() {
+		mlog.Printf2("fs/ops", " expect dir:%v <> is:%v", *isdir, child.IsDir())
 		code = EPERM
 		return
 	}
@@ -493,6 +494,7 @@ func (self *fsOps) stickyMutateCheck(inode, child *inode, ctx *Context) Status {
 	if ctx.Uid == cmeta.StUid {
 		return OK
 	}
+	mlog.Printf2("fs/ops", "stickyMutateCheck failed; non-own dentry")
 	return EPERM
 }
 
@@ -506,7 +508,11 @@ func (self *fsOps) unlink(input *InHeader, name string, isdir *bool) (code Statu
 func (self *fsOps) Unlink(input *InHeader, name string) (code Status) {
 	mlog.Printf2("fs/ops", "ops.Unlink %s", name)
 	b := false
-	return self.unlink(input, name, &b)
+	bp := &b
+	if input.Uid == 0 {
+		bp = nil
+	}
+	return self.unlink(input, name, bp)
 }
 
 func (self *fsOps) Rmdir(input *InHeader, name string) (code Status) {

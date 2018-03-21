@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Tue Mar 13 12:12:25 2018 mstenber
- * Edit time:     146 min
+ * Last modified: Wed Mar 21 11:26:50 2018 mstenber
+ * Edit time:     163 min
  *
  */
 
@@ -53,7 +53,17 @@ func (self *badgerBackend) Init(config storage.BackendConfiguration) {
 }
 
 func (self *badgerBackend) Flush() {
-
+	mlog.Printf2("storage/badger/badger", "bad.Flush start")
+	err := self.db.PurgeOlderVersions()
+	if err != nil {
+		log.Panic(err)
+	}
+	mlog.Printf2("storage/badger/badger", " RunValueLogGC")
+	err = self.db.RunValueLogGC(0.5)
+	if err != nil && err != badger.ErrNoRewrite {
+		log.Panic(err)
+	}
+	mlog.Printf2("storage/badger/badger", " gc done %v", err)
 }
 
 func (self *badgerBackend) Close() {

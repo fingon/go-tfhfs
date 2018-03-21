@@ -4,16 +4,14 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Thu Mar 15 15:58:44 2018 mstenber
- * Edit time:     649 min
+ * Last modified: Wed Mar 21 11:49:21 2018 mstenber
+ * Edit time:     661 min
  *
  */
 
 package storage
 
 import (
-	"sync/atomic"
-
 	"github.com/fingon/go-tfhfs/codec"
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/util"
@@ -34,6 +32,15 @@ type oldNewStruct struct {
 type blockMap map[string]*Block
 
 type blockObjectMap map[*Block]bool
+
+const (
+	C_READ = iota
+	C_READBYTES
+	C_WRITE
+	C_WRITEBYTES
+	C_DELETE
+	NUM_C
+)
 
 type Storage struct {
 	// Backend specifies the backend to use.
@@ -65,7 +72,7 @@ type Storage struct {
 	// Stuff below here is ~DelayedStorage
 	names map[string]*oldNewStruct
 
-	reads, writes, readbytes, writebytes int64
+	counters [NUM_C]util.AtomicInt
 
 	jobChannel chan *jobIn
 
@@ -179,8 +186,19 @@ func (self *Storage) flushBlockNames() int {
 
 func (self *Storage) flush() int {
 	mlog.Printf2("storage/storage", "st.Flush")
-	mlog.Printf2("storage/storage", " reads since last flush: %d - %d k", self.reads, self.reads/1024)
-	mlog.Printf2("storage/storage", " writes since last flush: %d - %d k", self.writes, self.writebytes/1024)
+	var c [NUM_C]int64
+	for i := 0; i < NUM_C; i++ {
+		c[i] = self.counters[i].Get()
+	}
+	if c[C_READ] > 0 {
+		mlog.Printf2("storage/storage", " reads since last flush: %d - %d k", c[C_READ], c[C_READBYTES]/1024)
+	}
+	if c[C_WRITE] > 0 {
+		mlog.Printf2("storage/storage", " writes since last flush: %d - %d k", c[C_WRITE], c[C_WRITEBYTES]/1024)
+	}
+	if c[C_DELETE] > 0 {
+		mlog.Printf2("storage/storage", " deletes since last flush: %d", c[C_DELETE])
+	}
 	mlog.Printf2("storage/storage", " blocks:%d (%d dirty, %d transient)",
 		len(self.blocks),
 		len(self.dirtyBlocks),
@@ -196,10 +214,9 @@ func (self *Storage) flush() int {
 			}
 		}
 	}
-	atomic.StoreInt64(&self.reads, 0)
-	atomic.StoreInt64(&self.readbytes, 0)
-	atomic.StoreInt64(&self.writes, 0)
-	atomic.StoreInt64(&self.writebytes, 0)
+	for i := 0; i < NUM_C; i++ {
+		self.counters[i].Set(0)
+	}
 
 	// _flush_names in Python prototype
 	ops := self.flushBlockNames()
@@ -248,7 +265,7 @@ func (self *Storage) flush() int {
 		}
 	}
 
-	if self.Backend != nil {
+	if self.Backend != nil && ops > 0 {
 		self.Backend.Flush()
 	}
 

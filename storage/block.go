@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan  3 14:54:09 2018 mstenber
- * Last modified: Tue Mar 13 17:57:24 2018 mstenber
- * Edit time:     320 min
+ * Last modified: Wed Mar 21 11:34:21 2018 mstenber
+ * Edit time:     322 min
  *
  */
 
@@ -86,8 +86,8 @@ func (self *Block) GetData() []byte {
 			mlog.Printf2("storage/block", "%v.GetData - calling s.be.GetBlockData", self)
 			data := self.storage.Backend.GetBlockData(self)
 			self.Data.Set(&data)
-			atomic.AddInt64(&self.storage.reads, 1)
-			atomic.AddInt64(&self.storage.readbytes, int64(len(data)))
+			self.storage.counters[C_READ].AddInt(1)
+			self.storage.counters[C_READBYTES].AddInt(len(data))
 		}
 	}
 	return *self.Data.Get()
@@ -117,15 +117,16 @@ func (self *Block) flush() int {
 			// just in case grab data if we already do not
 			// have it and we have to re-add this back
 			self.GetData()
+			self.storage.counters[C_DELETE].AddInt(1)
 			self.Backend.DeleteBlock(self)
 			self.Backend = nil
 		}
 		ops++
 	} else if self.Backend == nil {
 		// We want to be added to backend
-		atomic.AddInt64(&self.storage.writes, 1)
+		self.storage.counters[C_WRITE].AddInt(1)
 		data := self.GetData()
-		atomic.AddInt64(&self.storage.writebytes, int64(len(data)))
+		self.storage.counters[C_WRITEBYTES].AddInt(len(data))
 		self.storage.Backend.StoreBlock(self)
 		self.Backend = self.storage.Backend
 		ops++

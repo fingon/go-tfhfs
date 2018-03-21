@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Wed Mar 21 13:40:13 2018 mstenber
- * Edit time:     494 min
+ * Last modified: Wed Mar 21 13:54:04 2018 mstenber
+ * Edit time:     496 min
  *
  */
 
@@ -220,7 +220,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		}
 		if input.Valid&FATTR_GID != 0 && int32(input.Gid) != -1 {
 			newmeta.StGid = input.Gid
-			if !(root || input.Gid == meta.StGid || (uid == meta.StUid && ownGid(input.Gid))) {
+			if !(root || (uid == meta.StUid && ownGid(input.Gid))) {
 				mlog.Printf2("fs/ops", " non-root setting gid")
 				code = EPERM
 				// Non-root setting uid = bad.

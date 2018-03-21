@@ -1,0 +1,301 @@
+# prove -r /Users/mstenber/git/pjdfstest/tests
+/Users/mstenber/git/pjdfstest/tests/chflags/00.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/01.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/02.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/03.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/04.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/05.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/06.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/07.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/08.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/09.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/10.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/11.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/12.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chflags/13.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/chmod/00.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/01.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/02.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/03.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/04.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/05.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/06.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/07.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/08.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/09.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/10.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/11.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chmod/12.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/00.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/01.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/02.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/03.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/04.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/05.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/06.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/07.t ............ 
+Failed 19/132 subtests 
+/Users/mstenber/git/pjdfstest/tests/chown/08.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/09.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/chown/10.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/00.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/01.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/02.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/03.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/04.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/05.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/06.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/07.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/08.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/09.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/10.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/11.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/12.t ........ 
+Failed 1/3 subtests 
+/Users/mstenber/git/pjdfstest/tests/ftruncate/13.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/ftruncate/14.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/granular/00.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/granular/01.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/granular/02.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/granular/03.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/granular/04.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/granular/05.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/granular/06.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/link/00.t ............. 
+Failed 6/202 subtests 
+/Users/mstenber/git/pjdfstest/tests/link/01.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/02.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/03.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/04.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/05.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/06.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/07.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/08.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/09.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/10.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/11.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/12.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/13.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/14.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/15.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/16.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/link/17.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/00.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/01.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/02.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/03.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/04.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/05.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/06.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/07.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/08.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/09.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/10.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/11.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkdir/12.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/00.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/01.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/02.t ........... ok
+rm: 72d80e651429754280e493d83f24f320fed6c97c8ac55c13a3e924f7d8725fa23ed521089824b7adb585dff738a2eb8097fab43c3a87f8bdf6d76d5878483ff/5630897e470bd67385451cceeabbc2091ee39d6c564a620b3bffaab24ad404c90d3e9768eb9fe7d432e4b19429fcf34ac3366eaabccb17af39f42a6bb6e48bc/f3b86120b2144c04ae7a2f9ac77035838cc3e69d80172d049d2bf79328efcd6b3e2dab0546ef8646b00f0f4e1d5294a8f4c652025324248dc01592c0f34b6ae/dab5f530efa6b2912fce9e4b3e4d88b6cefec791f2799a13ffe201643d9a016b4b569dd5e27f4d2d1cefef9fa628eaeb013977bed19599c2345caed6046315d/bd605aca75c6071ebbeaf4bed5a7769c9b02504163478a3119ab57d82938476115e5a80372100730f8543e5ebc62f86dd9c99266944421c203d712024f293c6/ab8e8792fe566e1915720a60b691f7c4d6821bc018cfb92ed024f20923c8674db56c957f854b3ee4e9617e6cf9e3d72a44335235fdab14dcca1ac32a3d22336/5822c13b5b5f2383e27a07260cac6b08b0f0a816dfb5ca16d9da563fbb182b847838ffef97cd1ae1c187d20e2b8e49cb9bf034b655ed66912d472148925732c/2366047cdc71bbb908c54b7c4f9ee816f320b29d9727cc3a7a518a6f0f47652b333aa7e3efc600b6dda87b7106d21429d7361bff4a989141f7c5effc7c0fb6c: No space left on device
+rm: 72d80e651429754280e493d83f24f320fed6c97c8ac55c13a3e924f7d8725fa23ed521089824b7adb585dff738a2eb8097fab43c3a87f8bdf6d76d5878483ff/5630897e470bd67385451cceeabbc2091ee39d6c564a620b3bffaab24ad404c90d3e9768eb9fe7d432e4b19429fcf34ac3366eaabccb17af39f42a6bb6e48bc/f3b86120b2144c04ae7a2f9ac77035838cc3e69d80172d049d2bf79328efcd6b3e2dab0546ef8646b00f0f4e1d5294a8f4c652025324248dc01592c0f34b6ae/dab5f530efa6b2912fce9e4b3e4d88b6cefec791f2799a13ffe201643d9a016b4b569dd5e27f4d2d1cefef9fa628eaeb013977bed19599c2345caed6046315d/bd605aca75c6071ebbeaf4bed5a7769c9b02504163478a3119ab57d82938476115e5a80372100730f8543e5ebc62f86dd9c99266944421c203d712024f293c6/ab8e8792fe566e1915720a60b691f7c4d6821bc018cfb92ed024f20923c8674db56c957f854b3ee4e9617e6cf9e3d72a44335235fdab14dcca1ac32a3d22336/5822c13b5b5f2383e27a07260cac6b08b0f0a816dfb5ca16d9da563fbb182b847838ffef97cd1ae1c187d20e2b8e49cb9bf034b655ed66912d472148925732c: Directory not empty
+rm: 72d80e651429754280e493d83f24f320fed6c97c8ac55c13a3e924f7d8725fa23ed521089824b7adb585dff738a2eb8097fab43c3a87f8bdf6d76d5878483ff/5630897e470bd67385451cceeabbc2091ee39d6c564a620b3bffaab24ad404c90d3e9768eb9fe7d432e4b19429fcf34ac3366eaabccb17af39f42a6bb6e48bc/f3b86120b2144c04ae7a2f9ac77035838cc3e69d80172d049d2bf79328efcd6b3e2dab0546ef8646b00f0f4e1d5294a8f4c652025324248dc01592c0f34b6ae/dab5f530efa6b2912fce9e4b3e4d88b6cefec791f2799a13ffe201643d9a016b4b569dd5e27f4d2d1cefef9fa628eaeb013977bed19599c2345caed6046315d/bd605aca75c6071ebbeaf4bed5a7769c9b02504163478a3119ab57d82938476115e5a80372100730f8543e5ebc62f86dd9c99266944421c203d712024f293c6/ab8e8792fe566e1915720a60b691f7c4d6821bc018cfb92ed024f20923c8674db56c957f854b3ee4e9617e6cf9e3d72a44335235fdab14dcca1ac32a3d22336: Directory not empty
+rm: 72d80e651429754280e493d83f24f320fed6c97c8ac55c13a3e924f7d8725fa23ed521089824b7adb585dff738a2eb8097fab43c3a87f8bdf6d76d5878483ff/5630897e470bd67385451cceeabbc2091ee39d6c564a620b3bffaab24ad404c90d3e9768eb9fe7d432e4b19429fcf34ac3366eaabccb17af39f42a6bb6e48bc/f3b86120b2144c04ae7a2f9ac77035838cc3e69d80172d049d2bf79328efcd6b3e2dab0546ef8646b00f0f4e1d5294a8f4c652025324248dc01592c0f34b6ae/dab5f530efa6b2912fce9e4b3e4d88b6cefec791f2799a13ffe201643d9a016b4b569dd5e27f4d2d1cefef9fa628eaeb013977bed19599c2345caed6046315d/bd605aca75c6071ebbeaf4bed5a7769c9b02504163478a3119ab57d82938476115e5a80372100730f8543e5ebc62f86dd9c99266944421c203d712024f293c6: Directory not empty
+rm: 72d80e651429754280e493d83f24f320fed6c97c8ac55c13a3e924f7d8725fa23ed521089824b7adb585dff738a2eb8097fab43c3a87f8bdf6d76d5878483ff/5630897e470bd67385451cceeabbc2091ee39d6c564a620b3bffaab24ad404c90d3e9768eb9fe7d432e4b19429fcf34ac3366eaabccb17af39f42a6bb6e48bc/f3b86120b2144c04ae7a2f9ac77035838cc3e69d80172d049d2bf79328efcd6b3e2dab0546ef8646b00f0f4e1d5294a8f4c652025324248dc01592c0f34b6ae/dab5f530efa6b2912fce9e4b3e4d88b6cefec791f2799a13ffe201643d9a016b4b569dd5e27f4d2d1cefef9fa628eaeb013977bed19599c2345caed6046315d: Directory not empty
+rm: 72d80e651429754280e493d83f24f320fed6c97c8ac55c13a3e924f7d8725fa23ed521089824b7adb585dff738a2eb8097fab43c3a87f8bdf6d76d5878483ff/5630897e470bd67385451cceeabbc2091ee39d6c564a620b3bffaab24ad404c90d3e9768eb9fe7d432e4b19429fcf34ac3366eaabccb17af39f42a6bb6e48bc/f3b86120b2144c04ae7a2f9ac77035838cc3e69d80172d049d2bf79328efcd6b3e2dab0546ef8646b00f0f4e1d5294a8f4c652025324248dc01592c0f34b6ae: Directory not empty
+rm: 72d80e651429754280e493d83f24f320fed6c97c8ac55c13a3e924f7d8725fa23ed521089824b7adb585dff738a2eb8097fab43c3a87f8bdf6d76d5878483ff/5630897e470bd67385451cceeabbc2091ee39d6c564a620b3bffaab24ad404c90d3e9768eb9fe7d432e4b19429fcf34ac3366eaabccb17af39f42a6bb6e48bc: Directory not empty
+rm: 72d80e651429754280e493d83f24f320fed6c97c8ac55c13a3e924f7d8725fa23ed521089824b7adb585dff738a2eb8097fab43c3a87f8bdf6d76d5878483ff: Directory not empty
+/Users/mstenber/git/pjdfstest/tests/mkfifo/03.t ........... 
+Dubious, test returned 1 (wstat 256, 0x100)
+Failed 1/4 subtests 
+/Users/mstenber/git/pjdfstest/tests/mkfifo/04.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/05.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/06.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/07.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/08.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/09.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/10.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/11.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mkfifo/12.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/mknod/00.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/01.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/02.t ............ ok
+rm: eb7e822c9cc53d31f12c09114a783485ece4c1c330a0b19712f3de6797b83bddf1470e8cbdfed12c016d5a111ee6c19522725dab434b9e343bb47410429fcbf/32e999d421cfa86fc9c906cb9cbf57d2c8fcadf75af11d8d032dde5cc6d81ecbe25221ce59b8ffba24b7b0198832789d3919e9b8c31d281980183205580f653/45890b3a8c93849d321e53fbf7d6e212007767fcd4b538a1b7e6aeacdc6ce9effec363d7b16900bdaaf160d6bf62d90f82f1548af0f1aada24f26818997dd06/e453e8b423609b176cbba65027393ef58bf43f8ca3646f4e9c36ee3ec93968af8ce5d4359c2d0c37f57d408baab041299a55f97f3307cacb06fbb8bc5b9ae03/99f5b2019f182ba31ce633bbae1abd8ca32223f3422bd2c84900ddb257e8889ef3b78b5d92e4e17897e32fbec749115bb799111b8e0eb303de8c2e94a2aceb7/72a2309de75bfae02df3e5dc1311e493520af3a5cf3fd1816455aeca7ae07efe64becf09d703922f44f39b6d92c5f067eea03d4f30c81ecaa9f71baf9f218b0/d3d2e0e2ab0c89548da1fe52e7a38d9d2ca2f17d0dc41b1f4a56184088d3a3c9694c90d867805b92b6468f87496535129bee3646c3edb0d438be07ce9636219/797e7e51b3610d9d1684c916fa15a79429ba23de259a3645ce88c84f98fd3bcf042394c5705dbd6f84578e87791a030334d5ff02b51c9bd9c453b3c126a6316: No space left on device
+rm: eb7e822c9cc53d31f12c09114a783485ece4c1c330a0b19712f3de6797b83bddf1470e8cbdfed12c016d5a111ee6c19522725dab434b9e343bb47410429fcbf/32e999d421cfa86fc9c906cb9cbf57d2c8fcadf75af11d8d032dde5cc6d81ecbe25221ce59b8ffba24b7b0198832789d3919e9b8c31d281980183205580f653/45890b3a8c93849d321e53fbf7d6e212007767fcd4b538a1b7e6aeacdc6ce9effec363d7b16900bdaaf160d6bf62d90f82f1548af0f1aada24f26818997dd06/e453e8b423609b176cbba65027393ef58bf43f8ca3646f4e9c36ee3ec93968af8ce5d4359c2d0c37f57d408baab041299a55f97f3307cacb06fbb8bc5b9ae03/99f5b2019f182ba31ce633bbae1abd8ca32223f3422bd2c84900ddb257e8889ef3b78b5d92e4e17897e32fbec749115bb799111b8e0eb303de8c2e94a2aceb7/72a2309de75bfae02df3e5dc1311e493520af3a5cf3fd1816455aeca7ae07efe64becf09d703922f44f39b6d92c5f067eea03d4f30c81ecaa9f71baf9f218b0/d3d2e0e2ab0c89548da1fe52e7a38d9d2ca2f17d0dc41b1f4a56184088d3a3c9694c90d867805b92b6468f87496535129bee3646c3edb0d438be07ce9636219: Directory not empty
+rm: eb7e822c9cc53d31f12c09114a783485ece4c1c330a0b19712f3de6797b83bddf1470e8cbdfed12c016d5a111ee6c19522725dab434b9e343bb47410429fcbf/32e999d421cfa86fc9c906cb9cbf57d2c8fcadf75af11d8d032dde5cc6d81ecbe25221ce59b8ffba24b7b0198832789d3919e9b8c31d281980183205580f653/45890b3a8c93849d321e53fbf7d6e212007767fcd4b538a1b7e6aeacdc6ce9effec363d7b16900bdaaf160d6bf62d90f82f1548af0f1aada24f26818997dd06/e453e8b423609b176cbba65027393ef58bf43f8ca3646f4e9c36ee3ec93968af8ce5d4359c2d0c37f57d408baab041299a55f97f3307cacb06fbb8bc5b9ae03/99f5b2019f182ba31ce633bbae1abd8ca32223f3422bd2c84900ddb257e8889ef3b78b5d92e4e17897e32fbec749115bb799111b8e0eb303de8c2e94a2aceb7/72a2309de75bfae02df3e5dc1311e493520af3a5cf3fd1816455aeca7ae07efe64becf09d703922f44f39b6d92c5f067eea03d4f30c81ecaa9f71baf9f218b0: Directory not empty
+rm: eb7e822c9cc53d31f12c09114a783485ece4c1c330a0b19712f3de6797b83bddf1470e8cbdfed12c016d5a111ee6c19522725dab434b9e343bb47410429fcbf/32e999d421cfa86fc9c906cb9cbf57d2c8fcadf75af11d8d032dde5cc6d81ecbe25221ce59b8ffba24b7b0198832789d3919e9b8c31d281980183205580f653/45890b3a8c93849d321e53fbf7d6e212007767fcd4b538a1b7e6aeacdc6ce9effec363d7b16900bdaaf160d6bf62d90f82f1548af0f1aada24f26818997dd06/e453e8b423609b176cbba65027393ef58bf43f8ca3646f4e9c36ee3ec93968af8ce5d4359c2d0c37f57d408baab041299a55f97f3307cacb06fbb8bc5b9ae03/99f5b2019f182ba31ce633bbae1abd8ca32223f3422bd2c84900ddb257e8889ef3b78b5d92e4e17897e32fbec749115bb799111b8e0eb303de8c2e94a2aceb7: Directory not empty
+rm: eb7e822c9cc53d31f12c09114a783485ece4c1c330a0b19712f3de6797b83bddf1470e8cbdfed12c016d5a111ee6c19522725dab434b9e343bb47410429fcbf/32e999d421cfa86fc9c906cb9cbf57d2c8fcadf75af11d8d032dde5cc6d81ecbe25221ce59b8ffba24b7b0198832789d3919e9b8c31d281980183205580f653/45890b3a8c93849d321e53fbf7d6e212007767fcd4b538a1b7e6aeacdc6ce9effec363d7b16900bdaaf160d6bf62d90f82f1548af0f1aada24f26818997dd06/e453e8b423609b176cbba65027393ef58bf43f8ca3646f4e9c36ee3ec93968af8ce5d4359c2d0c37f57d408baab041299a55f97f3307cacb06fbb8bc5b9ae03: Directory not empty
+rm: eb7e822c9cc53d31f12c09114a783485ece4c1c330a0b19712f3de6797b83bddf1470e8cbdfed12c016d5a111ee6c19522725dab434b9e343bb47410429fcbf/32e999d421cfa86fc9c906cb9cbf57d2c8fcadf75af11d8d032dde5cc6d81ecbe25221ce59b8ffba24b7b0198832789d3919e9b8c31d281980183205580f653/45890b3a8c93849d321e53fbf7d6e212007767fcd4b538a1b7e6aeacdc6ce9effec363d7b16900bdaaf160d6bf62d90f82f1548af0f1aada24f26818997dd06: Directory not empty
+rm: eb7e822c9cc53d31f12c09114a783485ece4c1c330a0b19712f3de6797b83bddf1470e8cbdfed12c016d5a111ee6c19522725dab434b9e343bb47410429fcbf/32e999d421cfa86fc9c906cb9cbf57d2c8fcadf75af11d8d032dde5cc6d81ecbe25221ce59b8ffba24b7b0198832789d3919e9b8c31d281980183205580f653: Directory not empty
+rm: eb7e822c9cc53d31f12c09114a783485ece4c1c330a0b19712f3de6797b83bddf1470e8cbdfed12c016d5a111ee6c19522725dab434b9e343bb47410429fcbf: Directory not empty
+/Users/mstenber/git/pjdfstest/tests/mknod/03.t ............ 
+Dubious, test returned 1 (wstat 256, 0x100)
+Failed 7/12 subtests 
+/Users/mstenber/git/pjdfstest/tests/mknod/04.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/05.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/06.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/07.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/08.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/09.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/10.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/mknod/11.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/open/00.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/01.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/02.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/03.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/04.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/05.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/06.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/07.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/08.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/09.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/10.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/11.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/12.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/13.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/14.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/15.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/16.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/17.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/18.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/19.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/20.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/21.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/22.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/23.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/open/24.t ............. ok
+/Users/mstenber/git/pjdfstest/tests/posix_fallocate/00.t .. ok
+/Users/mstenber/git/pjdfstest/tests/rename/00.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/01.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/02.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/03.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/04.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/05.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/06.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/07.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/08.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/09.t ........... 
+Failed 16/2353 subtests 
+/Users/mstenber/git/pjdfstest/tests/rename/10.t ........... 
+Failed 8/2099 subtests 
+/Users/mstenber/git/pjdfstest/tests/rename/11.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/12.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/13.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/14.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/15.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/16.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/17.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/18.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/19.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/20.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/rename/21.t ........... 
+Failed 1/16 subtests 
+/Users/mstenber/git/pjdfstest/tests/rmdir/00.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/01.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/02.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/03.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/04.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/05.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/06.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/07.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/08.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/09.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/10.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/11.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/12.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/13.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/14.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/rmdir/15.t ............ ok
+/Users/mstenber/git/pjdfstest/tests/symlink/00.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/01.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/02.t .......... ok
+rm: 215e4caa7921e2831c3c4c095d8bf63b63b6636de77250f91dd3cbc90fe866b4c1dd650dd32aab5c3c18e09c52ecce7965975df143687ed5094edec37e11e7e/4f22e8dce1b8de04146e8bf18de2bf53639dd77b1fa99ad64f383f0f7348cda81dfb3db57259297da5c63ce1fa44cb0aed0e6c7465ee6b576bc471eaceb2db5/9b766c67c358f9008b4ddde1bd6cad6186e2406cdb5a237257d9347464452d644dd524a2e3b1fff3e32bf788504cd02ec838c0b8a1ef0079b8bdccee82af1a0/3916f74119db42d70392f4a28b0ba3f01c115ee851bc2d8e76d2ad7ce13fe86be2b3ee551b390e80863d6c86de542d31654b4b7049eb59de9f1519da3ff139a/2b89470845a185fea013d919852455979ca2c1663e9452eb18b1a2c76f7993f2ad150c3dfc7207e4433ce0205cf464efde60a80ee70f84aedf5a91c3e58130d/89a8cbd70eeac90b3634f082edc8b9a25a3e2993a4620a5d362e719db96b5be45ac96d1868dbf03d16f281bdc4b4ce6ee229e3c84fb069bd43419f97579841f/08c228c6e6e4e8cfa395a5a3d11f8f87575c6002361ec4d13dbfb1449a6cfe3ab8290c813bbb77bb5bb07aa679b7e449c6e81c6d61755d7d71d45cbf82956dc/70cec230657c4279c813c826d7b83b4495609344afc0d68710243ee5bcabdb784a508ad20f79adb1c935919e93fe11ef0275b4f4475cf281d7706b18cf57f24: No space left on device
+rm: 215e4caa7921e2831c3c4c095d8bf63b63b6636de77250f91dd3cbc90fe866b4c1dd650dd32aab5c3c18e09c52ecce7965975df143687ed5094edec37e11e7e/4f22e8dce1b8de04146e8bf18de2bf53639dd77b1fa99ad64f383f0f7348cda81dfb3db57259297da5c63ce1fa44cb0aed0e6c7465ee6b576bc471eaceb2db5/9b766c67c358f9008b4ddde1bd6cad6186e2406cdb5a237257d9347464452d644dd524a2e3b1fff3e32bf788504cd02ec838c0b8a1ef0079b8bdccee82af1a0/3916f74119db42d70392f4a28b0ba3f01c115ee851bc2d8e76d2ad7ce13fe86be2b3ee551b390e80863d6c86de542d31654b4b7049eb59de9f1519da3ff139a/2b89470845a185fea013d919852455979ca2c1663e9452eb18b1a2c76f7993f2ad150c3dfc7207e4433ce0205cf464efde60a80ee70f84aedf5a91c3e58130d/89a8cbd70eeac90b3634f082edc8b9a25a3e2993a4620a5d362e719db96b5be45ac96d1868dbf03d16f281bdc4b4ce6ee229e3c84fb069bd43419f97579841f/08c228c6e6e4e8cfa395a5a3d11f8f87575c6002361ec4d13dbfb1449a6cfe3ab8290c813bbb77bb5bb07aa679b7e449c6e81c6d61755d7d71d45cbf82956dc: Directory not empty
+rm: 215e4caa7921e2831c3c4c095d8bf63b63b6636de77250f91dd3cbc90fe866b4c1dd650dd32aab5c3c18e09c52ecce7965975df143687ed5094edec37e11e7e/4f22e8dce1b8de04146e8bf18de2bf53639dd77b1fa99ad64f383f0f7348cda81dfb3db57259297da5c63ce1fa44cb0aed0e6c7465ee6b576bc471eaceb2db5/9b766c67c358f9008b4ddde1bd6cad6186e2406cdb5a237257d9347464452d644dd524a2e3b1fff3e32bf788504cd02ec838c0b8a1ef0079b8bdccee82af1a0/3916f74119db42d70392f4a28b0ba3f01c115ee851bc2d8e76d2ad7ce13fe86be2b3ee551b390e80863d6c86de542d31654b4b7049eb59de9f1519da3ff139a/2b89470845a185fea013d919852455979ca2c1663e9452eb18b1a2c76f7993f2ad150c3dfc7207e4433ce0205cf464efde60a80ee70f84aedf5a91c3e58130d/89a8cbd70eeac90b3634f082edc8b9a25a3e2993a4620a5d362e719db96b5be45ac96d1868dbf03d16f281bdc4b4ce6ee229e3c84fb069bd43419f97579841f: Directory not empty
+rm: 215e4caa7921e2831c3c4c095d8bf63b63b6636de77250f91dd3cbc90fe866b4c1dd650dd32aab5c3c18e09c52ecce7965975df143687ed5094edec37e11e7e/4f22e8dce1b8de04146e8bf18de2bf53639dd77b1fa99ad64f383f0f7348cda81dfb3db57259297da5c63ce1fa44cb0aed0e6c7465ee6b576bc471eaceb2db5/9b766c67c358f9008b4ddde1bd6cad6186e2406cdb5a237257d9347464452d644dd524a2e3b1fff3e32bf788504cd02ec838c0b8a1ef0079b8bdccee82af1a0/3916f74119db42d70392f4a28b0ba3f01c115ee851bc2d8e76d2ad7ce13fe86be2b3ee551b390e80863d6c86de542d31654b4b7049eb59de9f1519da3ff139a/2b89470845a185fea013d919852455979ca2c1663e9452eb18b1a2c76f7993f2ad150c3dfc7207e4433ce0205cf464efde60a80ee70f84aedf5a91c3e58130d: Directory not empty
+rm: 215e4caa7921e2831c3c4c095d8bf63b63b6636de77250f91dd3cbc90fe866b4c1dd650dd32aab5c3c18e09c52ecce7965975df143687ed5094edec37e11e7e/4f22e8dce1b8de04146e8bf18de2bf53639dd77b1fa99ad64f383f0f7348cda81dfb3db57259297da5c63ce1fa44cb0aed0e6c7465ee6b576bc471eaceb2db5/9b766c67c358f9008b4ddde1bd6cad6186e2406cdb5a237257d9347464452d644dd524a2e3b1fff3e32bf788504cd02ec838c0b8a1ef0079b8bdccee82af1a0/3916f74119db42d70392f4a28b0ba3f01c115ee851bc2d8e76d2ad7ce13fe86be2b3ee551b390e80863d6c86de542d31654b4b7049eb59de9f1519da3ff139a: Directory not empty
+rm: 215e4caa7921e2831c3c4c095d8bf63b63b6636de77250f91dd3cbc90fe866b4c1dd650dd32aab5c3c18e09c52ecce7965975df143687ed5094edec37e11e7e/4f22e8dce1b8de04146e8bf18de2bf53639dd77b1fa99ad64f383f0f7348cda81dfb3db57259297da5c63ce1fa44cb0aed0e6c7465ee6b576bc471eaceb2db5/9b766c67c358f9008b4ddde1bd6cad6186e2406cdb5a237257d9347464452d644dd524a2e3b1fff3e32bf788504cd02ec838c0b8a1ef0079b8bdccee82af1a0: Directory not empty
+rm: 215e4caa7921e2831c3c4c095d8bf63b63b6636de77250f91dd3cbc90fe866b4c1dd650dd32aab5c3c18e09c52ecce7965975df143687ed5094edec37e11e7e/4f22e8dce1b8de04146e8bf18de2bf53639dd77b1fa99ad64f383f0f7348cda81dfb3db57259297da5c63ce1fa44cb0aed0e6c7465ee6b576bc471eaceb2db5: Directory not empty
+rm: 215e4caa7921e2831c3c4c095d8bf63b63b6636de77250f91dd3cbc90fe866b4c1dd650dd32aab5c3c18e09c52ecce7965975df143687ed5094edec37e11e7e: Directory not empty
+/Users/mstenber/git/pjdfstest/tests/symlink/03.t .......... 
+Dubious, test returned 1 (wstat 256, 0x100)
+Failed 1/6 subtests 
+/Users/mstenber/git/pjdfstest/tests/symlink/04.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/05.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/06.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/07.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/08.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/09.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/10.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/11.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/symlink/12.t .......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/00.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/01.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/02.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/03.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/04.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/05.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/06.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/07.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/08.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/09.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/10.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/11.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/12.t ......... 
+Failed 1/3 subtests 
+/Users/mstenber/git/pjdfstest/tests/truncate/13.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/truncate/14.t ......... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/00.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/01.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/02.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/03.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/04.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/05.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/06.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/07.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/08.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/09.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/10.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/11.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/12.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/unlink/13.t ........... ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/00.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/01.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/02.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/03.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/04.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/05.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/06.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/07.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/08.t ........ ok
+/Users/mstenber/git/pjdfstest/tests/utimensat/09.t ........ ok
+
+Test Summary Report
+-------------------
+/Users/mstenber/git/pjdfstest/tests/chown/07.t          (Wstat: 0 Tests: 132 Failed: 19)
+  Failed tests:  7, 12, 20, 27, 32, 40, 47, 52, 60, 67, 72
+                80, 87, 92, 100, 107, 112, 120, 127
+/Users/mstenber/git/pjdfstest/tests/ftruncate/12.t      (Wstat: 0 Tests: 3 Failed: 1)
+  Failed test:  2
+/Users/mstenber/git/pjdfstest/tests/link/00.t           (Wstat: 0 Tests: 202 Failed: 6)
+  Failed tests:  147-150, 152, 183
+/Users/mstenber/git/pjdfstest/tests/mkfifo/03.t         (Wstat: 256 Tests: 4 Failed: 1)
+  Failed test:  3
+  Non-zero exit status: 1
+/Users/mstenber/git/pjdfstest/tests/mknod/03.t          (Wstat: 256 Tests: 12 Failed: 7)
+  Failed tests:  3, 5-7, 9-11
+  Non-zero exit status: 1
+/Users/mstenber/git/pjdfstest/tests/rename/09.t         (Wstat: 0 Tests: 2353 Failed: 16)
+  Failed tests:  2269-2272, 2279-2281, 2284, 2289-2292, 2299-2301
+                2304
+/Users/mstenber/git/pjdfstest/tests/rename/10.t         (Wstat: 0 Tests: 2099 Failed: 8)
+  Failed tests:  2056-2058, 2061, 2063-2065, 2068
+/Users/mstenber/git/pjdfstest/tests/rename/21.t         (Wstat: 0 Tests: 16 Failed: 1)
+  Failed test:  5
+/Users/mstenber/git/pjdfstest/tests/symlink/03.t        (Wstat: 256 Tests: 6 Failed: 1)
+  Failed test:  4
+  Non-zero exit status: 1
+/Users/mstenber/git/pjdfstest/tests/truncate/12.t       (Wstat: 0 Tests: 3 Failed: 1)
+  Failed test:  2
+Files=232, Tests=8677, 221 wallclock secs ( 1.81 usr  0.52 sys + 40.30 cusr 49.37 csys = 92.00 CPU)
+Result: FAIL
+  42.18s user 49.92s system 41% cpu 3:40.73 total

@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Tue Mar 20 10:32:14 2018 mstenber
-# Edit time:     137 min
+# Last modified: Wed Mar 21 13:13:41 2018 mstenber
+# Edit time:     139 min
 #
 #
 
@@ -228,3 +228,9 @@ fstorture: binaries
 	mkdir -p /tmp/x/d1
 	mkdir -p /tmp/x/d2
 	~/git/fstools/src/fstorture/fstorture /tmp/d[12] 123 -t 1m
+
+
+# https://github.com/pjd/pjdfstest
+pjdfstest: binaries
+	./sanitytest.sh d
+	cd /tmp/x && sudo prove -f -o -r ~/git/pjdfstest/tests && umount /tmp/x

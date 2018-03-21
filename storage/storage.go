@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 14 19:10:02 2017 mstenber
- * Last modified: Wed Mar 21 11:49:21 2018 mstenber
- * Edit time:     661 min
+ * Last modified: Wed Mar 21 13:07:36 2018 mstenber
+ * Edit time:     664 min
  *
  */
 
@@ -265,7 +265,7 @@ func (self *Storage) flush() int {
 		}
 	}
 
-	if self.Backend != nil && ops > 0 {
+	if self.Backend != nil && (ops > 0 || c[C_WRITE] > 0 || c[C_DELETE] > 0) {
 		self.Backend.Flush()
 	}
 

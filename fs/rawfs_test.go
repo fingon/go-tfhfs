@@ -4,7 +4,7 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 15:43:45 2017 mstenber
- * Last modified: Tue Mar 13 13:52:03 2018 mstenber
+ * Last modified: Wed Mar 21 14:13:41 2018 mstenber
  * Edit time:     250 min
  *
  */
@@ -272,7 +272,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 
 	wg.Go(func() {
 		_, err := u2.Stat("/u1/u/.")
-		assert.True(t, err != nil)
+		assert.True(t, err != nil || useKernelPermissions)
 	})
 
 	wg.Go(func() {
@@ -282,7 +282,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 
 	wg.Go(func() {
 		_, err := u3.Stat("/u1/g/.")
-		assert.True(t, err != nil)
+		assert.True(t, err != nil || useKernelPermissions)
 	})
 
 	wg.Go(func() {
@@ -292,7 +292,7 @@ func ProdFs(t *testing.T, fs *Fs) {
 
 	wg.Go(func() {
 		_, err := u2.Stat("/u1/o/.")
-		assert.True(t, err != nil)
+		assert.True(t, err != nil || useKernelPermissions)
 	})
 
 	wg.Go(func() {

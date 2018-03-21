@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Wed Mar 21 13:54:04 2018 mstenber
- * Edit time:     496 min
+ * Last modified: Wed Mar 21 14:27:44 2018 mstenber
+ * Edit time:     505 min
  *
  */
 
@@ -22,6 +22,12 @@ import (
 	"github.com/fingon/go-tfhfs/mlog"
 	. "github.com/hanwen/go-fuse/fuse"
 )
+
+// Whether to implement our own Access and associated other security
+// checks. At least on OS X, not implementing seems to be better
+// choice, asithout supplementary groups API outside Linux, we're
+// better off letting kernel do the check. (see TODO)
+const useKernelPermissions bool = true
 
 type fsOps struct {
 	mu sync.Mutex
@@ -64,6 +70,9 @@ func (self *fsOps) access(inode *inode, mode uint32, orOwn bool, ctx *Context) S
 	if meta == nil {
 		mlog.Printf2("fs/ops", "access: -meta does not exist")
 		return ENOENT
+	}
+	if useKernelPermissions {
+		return OK
 	}
 	if ctx.Uid == 0 {
 		mlog.Printf2("fs/ops", "access: +root")
@@ -209,7 +218,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		// FATTR_FH?
 		if input.Valid&FATTR_UID != 0 && int32(input.Uid) != -1 {
 			newmeta.StUid = input.Uid
-			if !(root || input.Uid == meta.StUid) {
+			if !(root || input.Uid == meta.StUid) && !useKernelPermissions {
 				mlog.Printf2("fs/ops", " non-root setting uid")
 				code = EPERM
 				// Non-root setting uid = bad.
@@ -220,7 +229,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 		}
 		if input.Valid&FATTR_GID != 0 && int32(input.Gid) != -1 {
 			newmeta.StGid = input.Gid
-			if !(root || (uid == meta.StUid && ownGid(input.Gid))) {
+			if !(root || (uid == meta.StUid && ownGid(input.Gid))) && !useKernelPermissions {
 				mlog.Printf2("fs/ops", " non-root setting gid")
 				code = EPERM
 				// Non-root setting uid = bad.
@@ -246,7 +255,7 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 			// accept any mode bits, OS knows best?
 			// (with OS X some relatively high bit modes are required,
 			// e.g. 0100xxx seems to be needed at least for cp to work even)
-			if !root && meta.StUid != uid && mode != oldmode {
+			if !root && meta.StUid != uid && mode != oldmode && !useKernelPermissions {
 				code = EPERM
 				mlog.Printf2("fs/ops", " non-root setting non-owned mode")
 				return
@@ -257,15 +266,17 @@ func (self *fsOps) SetAttr(input *SetAttrIn, out *AttrOut) (code Status) {
 
 		if newmeta != meta.InodeMetaData {
 			isTruncate := input.Valid&FATTR_SIZE != 0
-			code = self.access(inode, W_OK, !isTruncate, &input.Context)
-			if !code.Ok() {
-				if isTruncate {
-					// Truncate says EACCES
-					code = EACCES
-				} else {
-					code = EPERM
+			if !useKernelPermissions {
+				code = self.access(inode, W_OK, !isTruncate, &input.Context)
+				if !code.Ok() {
+					if isTruncate {
+						// Truncate says EACCES
+						code = EACCES
+					} else {
+						code = EPERM
+					}
+					return
 				}
-				return
 			}
 			if input.Valid&FATTR_SIZE != 0 {
 				inode.SetMetaSizeInTransaction(meta, input.Size, tr)
@@ -450,7 +461,7 @@ func (self *fsOps) unlinkInodeInInode(inode, child *inode, name string, isdir *b
 			return Status(syscall.ENOTEMPTY)
 		}
 	}
-	if isdir != nil && *isdir != child.IsDir() {
+	if isdir != nil && *isdir != child.IsDir() && !useKernelPermissions {
 		mlog.Printf2("fs/ops", " expect dir:%v <> is:%v", *isdir, child.IsDir())
 		code = EPERM
 		return
@@ -479,7 +490,7 @@ func (self *fsOps) stickyMutateCheck(inode, child *inode, ctx *Context) Status {
 		return ENOENT
 	}
 	// Non-sticky directory = ok
-	if (meta.StMode & syscall.S_ISVTX) == 0 {
+	if (meta.StMode&syscall.S_ISVTX) == 0 || useKernelPermissions {
 		return OK
 	}
 	// root / own directory = ok
@@ -713,9 +724,11 @@ func (self *fsOps) Link(input *LinkIn, name string, out *EntryOut) (code Status)
 }
 
 func (self *fsOps) Access(input *AccessIn) (code Status) {
+	if useKernelPermissions {
+		return ENOSYS
+	}
 	inode := self.fs.GetInode(input.NodeId)
 	defer inode.Release()
-
 	return self.access(inode, input.Mask, false, &input.Context)
 }
 

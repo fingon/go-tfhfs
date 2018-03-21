@@ -51,3 +51,6 @@ Files=184, Tests=1944, 156 wallclock secs ( 0.84 usr  0.34 sys + 14.49 cusr 18.5
 * ask hanwen about sometimes nil out in Link call - is it bug or feature?
 
 * look at Windows support - dokany / winfsp?
+
+* figure how to get supplementary groups on OS X, provide the info to
+  osefuxe project, and eventually use the ops' Access method

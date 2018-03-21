@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Mar 21 13:13:41 2018 mstenber
-# Edit time:     139 min
+# Last modified: Wed Mar 21 14:03:55 2018 mstenber
+# Edit time:     144 min
 #
 #
 
@@ -231,6 +231,9 @@ fstorture: binaries
 
 
 # https://github.com/pjd/pjdfstest
-pjdfstest: binaries
+logs/pjdfstest/tfhfs.log: binaries
 	./sanitytest.sh d
-	cd /tmp/x && sudo prove -f -o -r ~/git/pjdfstest/tests && umount /tmp/x
+	( cd /tmp/x && sudo prove -f -o -r ~/git/pjdfstest/tests 2>&1) | tee $@.new ; umount /tmp/x
+	mv $@.new $@
+
+pjdfstest: logs/pjdfstest/tfhfs.log

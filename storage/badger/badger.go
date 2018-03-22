@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Wed Mar 21 12:22:14 2018 mstenber
- * Edit time:     173 min
+ * Last modified: Thu Mar 22 10:09:19 2018 mstenber
+ * Edit time:     178 min
  *
  */
 
@@ -45,6 +45,13 @@ func (self *badgerBackend) Init(config storage.BackendConfiguration) {
 	opts := badger.DefaultOptions
 	opts.Dir = dir
 	opts.ValueDir = dir
+
+	// Default ValueLogFileSize is 1GB (1<<30), which is bit much
+	// if I want to rsync files across at some point. So use
+	// 1<<27. Even 128MB files should not be THAT common for my
+	// typical use cases..
+	opts.ValueLogFileSize = 1 << 27
+
 	if config.Unsafe {
 		opts.SyncWrites = false
 	}
@@ -62,7 +69,11 @@ func (self *badgerBackend) Flush() {
 		log.Panic(err)
 	}
 	mlog.Printf2("storage/badger/badger", " RunValueLogGC")
+	// 0.5 = 2x write amplification (but 50% storage efficiency)
+	// 0.2 = 5x write amplification (but 80% storage efficiency)
+	// TBD: This should be a parameter..
 	err = self.db.RunValueLogGC(0.5)
+	// 5x write amplification(!)
 	if err != nil && err != badger.ErrNoRewrite {
 		log.Panic(err)
 	}

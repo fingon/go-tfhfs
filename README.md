@@ -1,11 +1,17 @@
 go-tfhfs
 ========
 
-This is the next-generation rewrite of my earlier
-[tfhfs project](https://github.com/fingon/tfhfs) that was written in
-Python.
+*NOTE*: This project is now officially stalled, as in practical
+ benchmarking it is simply not fast enough. The modern SSDs
+ (gigabytes/second, crazy IOPS) and fuse (few hundred megabytes/second,
+ slower IOPS) are simply not match made in heaven it seems.
 
-This is very preliminary still, but notable planned changes include:
+This is the next-generation rewrite (Dec 2017 - Mar 2018) of my earlier
+[tfhfs project](https://github.com/fingon/tfhfs) that was written in
+Python. This can be considered pre-alpha; it mostly works, but I do not
+recommend using it yet except to test if you are curious.
+
+Design changes:
 
 * using inodes instead of paths as bases for the btree forest => semantics
 more closely match UNIX
@@ -17,10 +23,6 @@ more closely match UNIX
 
 * make the design leverage parallelism much more ( parallel sha256,
   encryption, tree merging )
-
-Design is mostly done, I wish I had just few weeks of coding time to
-actually implement this next iteration :) We shall see how long this will
-take. 
 
 ![Current components](doc/overview.svg)
 

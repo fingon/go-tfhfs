@@ -1,5 +1,8 @@
 syntax = "proto3";
 
+// Note: Essentially ALL fields are really required. Sticking in
+// comments like that is asinine though.
+
 package fingon.iki.fi.tfhfs;
 option go_package = "pb";
 
@@ -25,10 +28,10 @@ service Fs {
 }
 
 message Block {
-  string id = 1;
+  bytes id = 1;
   int32 status = 2;
-  string data = 3;
-  repeated string missingIds = 4;
+  bytes data = 3;
+  repeated bytes missingIds = 4;
 }
 
 message BlockName {
@@ -36,13 +39,13 @@ message BlockName {
 }
 
 message BlockId {
-  string id = 1;
+  bytes id = 1;
 }
 
 // Specific requests
 
 message GetBlockRequest {
-  string id = 1;
+  bytes id = 1;
   bool wantData = 2;
   bool wantMissing = 3;
 }
@@ -59,7 +62,7 @@ message StoreRequest {
 
 message SetNameRequest {
   string name = 1;
-  string id = 2;
+  bytes id = 2;
 }
 
 

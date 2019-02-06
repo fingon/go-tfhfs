@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Wed Jan 17 14:19:35 2018 mstenber
- * Last modified: Wed Jan 17 18:05:56 2018 mstenber
- * Edit time:     70 min
+ * Last modified: Wed Feb  6 12:02:45 2019 mstenber
+ * Edit time:     74 min
  *
  */
 
@@ -91,7 +91,8 @@ func (self *Connector) Sync(from *Connection, to *Connection) (ops int, err erro
 
 	// Nothing to be done
 	if fid != tid {
-		subops, err := self.copyBlockTo(fclient, tclient, fid.Id, to.OtherRootName)
+		subops, err := self.copyBlockTo(fclient, tclient,
+			string(fid.Id), to.OtherRootName)
 		if err != nil {
 			return 0, err
 		}
@@ -128,19 +129,20 @@ func (self *Connector) copyBlockTo(fclient, tclient pb.Fs, bid, inName string) (
 
 	// Cheap part first - check if it is there already
 	ops++
-	b, err := tclient.GetBlockById(bg, &pb.GetBlockRequest{Id: bid, WantMissing: true})
+	b, err := tclient.GetBlockById(bg, &pb.GetBlockRequest{Id: []byte(bid),
+		WantMissing: true})
 	if err != nil {
 		return
 	}
-	if b.Id == "" {
+	if string(b.Id) == "" {
 		ops++
-		fb, err2 := fclient.GetBlockById(bg, &pb.GetBlockRequest{Id: bid, WantData: true})
+		fb, err2 := fclient.GetBlockById(bg, &pb.GetBlockRequest{Id: []byte(bid), WantData: true})
 		if err2 != nil {
 			return 0, err2
 		}
 
 		ops++
-		b, err = tclient.StoreBlock(bg, &pb.StoreRequest{Name: inName, Block: &pb.Block{Id: bid, Data: fb.Data, Status: int32(storage.BS_WEAK)}})
+		b, err = tclient.StoreBlock(bg, &pb.StoreRequest{Name: inName, Block: &pb.Block{Id: []byte(bid), Data: fb.Data, Status: int32(storage.BS_WEAK)}})
 		if err != nil {
 			return
 		}
@@ -159,7 +161,7 @@ func (self *Connector) upgradeBlock(fclient, tclient pb.Fs, bid, inName string, 
 			var wg util.SimpleWaitGroup
 			var lock util.MutexLocked
 			for _, mbid := range b.MissingIds {
-				mbid := mbid
+				mbid := string(mbid)
 				wg.Go(func() {
 					subops, err2 := self.copyBlockTo(fclient, tclient, mbid, inName)
 					defer lock.Locked()()
@@ -176,7 +178,7 @@ func (self *Connector) upgradeBlock(fclient, tclient pb.Fs, bid, inName string, 
 			}
 		}
 
-		b, err = tclient.UpgradeBlockNonWeak(bg, &pb.BlockId{Id: bid})
+		b, err = tclient.UpgradeBlockNonWeak(bg, pb.StringToBlockId(bid))
 		if b.MissingIds == nil || len(b.MissingIds) == 0 {
 			return
 		}

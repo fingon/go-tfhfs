@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sat Dec 23 15:10:01 2017 mstenber
- * Last modified: Thu Mar 22 10:09:19 2018 mstenber
- * Edit time:     178 min
+ * Last modified: Wed Feb  6 11:34:03 2019 mstenber
+ * Edit time:     181 min
  *
  */
 
@@ -64,15 +64,10 @@ func (self *badgerBackend) Init(config storage.BackendConfiguration) {
 
 func (self *badgerBackend) Flush() {
 	mlog.Printf2("storage/badger/badger", "bad.Flush start")
-	err := self.db.PurgeOlderVersions()
-	if err != nil {
-		log.Panic(err)
-	}
-	mlog.Printf2("storage/badger/badger", " RunValueLogGC")
 	// 0.5 = 2x write amplification (but 50% storage efficiency)
 	// 0.2 = 5x write amplification (but 80% storage efficiency)
 	// TBD: This should be a parameter..
-	err = self.db.RunValueLogGC(0.5)
+	err := self.db.RunValueLogGC(0.5)
 	// 5x write amplification(!)
 	if err != nil && err != badger.ErrNoRewrite {
 		log.Panic(err)

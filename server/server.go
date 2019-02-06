@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Tue Jan 16 14:38:35 2018 mstenber
- * Last modified: Tue Feb 13 12:42:42 2018 mstenber
- * Edit time:     172 min
+ * Last modified: Wed Feb  6 12:04:56 2019 mstenber
+ * Edit time:     178 min
  *
  */
 
@@ -22,6 +22,7 @@ import (
 	"github.com/fingon/go-tfhfs/fs"
 	"github.com/fingon/go-tfhfs/ibtree/hugger"
 	"github.com/fingon/go-tfhfs/mlog"
+	"github.com/fingon/go-tfhfs/pb"
 	. "github.com/fingon/go-tfhfs/pb"
 	"github.com/fingon/go-tfhfs/storage"
 )
@@ -89,11 +90,11 @@ func (self *Server) GetBlockIdByName(ctx context.Context, name *BlockName) (*Blo
 				}
 			})
 		if bid != "" {
-			return &BlockId{Id: bid}, nil
+			return pb.StringToBlockId(bid), nil
 		}
 	}
 	id := self.Storage.GetBlockIdByName(name.Name)
-	return &BlockId{Id: id}, nil
+	return pb.StringToBlockId(id), nil
 }
 
 func (self *Server) getBlock(id string, wantData, wantMissing bool) (*Block, error) {
@@ -102,7 +103,7 @@ func (self *Server) getBlock(id string, wantData, wantMissing bool) (*Block, err
 		return &Block{}, nil
 	}
 	defer b.Close()
-	res := &Block{Id: id, Status: int32(b.Status())}
+	res := &Block{Id: []byte(id), Status: int32(b.Status())}
 	if wantData {
 		data := b.Data()
 		// TBD: Should there be separate API to get
@@ -113,14 +114,14 @@ func (self *Server) getBlock(id string, wantData, wantMissing bool) (*Block, err
 		if err != nil {
 			return nil, err
 		}
-		res.Data = string(encodedData)
+		res.Data = encodedData
 	}
 	if wantMissing && b.Status() == storage.BS_WEAK {
-		missing := make([]string, 0)
+		missing := make([][]byte, 0)
 		b.IterateReferences(func(id string) {
 			b2 := self.Storage.GetBlockById(id)
 			if b2 == nil {
-				missing = append(missing, id)
+				missing = append(missing, []byte(id))
 				return
 			}
 			b2.Close()
@@ -132,7 +133,7 @@ func (self *Server) getBlock(id string, wantData, wantMissing bool) (*Block, err
 
 func (self *Server) GetBlockById(ctx context.Context, req *GetBlockRequest) (*Block, error) {
 	mlog.Printf2("server/server", "s.GetBlockById %x", req.Id)
-	return self.getBlock(req.Id, req.WantData, req.WantMissing)
+	return self.getBlock(string(req.Id), req.WantData, req.WantMissing)
 }
 
 func (self *Server) MergeBlockNameTo(ctx context.Context, req *MergeRequest) (*MergeResult, error) {
@@ -158,12 +159,12 @@ func (self *Server) MergeBlockNameTo(ctx context.Context, req *MergeRequest) (*M
 func (self *Server) SetNameToBlockId(ctx context.Context, req *SetNameRequest) (*SetNameResult, error) {
 	mlog.Printf2("server/server", "s.SetNameToBlockId %s => %x", req.Name, req.Id)
 	res := &SetNameResult{Ok: true}
-	self.Storage.SetNameToBlockId(req.Name, req.Id)
+	self.Storage.SetNameToBlockId(req.Name, string(req.Id))
 	return res, nil
 }
 
 func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, error) {
-	bid := req.Block.Id
+	bid := string(req.Block.Id)
 	mlog.Printf2("server/server", "s.StoreBlock %x", bid)
 	encodedData := []byte(req.Block.Data)
 	data, err := self.Storage.Codec.DecodeBytes(encodedData, []byte(bid))
@@ -173,13 +174,13 @@ func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, 
 	self.Update(func(tr *hugger.Transaction) {
 		st := storage.BlockStatus(req.Block.Status)
 		bl := self.GetStorageBlock(st, data, nil, nil)
-		if bl.Id() != bid {
+		if string(bl.Id()) != bid {
 			err = ErrWrongId
 			return
 		}
-		k := fs.NewBlockKeyNameBlock(req.Name, bl.Id()).IB()
+		k := fs.NewBlockKeyNameBlock(req.Name, string(bl.Id())).IB()
 		tr.IB().Set(k, bl.Id())
-		bid = bl.Id()
+		bid = string(bl.Id())
 	})
 	if err != nil {
 		return nil, err
@@ -187,10 +188,11 @@ func (self *Server) StoreBlock(ctx context.Context, req *StoreRequest) (*Block, 
 	return self.getBlock(bid, false, true)
 }
 
-func (self *Server) UpgradeBlockNonWeak(ctx context.Context, bid *BlockId) (*Block, error) {
-	b := self.Storage.GetBlockById(bid.Id)
+func (self *Server) UpgradeBlockNonWeak(ctx context.Context, rbid *BlockId) (*Block, error) {
+	bid := string(rbid.Id)
+	b := self.Storage.GetBlockById(bid)
 	if b != nil {
 		b.SetStatus(storage.BS_NORMAL)
 	}
-	return self.getBlock(bid.Id, false, true)
+	return self.getBlock(bid, false, true)
 }

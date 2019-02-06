@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 12:52:43 2017 mstenber
- * Last modified: Wed Mar 21 14:27:44 2018 mstenber
- * Edit time:     505 min
+ * Last modified: Wed Feb  6 11:34:53 2019 mstenber
+ * Edit time:     507 min
  *
  */
 
@@ -823,13 +823,22 @@ func (self *fsOps) Flush(input *FlushIn) Status {
 	return ENOSYS
 }
 
-func (self *fsOps) Flock(input *FlockIn, flags int) Status {
-	// TBD - not sure if locking across this is really realistic
-	// as we assume synchronization is going to occur only rarely
+func (self *fsOps) Fallocate(in *FallocateIn) (code Status) {
+	// TBD - we have rather loose definition of space :p
 	return ENOSYS
 }
 
-func (self *fsOps) Fallocate(in *FallocateIn) (code Status) {
-	// TBD - we have rather loose definition of space :p
+func (self *fsOps) GetLk(input *LkIn, out *LkOut) (code Status) {
+	// TBD - implement locking someday?
+	return ENOSYS
+}
+
+func (self *fsOps) SetLk(input *LkIn) (code Status) {
+	// TBD - implement locking someday?
+	return ENOSYS
+}
+
+func (self *fsOps) SetLkw(input *LkIn) (code Status) {
+	// TBD - implement locking someday?
 	return ENOSYS
 }

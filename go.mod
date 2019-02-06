@@ -2,7 +2,6 @@ module github.com/fingon/go-tfhfs
 
 require (
 	github.com/AndreasBriese/bbloom v0.0.0-20180913140656-343706a395b7 // indirect
-	github.com/coreos/bbolt v1.3.2
 	github.com/dgraph-io/badger v1.5.3
 	github.com/dgryski/go-farm v0.0.0-20190104051053-3adb47b1fb0f // indirect
 	github.com/glycerine/greenpack v5.0.8+incompatible
@@ -22,7 +21,6 @@ require (
 	github.com/stvp/assert v0.0.0-20170616060220-4bc16443988b
 	github.com/twitchtv/twirp v5.5.1+incompatible
 	github.com/ugorji/go/codec v0.0.0-20190204201341-e444a5086c43
-	go.etcd.io/bbolt v1.3.2 // indirect
 	golang.org/x/crypto v0.0.0-20190131182504-b8fe1690c613
 	golang.org/x/net v0.0.0-20190125091013-d26f9f9a57f3 // indirect
 	golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4 // indirect

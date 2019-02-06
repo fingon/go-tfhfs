@@ -4,7 +4,7 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Fri Jan  5 12:22:52 2018 mstenber
- * Last modified: Tue Mar 20 13:35:41 2018 mstenber
+ * Last modified: Wed Feb  6 13:31:49 2019 mstenber
  * Edit time:     26 min
  *
  */
@@ -16,7 +16,6 @@ import (
 	"github.com/fingon/go-tfhfs/mlog"
 	"github.com/fingon/go-tfhfs/storage"
 	"github.com/fingon/go-tfhfs/storage/badger"
-	"github.com/fingon/go-tfhfs/storage/bolt"
 	"github.com/fingon/go-tfhfs/storage/file"
 	"github.com/fingon/go-tfhfs/storage/inmemory"
 	"github.com/fingon/go-tfhfs/storage/tree"
@@ -34,9 +33,6 @@ var backendFactories = map[string]factoryCallback{
 	},
 	"badger": func() storage.Backend {
 		return badger.NewBadgerBackend()
-	},
-	"bolt": func() storage.Backend {
-		return bolt.NewBoltBackend()
 	},
 	"file": func() storage.Backend {
 		return file.NewFileBackend()

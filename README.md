@@ -31,14 +31,9 @@ more closely match UNIX
 Build
 -----
 
-This does not really use normal Go building style as I do not like storing
-generated files in the tree. So if you want to play with it, you have to
-play with it my way (I might be convinced to change this given good
-arguments, so if you care, tell me why).
-
-* git clone ..
-
-* make
+```
+# go get github.com/fingon/go-tfhfs
+```
 
 Usage
 -----

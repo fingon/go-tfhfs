@@ -634,7 +634,33 @@ func (z *OpSlice) DecodeMsg(dc *msgp.Reader) (err error) {
 		(*z) = make(OpSlice, zgensym_f1f62b7068e7cc57_24)
 	}
 	for zgensym_f1f62b7068e7cc57_23 := range *z {
-		err = (*z)[zgensym_f1f62b7068e7cc57_23].DecodeMsg(dc)
+		var zgensym_f1f62b7068e7cc57_25 uint32
+		zgensym_f1f62b7068e7cc57_25, err = dc.ReadArrayHeader()
+		if err != nil {
+			return
+		}
+		if zgensym_f1f62b7068e7cc57_25 != 2 {
+			err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_25}
+			return
+		}
+		var zgensym_f1f62b7068e7cc57_26 uint32
+		zgensym_f1f62b7068e7cc57_26, err = dc.ReadArrayHeader()
+		if err != nil {
+			return
+		}
+		if zgensym_f1f62b7068e7cc57_26 != 2 {
+			err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_26}
+			return
+		}
+		(*z)[zgensym_f1f62b7068e7cc57_23].Location.Offset, err = dc.ReadUint64()
+		if err != nil {
+			return
+		}
+		(*z)[zgensym_f1f62b7068e7cc57_23].Location.Size, err = dc.ReadUint64()
+		if err != nil {
+			return
+		}
+		(*z)[zgensym_f1f62b7068e7cc57_23].Free, err = dc.ReadBool()
 		if err != nil {
 			return
 		}
@@ -656,20 +682,24 @@ func (z OpSlice) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zgensym_f1f62b7068e7cc57_25 := range z {
-		// encodeGen.gBase IDENT
-
-		// record the interface for deduplication
-		var dup bool
-		dup, err = en.DedupWriteIsDup(z[zgensym_f1f62b7068e7cc57_25])
+	for zgensym_f1f62b7068e7cc57_27 := range z {
+		// array header, size 2
+		// array header, size 2
+		err = en.Append(0x92, 0x92)
+		if err != nil {
+			return err
+		}
+		err = en.WriteUint64(z[zgensym_f1f62b7068e7cc57_27].Location.Offset)
 		if err != nil {
 			return
 		}
-		if !dup {
-			err = z[zgensym_f1f62b7068e7cc57_25].EncodeMsg(en)
-			if err != nil {
-				return
-			}
+		err = en.WriteUint64(z[zgensym_f1f62b7068e7cc57_27].Location.Size)
+		if err != nil {
+			return
+		}
+		err = en.WriteBool(z[zgensym_f1f62b7068e7cc57_27].Free)
+		if err != nil {
+			return
 		}
 	}
 	return
@@ -683,11 +713,13 @@ func (z OpSlice) MarshalMsg(b []byte) (o []byte, err error) {
 
 	o = msgp.Require(b, z.Msgsize())
 	o = msgp.AppendArrayHeader(o, uint32(len(z)))
-	for zgensym_f1f62b7068e7cc57_25 := range z {
-		o, err = z[zgensym_f1f62b7068e7cc57_25].MarshalMsg(o) // not is.iface, gen/marshal.go:243
-		if err != nil {
-			return
-		}
+	for zgensym_f1f62b7068e7cc57_27 := range z {
+		// array header, size 2
+		// array header, size 2
+		o = append(o, 0x92, 0x92)
+		o = msgp.AppendUint64(o, z[zgensym_f1f62b7068e7cc57_27].Location.Offset)
+		o = msgp.AppendUint64(o, z[zgensym_f1f62b7068e7cc57_27].Location.Size)
+		o = msgp.AppendBool(o, z[zgensym_f1f62b7068e7cc57_27].Free)
 	}
 	return
 }
@@ -709,18 +741,47 @@ func (z *OpSlice) UnmarshalMsgWithCfg(bts []byte, cfg *msgp.RuntimeConfig) (o []
 		(*z) = (*z)[:0]
 	} else {
 
-		var zgensym_f1f62b7068e7cc57_27 uint32
-		zgensym_f1f62b7068e7cc57_27, bts, err = nbs.ReadArrayHeaderBytes(bts)
+		var zgensym_f1f62b7068e7cc57_29 uint32
+		zgensym_f1f62b7068e7cc57_29, bts, err = nbs.ReadArrayHeaderBytes(bts)
 		if err != nil {
 			return
 		}
-		if cap((*z)) >= int(zgensym_f1f62b7068e7cc57_27) {
-			(*z) = (*z)[:zgensym_f1f62b7068e7cc57_27]
+		if cap((*z)) >= int(zgensym_f1f62b7068e7cc57_29) {
+			(*z) = (*z)[:zgensym_f1f62b7068e7cc57_29]
 		} else {
-			(*z) = make(OpSlice, zgensym_f1f62b7068e7cc57_27)
+			(*z) = make(OpSlice, zgensym_f1f62b7068e7cc57_29)
 		}
-		for zgensym_f1f62b7068e7cc57_26 := range *z {
-			bts, err = (*z)[zgensym_f1f62b7068e7cc57_26].UnmarshalMsg(bts)
+		for zgensym_f1f62b7068e7cc57_28 := range *z {
+			var zgensym_f1f62b7068e7cc57_30 uint32
+			zgensym_f1f62b7068e7cc57_30, bts, err = nbs.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				return
+			}
+			if zgensym_f1f62b7068e7cc57_30 != 2 {
+				err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_30}
+				return
+			}
+			var zgensym_f1f62b7068e7cc57_31 uint32
+			zgensym_f1f62b7068e7cc57_31, bts, err = nbs.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				return
+			}
+			if zgensym_f1f62b7068e7cc57_31 != 2 {
+				err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_31}
+				return
+			}
+			(*z)[zgensym_f1f62b7068e7cc57_28].Location.Offset, bts, err = nbs.ReadUint64Bytes(bts)
+
+			if err != nil {
+				return
+			}
+			(*z)[zgensym_f1f62b7068e7cc57_28].Location.Size, bts, err = nbs.ReadUint64Bytes(bts)
+
+			if err != nil {
+				return
+			}
+			(*z)[zgensym_f1f62b7068e7cc57_28].Free, bts, err = nbs.ReadBoolBytes(bts)
+
 			if err != nil {
 				return
 			}
@@ -739,10 +800,7 @@ func (z *OpSlice) UnmarshalMsgWithCfg(bts []byte, cfg *msgp.RuntimeConfig) (o []
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z OpSlice) Msgsize() (s int) {
-	s = msgp.ArrayHeaderSize
-	for zgensym_f1f62b7068e7cc57_28 := range z {
-		s += z[zgensym_f1f62b7068e7cc57_28].Msgsize()
-	}
+	s = msgp.ArrayHeaderSize + (len(z) * (25 + 23 + msgp.Uint64Size + msgp.Uint64Size + msgp.BoolSize))
 	return
 }
 
@@ -750,13 +808,13 @@ func (z OpSlice) Msgsize() (s int) {
 // We treat empty fields as if we read a Nil from the wire.
 func (z *Superblock) DecodeMsg(dc *msgp.Reader) (err error) {
 
-	var zgensym_f1f62b7068e7cc57_32 uint32
-	zgensym_f1f62b7068e7cc57_32, err = dc.ReadArrayHeader()
+	var zgensym_f1f62b7068e7cc57_35 uint32
+	zgensym_f1f62b7068e7cc57_35, err = dc.ReadArrayHeader()
 	if err != nil {
 		return
 	}
-	if zgensym_f1f62b7068e7cc57_32 != 6 {
-		err = msgp.ArrayError{Wanted: 6, Got: zgensym_f1f62b7068e7cc57_32}
+	if zgensym_f1f62b7068e7cc57_35 != 6 {
+		err = msgp.ArrayError{Wanted: 6, Got: zgensym_f1f62b7068e7cc57_35}
 		return
 	}
 	z.Generation, err = dc.ReadUint64()
@@ -771,62 +829,17 @@ func (z *Superblock) DecodeMsg(dc *msgp.Reader) (err error) {
 	if err != nil {
 		return
 	}
-	var zgensym_f1f62b7068e7cc57_33 uint32
-	zgensym_f1f62b7068e7cc57_33, err = dc.ReadArrayHeader()
-	if err != nil {
-		return
-	}
-	if cap(z.RootLocation) >= int(zgensym_f1f62b7068e7cc57_33) {
-		z.RootLocation = (z.RootLocation)[:zgensym_f1f62b7068e7cc57_33]
-	} else {
-		z.RootLocation = make(LocationSlice, zgensym_f1f62b7068e7cc57_33)
-	}
-	for zgensym_f1f62b7068e7cc57_29 := range z.RootLocation {
-		var zgensym_f1f62b7068e7cc57_34 uint32
-		zgensym_f1f62b7068e7cc57_34, err = dc.ReadArrayHeader()
-		if err != nil {
-			return
-		}
-		if zgensym_f1f62b7068e7cc57_34 != 2 {
-			err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_34}
-			return
-		}
-		z.RootLocation[zgensym_f1f62b7068e7cc57_29].Offset, err = dc.ReadUint64()
-		if err != nil {
-			return
-		}
-		z.RootLocation[zgensym_f1f62b7068e7cc57_29].Size, err = dc.ReadUint64()
-		if err != nil {
-			return
-		}
-	}
-	var zgensym_f1f62b7068e7cc57_35 uint32
-	zgensym_f1f62b7068e7cc57_35, err = dc.ReadArrayHeader()
-	if err != nil {
-		return
-	}
-	if cap(z.Pending) >= int(zgensym_f1f62b7068e7cc57_35) {
-		z.Pending = (z.Pending)[:zgensym_f1f62b7068e7cc57_35]
-	} else {
-		z.Pending = make(OpSlice, zgensym_f1f62b7068e7cc57_35)
-	}
-	for zgensym_f1f62b7068e7cc57_30 := range z.Pending {
-		err = z.Pending[zgensym_f1f62b7068e7cc57_30].DecodeMsg(dc)
-		if err != nil {
-			return
-		}
-	}
 	var zgensym_f1f62b7068e7cc57_36 uint32
 	zgensym_f1f62b7068e7cc57_36, err = dc.ReadArrayHeader()
 	if err != nil {
 		return
 	}
-	if cap(z.PendingLocation) >= int(zgensym_f1f62b7068e7cc57_36) {
-		z.PendingLocation = (z.PendingLocation)[:zgensym_f1f62b7068e7cc57_36]
+	if cap(z.RootLocation) >= int(zgensym_f1f62b7068e7cc57_36) {
+		z.RootLocation = (z.RootLocation)[:zgensym_f1f62b7068e7cc57_36]
 	} else {
-		z.PendingLocation = make(LocationSlice, zgensym_f1f62b7068e7cc57_36)
+		z.RootLocation = make(LocationSlice, zgensym_f1f62b7068e7cc57_36)
 	}
-	for zgensym_f1f62b7068e7cc57_31 := range z.PendingLocation {
+	for zgensym_f1f62b7068e7cc57_33 := range z.RootLocation {
 		var zgensym_f1f62b7068e7cc57_37 uint32
 		zgensym_f1f62b7068e7cc57_37, err = dc.ReadArrayHeader()
 		if err != nil {
@@ -836,11 +849,44 @@ func (z *Superblock) DecodeMsg(dc *msgp.Reader) (err error) {
 			err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_37}
 			return
 		}
-		z.PendingLocation[zgensym_f1f62b7068e7cc57_31].Offset, err = dc.ReadUint64()
+		z.RootLocation[zgensym_f1f62b7068e7cc57_33].Offset, err = dc.ReadUint64()
 		if err != nil {
 			return
 		}
-		z.PendingLocation[zgensym_f1f62b7068e7cc57_31].Size, err = dc.ReadUint64()
+		z.RootLocation[zgensym_f1f62b7068e7cc57_33].Size, err = dc.ReadUint64()
+		if err != nil {
+			return
+		}
+	}
+	err = z.Pending.DecodeMsg(dc)
+	if err != nil {
+		return
+	}
+	var zgensym_f1f62b7068e7cc57_38 uint32
+	zgensym_f1f62b7068e7cc57_38, err = dc.ReadArrayHeader()
+	if err != nil {
+		return
+	}
+	if cap(z.PendingLocation) >= int(zgensym_f1f62b7068e7cc57_38) {
+		z.PendingLocation = (z.PendingLocation)[:zgensym_f1f62b7068e7cc57_38]
+	} else {
+		z.PendingLocation = make(LocationSlice, zgensym_f1f62b7068e7cc57_38)
+	}
+	for zgensym_f1f62b7068e7cc57_34 := range z.PendingLocation {
+		var zgensym_f1f62b7068e7cc57_39 uint32
+		zgensym_f1f62b7068e7cc57_39, err = dc.ReadArrayHeader()
+		if err != nil {
+			return
+		}
+		if zgensym_f1f62b7068e7cc57_39 != 2 {
+			err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_39}
+			return
+		}
+		z.PendingLocation[zgensym_f1f62b7068e7cc57_34].Offset, err = dc.ReadUint64()
+		if err != nil {
+			return
+		}
+		z.PendingLocation[zgensym_f1f62b7068e7cc57_34].Size, err = dc.ReadUint64()
 		if err != nil {
 			return
 		}
@@ -879,56 +925,50 @@ func (z *Superblock) EncodeMsg(en *msgp.Writer) (err error) {
 	if err != nil {
 		return
 	}
-	for zgensym_f1f62b7068e7cc57_29 := range z.RootLocation {
+	for zgensym_f1f62b7068e7cc57_33 := range z.RootLocation {
 		// array header, size 2
 		err = en.Append(0x92)
 		if err != nil {
 			return err
 		}
-		err = en.WriteUint64(z.RootLocation[zgensym_f1f62b7068e7cc57_29].Offset)
+		err = en.WriteUint64(z.RootLocation[zgensym_f1f62b7068e7cc57_33].Offset)
 		if err != nil {
 			return
 		}
-		err = en.WriteUint64(z.RootLocation[zgensym_f1f62b7068e7cc57_29].Size)
+		err = en.WriteUint64(z.RootLocation[zgensym_f1f62b7068e7cc57_33].Size)
 		if err != nil {
 			return
 		}
 	}
-	err = en.WriteArrayHeader(uint32(len(z.Pending)))
+	// encodeGen.gBase IDENT
+
+	// record the interface for deduplication
+	var dup bool
+	dup, err = en.DedupWriteIsDup(z.Pending)
 	if err != nil {
 		return
 	}
-	for zgensym_f1f62b7068e7cc57_30 := range z.Pending {
-		// encodeGen.gBase IDENT
-
-		// record the interface for deduplication
-		var dup bool
-		dup, err = en.DedupWriteIsDup(z.Pending[zgensym_f1f62b7068e7cc57_30])
+	if !dup {
+		err = z.Pending.EncodeMsg(en)
 		if err != nil {
 			return
-		}
-		if !dup {
-			err = z.Pending[zgensym_f1f62b7068e7cc57_30].EncodeMsg(en)
-			if err != nil {
-				return
-			}
 		}
 	}
 	err = en.WriteArrayHeader(uint32(len(z.PendingLocation)))
 	if err != nil {
 		return
 	}
-	for zgensym_f1f62b7068e7cc57_31 := range z.PendingLocation {
+	for zgensym_f1f62b7068e7cc57_34 := range z.PendingLocation {
 		// array header, size 2
 		err = en.Append(0x92)
 		if err != nil {
 			return err
 		}
-		err = en.WriteUint64(z.PendingLocation[zgensym_f1f62b7068e7cc57_31].Offset)
+		err = en.WriteUint64(z.PendingLocation[zgensym_f1f62b7068e7cc57_34].Offset)
 		if err != nil {
 			return
 		}
-		err = en.WriteUint64(z.PendingLocation[zgensym_f1f62b7068e7cc57_31].Size)
+		err = en.WriteUint64(z.PendingLocation[zgensym_f1f62b7068e7cc57_34].Size)
 		if err != nil {
 			return
 		}
@@ -949,25 +989,22 @@ func (z *Superblock) MarshalMsg(b []byte) (o []byte, err error) {
 	o = msgp.AppendUint64(o, z.BytesUsed)
 	o = msgp.AppendUint64(o, z.BytesTotal)
 	o = msgp.AppendArrayHeader(o, uint32(len(z.RootLocation)))
-	for zgensym_f1f62b7068e7cc57_29 := range z.RootLocation {
+	for zgensym_f1f62b7068e7cc57_33 := range z.RootLocation {
 		// array header, size 2
 		o = append(o, 0x92)
-		o = msgp.AppendUint64(o, z.RootLocation[zgensym_f1f62b7068e7cc57_29].Offset)
-		o = msgp.AppendUint64(o, z.RootLocation[zgensym_f1f62b7068e7cc57_29].Size)
+		o = msgp.AppendUint64(o, z.RootLocation[zgensym_f1f62b7068e7cc57_33].Offset)
+		o = msgp.AppendUint64(o, z.RootLocation[zgensym_f1f62b7068e7cc57_33].Size)
 	}
-	o = msgp.AppendArrayHeader(o, uint32(len(z.Pending)))
-	for zgensym_f1f62b7068e7cc57_30 := range z.Pending {
-		o, err = z.Pending[zgensym_f1f62b7068e7cc57_30].MarshalMsg(o) // not is.iface, gen/marshal.go:243
-		if err != nil {
-			return
-		}
+	o, err = z.Pending.MarshalMsg(o) // not is.iface, gen/marshal.go:243
+	if err != nil {
+		return
 	}
 	o = msgp.AppendArrayHeader(o, uint32(len(z.PendingLocation)))
-	for zgensym_f1f62b7068e7cc57_31 := range z.PendingLocation {
+	for zgensym_f1f62b7068e7cc57_34 := range z.PendingLocation {
 		// array header, size 2
 		o = append(o, 0x92)
-		o = msgp.AppendUint64(o, z.PendingLocation[zgensym_f1f62b7068e7cc57_31].Offset)
-		o = msgp.AppendUint64(o, z.PendingLocation[zgensym_f1f62b7068e7cc57_31].Size)
+		o = msgp.AppendUint64(o, z.PendingLocation[zgensym_f1f62b7068e7cc57_34].Offset)
+		o = msgp.AppendUint64(o, z.PendingLocation[zgensym_f1f62b7068e7cc57_34].Size)
 	}
 	return
 }
@@ -985,13 +1022,13 @@ func (z *Superblock) UnmarshalMsgWithCfg(bts []byte, cfg *msgp.RuntimeConfig) (o
 		bts = nbs.PushAlwaysNil(bts[1:])
 	}
 
-	var zgensym_f1f62b7068e7cc57_38 uint32
-	zgensym_f1f62b7068e7cc57_38, bts, err = nbs.ReadArrayHeaderBytes(bts)
+	var zgensym_f1f62b7068e7cc57_40 uint32
+	zgensym_f1f62b7068e7cc57_40, bts, err = nbs.ReadArrayHeaderBytes(bts)
 	if err != nil {
 		return
 	}
-	if zgensym_f1f62b7068e7cc57_38 != 6 {
-		err = msgp.ArrayError{Wanted: 6, Got: zgensym_f1f62b7068e7cc57_38}
+	if zgensym_f1f62b7068e7cc57_40 != 6 {
+		err = msgp.ArrayError{Wanted: 6, Got: zgensym_f1f62b7068e7cc57_40}
 		return
 	}
 	z.Generation, bts, err = nbs.ReadUint64Bytes(bts)
@@ -1013,89 +1050,72 @@ func (z *Superblock) UnmarshalMsgWithCfg(bts []byte, cfg *msgp.RuntimeConfig) (o
 		(z.RootLocation) = (z.RootLocation)[:0]
 	} else {
 
-		var zgensym_f1f62b7068e7cc57_39 uint32
-		zgensym_f1f62b7068e7cc57_39, bts, err = nbs.ReadArrayHeaderBytes(bts)
-		if err != nil {
-			return
-		}
-		if cap(z.RootLocation) >= int(zgensym_f1f62b7068e7cc57_39) {
-			z.RootLocation = (z.RootLocation)[:zgensym_f1f62b7068e7cc57_39]
-		} else {
-			z.RootLocation = make(LocationSlice, zgensym_f1f62b7068e7cc57_39)
-		}
-		for zgensym_f1f62b7068e7cc57_29 := range z.RootLocation {
-			var zgensym_f1f62b7068e7cc57_40 uint32
-			zgensym_f1f62b7068e7cc57_40, bts, err = nbs.ReadArrayHeaderBytes(bts)
-			if err != nil {
-				return
-			}
-			if zgensym_f1f62b7068e7cc57_40 != 2 {
-				err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_40}
-				return
-			}
-			z.RootLocation[zgensym_f1f62b7068e7cc57_29].Offset, bts, err = nbs.ReadUint64Bytes(bts)
-
-			if err != nil {
-				return
-			}
-			z.RootLocation[zgensym_f1f62b7068e7cc57_29].Size, bts, err = nbs.ReadUint64Bytes(bts)
-
-			if err != nil {
-				return
-			}
-		}
-	}
-	if nbs.AlwaysNil {
-		(z.Pending) = (z.Pending)[:0]
-	} else {
-
 		var zgensym_f1f62b7068e7cc57_41 uint32
 		zgensym_f1f62b7068e7cc57_41, bts, err = nbs.ReadArrayHeaderBytes(bts)
 		if err != nil {
 			return
 		}
-		if cap(z.Pending) >= int(zgensym_f1f62b7068e7cc57_41) {
-			z.Pending = (z.Pending)[:zgensym_f1f62b7068e7cc57_41]
+		if cap(z.RootLocation) >= int(zgensym_f1f62b7068e7cc57_41) {
+			z.RootLocation = (z.RootLocation)[:zgensym_f1f62b7068e7cc57_41]
 		} else {
-			z.Pending = make(OpSlice, zgensym_f1f62b7068e7cc57_41)
+			z.RootLocation = make(LocationSlice, zgensym_f1f62b7068e7cc57_41)
 		}
-		for zgensym_f1f62b7068e7cc57_30 := range z.Pending {
-			bts, err = z.Pending[zgensym_f1f62b7068e7cc57_30].UnmarshalMsg(bts)
+		for zgensym_f1f62b7068e7cc57_33 := range z.RootLocation {
+			var zgensym_f1f62b7068e7cc57_42 uint32
+			zgensym_f1f62b7068e7cc57_42, bts, err = nbs.ReadArrayHeaderBytes(bts)
+			if err != nil {
+				return
+			}
+			if zgensym_f1f62b7068e7cc57_42 != 2 {
+				err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_42}
+				return
+			}
+			z.RootLocation[zgensym_f1f62b7068e7cc57_33].Offset, bts, err = nbs.ReadUint64Bytes(bts)
+
+			if err != nil {
+				return
+			}
+			z.RootLocation[zgensym_f1f62b7068e7cc57_33].Size, bts, err = nbs.ReadUint64Bytes(bts)
+
 			if err != nil {
 				return
 			}
 		}
 	}
+	bts, err = z.Pending.UnmarshalMsg(bts)
+	if err != nil {
+		return
+	}
 	if nbs.AlwaysNil {
 		(z.PendingLocation) = (z.PendingLocation)[:0]
 	} else {
 
-		var zgensym_f1f62b7068e7cc57_42 uint32
-		zgensym_f1f62b7068e7cc57_42, bts, err = nbs.ReadArrayHeaderBytes(bts)
+		var zgensym_f1f62b7068e7cc57_43 uint32
+		zgensym_f1f62b7068e7cc57_43, bts, err = nbs.ReadArrayHeaderBytes(bts)
 		if err != nil {
 			return
 		}
-		if cap(z.PendingLocation) >= int(zgensym_f1f62b7068e7cc57_42) {
-			z.PendingLocation = (z.PendingLocation)[:zgensym_f1f62b7068e7cc57_42]
+		if cap(z.PendingLocation) >= int(zgensym_f1f62b7068e7cc57_43) {
+			z.PendingLocation = (z.PendingLocation)[:zgensym_f1f62b7068e7cc57_43]
 		} else {
-			z.PendingLocation = make(LocationSlice, zgensym_f1f62b7068e7cc57_42)
+			z.PendingLocation = make(LocationSlice, zgensym_f1f62b7068e7cc57_43)
 		}
-		for zgensym_f1f62b7068e7cc57_31 := range z.PendingLocation {
-			var zgensym_f1f62b7068e7cc57_43 uint32
-			zgensym_f1f62b7068e7cc57_43, bts, err = nbs.ReadArrayHeaderBytes(bts)
+		for zgensym_f1f62b7068e7cc57_34 := range z.PendingLocation {
+			var zgensym_f1f62b7068e7cc57_44 uint32
+			zgensym_f1f62b7068e7cc57_44, bts, err = nbs.ReadArrayHeaderBytes(bts)
 			if err != nil {
 				return
 			}
-			if zgensym_f1f62b7068e7cc57_43 != 2 {
-				err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_43}
+			if zgensym_f1f62b7068e7cc57_44 != 2 {
+				err = msgp.ArrayError{Wanted: 2, Got: zgensym_f1f62b7068e7cc57_44}
 				return
 			}
-			z.PendingLocation[zgensym_f1f62b7068e7cc57_31].Offset, bts, err = nbs.ReadUint64Bytes(bts)
+			z.PendingLocation[zgensym_f1f62b7068e7cc57_34].Offset, bts, err = nbs.ReadUint64Bytes(bts)
 
 			if err != nil {
 				return
 			}
-			z.PendingLocation[zgensym_f1f62b7068e7cc57_31].Size, bts, err = nbs.ReadUint64Bytes(bts)
+			z.PendingLocation[zgensym_f1f62b7068e7cc57_34].Size, bts, err = nbs.ReadUint64Bytes(bts)
 
 			if err != nil {
 				return
@@ -1115,10 +1135,6 @@ func (z *Superblock) UnmarshalMsgWithCfg(bts []byte, cfg *msgp.RuntimeConfig) (o
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Superblock) Msgsize() (s int) {
-	s = 1 + msgp.Uint64Size + msgp.Uint64Size + msgp.Uint64Size + msgp.ArrayHeaderSize + (len(z.RootLocation) * (23 + msgp.Uint64Size + msgp.Uint64Size)) + msgp.ArrayHeaderSize
-	for zgensym_f1f62b7068e7cc57_30 := range z.Pending {
-		s += z.Pending[zgensym_f1f62b7068e7cc57_30].Msgsize()
-	}
-	s += msgp.ArrayHeaderSize + (len(z.PendingLocation) * (23 + msgp.Uint64Size + msgp.Uint64Size))
+	s = 1 + msgp.Uint64Size + msgp.Uint64Size + msgp.Uint64Size + msgp.ArrayHeaderSize + (len(z.RootLocation) * (23 + msgp.Uint64Size + msgp.Uint64Size)) + z.Pending.Msgsize() + msgp.ArrayHeaderSize + (len(z.PendingLocation) * (23 + msgp.Uint64Size + msgp.Uint64Size))
 	return
 }

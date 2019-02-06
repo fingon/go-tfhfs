@@ -3,7 +3,7 @@ module github.com/fingon/go-tfhfs
 require (
 	github.com/AndreasBriese/bbloom v0.0.0-20180913140656-343706a395b7 // indirect
 	github.com/coreos/bbolt v1.3.2
-	github.com/dgraph-io/badger v1.5.4
+	github.com/dgraph-io/badger v1.5.3
 	github.com/dgryski/go-farm v0.0.0-20190104051053-3adb47b1fb0f // indirect
 	github.com/glycerine/greenpack v5.0.8+incompatible
 	github.com/golang/protobuf v1.2.0

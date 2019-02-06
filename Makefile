@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Wed Mar 21 14:03:55 2018 mstenber
-# Edit time:     144 min
+# Last modified: Wed Feb  6 12:12:09 2019 mstenber
+# Edit time:     147 min
 #
 #
 
@@ -204,7 +204,7 @@ prep-perf:
 	rm -rf /tmp/perf
 	mkdir -p /tmp/perf/size
 	mkdir -p /tmp/perf/amount
-	cp ~/software/mac/install-highsierra-app.tgz /tmp/perf/size
+	cp ~/software/mac/install-mojave.tgz /tmp/perf/size
 	rsync -a ~/share/1/Maildir/.Junk /tmp/perf/amount
 
 perf.md: .done.perf

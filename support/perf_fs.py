@@ -9,8 +9,8 @@
 # Copyright (c) 2016 Markus Stenberg
 #
 # Created:       Sun Dec 25 08:04:44 2016 mstenber
-# Last modified: Wed Mar 21 12:23:36 2018 mstenber
-# Edit time:     95 min
+# Last modified: Wed Feb  6 12:20:44 2019 mstenber
+# Edit time:     101 min
 #
 """This is 'whole'-system benchmark used to gather data for populating
 the 'official' performance figures with.
@@ -31,6 +31,9 @@ def _system(cmd):
     if rc:
         sys.exit(42)
 
+
+SIZEFILE = '/tmp/perf/size/install-mojave.tgz'
+AMOUNTDIR = '/tmp/perf/amount'
 
 if __name__ == '__main__':
 
@@ -61,11 +64,13 @@ if __name__ == '__main__':
     for desc, opts in tests:
         print(f'# {desc}')
         for write_cmd, units, unit_type in [
-                ('dd "if=/tmp/perf/size/install-highsierra-app.tgz" of=/tmp/x/foo.dat bs=1048576',
+                (f'dd "if={SIZEFILE}" of=/tmp/x/foo.dat bs=1048576',
                  # 'rsync /tmp/perf/size/install-highsierra-app.tgz /tmp/x/foo.dat',
-                    5078, 'megabyte'),  # 1 file :p
-                ('rsync -a /tmp/perf/amount /tmp/x/',
-                 60162, 'file'),  # 1194MB
+                 int(os.stat(SIZEFILE).st_size / 1024 / 1024),
+                 'megabyte'),  # 1 file :p
+                (f'rsync -a {AMOUNTDIR} /tmp/x/',
+                 int(os.popen(f'find {AMOUNTDIR} | wc -l').read()),
+                 'file'),  # 1194MB
         ]:
             print(f'## Write {units} {unit_type}s')
 

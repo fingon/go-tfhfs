@@ -1,5 +1,9 @@
 package fs
-import "github.com/fingon/go-tfhfs/util"
+import (
+	"sync"
+
+	"github.com/fingon/go-tfhfs/util"
+)
 
 // deleteNotifyIChannel provides infinite buffer channel abstraction. If
 // blocking is not really an option, IChannel should be used instead
@@ -12,10 +16,11 @@ import "github.com/fingon/go-tfhfs/util"
 // unneccessary inefficiency.
 
 type deleteNotifyIChannel struct {
-	list             deleteNotifyList
-	lock, waitLock   util.MutexLocked
-	started, waiting bool
-	receiveChannel   chan deleteNotify
+	list           deleteNotifyList
+	lock           util.MutexLocked
+	started        bool
+	cond           *sync.Cond
+	receiveChannel chan deleteNotify
 }
 
 func (self *deleteNotifyIChannel) start() {
@@ -24,8 +29,8 @@ func (self *deleteNotifyIChannel) start() {
 		return
 	}
 	self.started = true
+	self.cond = sync.NewCond(&self.lock)
 	self.receiveChannel = make(chan deleteNotify)
-	self.waitLock.Lock()
 	go func() {
 		for {
 			var value deleteNotify
@@ -34,16 +39,13 @@ func (self *deleteNotifyIChannel) start() {
 			if item != nil {
 				self.list.RemoveElement(item)
 				value = item.Value
-				self.waiting = false
 			} else {
-				self.waiting = true
+				self.cond.Wait()
 			}
 			self.lock.Unlock()
-			if item == nil {
-				self.waitLock.Lock()
-				continue
+			if item != nil {
+				self.receiveChannel <- value
 			}
-			self.receiveChannel <- value
 		}
 	}()
 }
@@ -60,10 +62,10 @@ func (self *deleteNotifyIChannel) Start() {
 func (self *deleteNotifyIChannel) Send(value deleteNotify) {
 	defer self.lock.Locked()()
 	self.start()
-	self.list.PushBack(value)
-	if self.waiting {
-		self.waitLock.Unlock()
+	if self.list.Front == nil {
+		self.cond.Signal()
 	}
+	self.list.PushBack(value)
 }
 
 func (self *deleteNotifyIChannel) Channel() chan deleteNotify {

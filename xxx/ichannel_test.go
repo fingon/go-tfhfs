@@ -4,8 +4,8 @@
  * Copyright (c) 2019 Markus Stenberg
  *
  * Created:       Thu Feb  7 10:48:54 2019 mstenber
- * Last modified: Thu Feb  7 10:52:19 2019 mstenber
- * Edit time:     2 min
+ * Last modified: Thu Feb  7 11:12:11 2019 mstenber
+ * Edit time:     3 min
  *
  */
 
@@ -26,4 +26,15 @@ func TestIChannel(t *testing.T) {
 	c.Send(v2)
 	assert.Equal(t, c.Receive(), v1)
 	assert.Equal(t, c.Receive(), v2)
+
+	c = YYYIChannel{}
+	ch := c.Channel()
+	c.Send(v2)
+	c.Send(v1)
+	assert.Equal(t, <-ch, v2)
+	assert.Equal(t, <-ch, v1)
+	c.Send(v1)
+	c.Send(v2)
+	assert.Equal(t, <-ch, v1)
+	assert.Equal(t, <-ch, v2)
 }

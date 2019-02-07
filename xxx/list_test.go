@@ -4,8 +4,8 @@
  * Copyright (c) 2018 Markus Stenberg
  *
  * Created:       Sun Jan  7 17:05:40 2018 mstenber
- * Last modified: Thu Jan 18 17:45:36 2018 mstenber
- * Edit time:     9 min
+ * Last modified: Thu Feb  7 11:14:10 2019 mstenber
+ * Edit time:     10 min
  *
  */
 
@@ -56,11 +56,13 @@ func Test(t *testing.T) {
 	empty := func() {
 		assert.True(t, l.Front != nil)
 		assert.True(t, l.Back != nil)
+		assert.Equal(t, l.String(), "YYYList<3 entries/0 free>")
 		l.Remove(l.Front)
 		l.Remove(l.Front)
 		l.Remove(l.Front)
 		assert.Nil(t, l.Front)
 		assert.Nil(t, l.Back)
+		assert.Equal(t, l.String(), "YYYList<0 entries/3 free>")
 	}
 	// First mallocs
 	fun(true)

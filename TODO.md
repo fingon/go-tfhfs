@@ -1,5 +1,8 @@
 # Pending early todo #
 
+* determine why Linux build has abysmal write performance when using
+  Badger (probably should batch writes more when using safe mode)
+
 * figure to describe arch
 
 * fix fstest failures if I feel like it (rename I do not understand, NXIO

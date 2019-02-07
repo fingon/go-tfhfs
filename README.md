@@ -32,15 +32,20 @@ Build
 -----
 
 ```
-# go get github.com/fingon/go-tfhfs
+# go get github.com/fingon/go-tfhfs/...
 ```
+
+(or get it via git for the amusing sanitytest.sh)
 
 Usage
 -----
 
-After that, targets of interest are:
+With go get, the tools of interest are `tfhfs` and `tfhfs-connector`
+binaries (more documentation TBD, look at sanitytest.sh or usage if you
+feel adventurous).
 
-./sanitytest.sh which runs minimal test which consists of:
+With git checkout, after running `make`, the main point of entry is
+`./sanitytest.sh` which runs minimal test which consists of:
 
 * mounting one volume at /tmp/x (with server at localhost:12345)
 
@@ -57,12 +62,6 @@ utility
 * remounting /tmp/x using the same fixed storage
 
 * still ensuring /tmp/x has state we set up there
-
-and
-
-of course the built ./tfhfs mounting binary, and ./tfhfs-connector
-synchronization utility (more documentation TBD, look at sanitytest.sh or
-usage if you feel adventurous).
 
 *NOTE*: You REALLY do not want to expose tfhfs server to non-localhost use
 at the moment; it is plain HTTP/1.1 without any security
@@ -85,3 +84,8 @@ Used tests to verify sanity
 branch)
 
 - fstorture from Apple fstools: https://github.com/macosforge/fstools
+
+Known limitations
+-----------------
+
+See [TODO](TODO.md)

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Tue Mar 13 12:25:59 2018 mstenber
- * Edit time:     391 min
+ * Last modified: Thu Feb  7 10:08:02 2019 mstenber
+ * Edit time:     397 min
  *
  */
 
@@ -34,6 +34,12 @@ const iterations = 1234
 const inodeDataLength = 8
 const blockSubTypeOffset = inodeDataLength
 
+type deleteNotify struct {
+	Parent uint64
+	Child  uint64
+	Name   string
+}
+
 type Fs struct {
 	Ops fsOps
 
@@ -41,6 +47,7 @@ type Fs struct {
 	inodeTracker
 	hugger.Hugger
 	closing       chan chan struct{}
+	deleted       chan deleteNotify
 	flushInterval time.Duration
 	server        *fuse.Server
 	storage       *storage.Storage
@@ -121,6 +128,7 @@ func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	(&fs.Hugger).Init(cacheSize)
 	fs.Ops.fs = fs
 	fs.closing = make(chan chan struct{})
+	fs.deleted = make(chan deleteNotify, 10)
 	fs.flushInterval = 1 * time.Second
 	fs.inodeTracker.Init(fs)
 	fs.writeLimiter.LimitPerCPU = 3 // somewhat IO bound
@@ -145,6 +153,12 @@ func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	go func() { // ok, singleton per fs
 		for {
 			select {
+			case deleted := <-fs.deleted:
+				if fs.server != nil {
+					fs.server.DeleteNotify(deleted.Parent,
+						deleted.Child,
+						deleted.Name)
+				}
 			case done := <-fs.closing:
 				fs.Flush()
 				done <- struct{}{}
@@ -171,6 +185,10 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 		return
 	}
 	self.Hugger.IterateReferencesCallback(nd, cb)
+}
+
+func (self *Fs) deleteNotify(parent, child uint64, name string) {
+	self.deleted <- deleteNotify{Parent: parent, Child: child, Name: name}
 }
 
 func BytesToNodeData(bd []byte) *ibtree.NodeData {

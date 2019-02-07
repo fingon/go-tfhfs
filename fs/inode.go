@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Fri Dec 29 08:21:32 2017 mstenber
- * Last modified: Tue Mar 20 12:25:48 2018 mstenber
- * Edit time:     395 min
+ * Last modified: Thu Feb  7 09:58:25 2019 mstenber
+ * Edit time:     401 min
  *
  */
 
@@ -354,9 +354,7 @@ func (self *inode) RemoveChild(child *inode, name string) (code fuse.Status) {
 		}
 	}
 	mlog.Printf2("fs/inode", " Removed %v", child)
-	if self.Fs().server != nil {
-		self.Fs().server.DeleteNotify(self.ino, child.ino, name)
-	}
+	self.Fs().deleteNotify(self.ino, child.ino, name)
 	return
 }
 

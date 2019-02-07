@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Mon Dec 25 01:15:39 2017 mstenber
- * Last modified: Tue Mar 20 11:04:51 2018 mstenber
- * Edit time:     26 min
+ * Last modified: Thu Feb  7 09:49:03 2019 mstenber
+ * Edit time:     27 min
  *
  */
 
@@ -52,30 +52,31 @@ const (
 type InodeMetaData struct {
 	// int64 st_ino = 1;
 	// ^ part of key, not data
-	StMode    uint32
-	StRdev    uint32
-	StUid     uint32
-	StGid     uint32
-	StAtimeNs uint64
-	StCtimeNs uint64
-	StMtimeNs uint64
-	StSize    uint64
-	StNlink   uint32
+	StMode    uint32 `zid:"0"`
+	StRdev    uint32 `zid:"1"`
+	StUid     uint32 `zid:"2"`
+	StGid     uint32 `zid:"3"`
+	StAtimeNs uint64 `zid:"4"`
+	StCtimeNs uint64 `zid:"5"`
+	StMtimeNs uint64 `zid:"6"`
+	StSize    uint64 `zid:"7"`
+	StNlink   uint32 `zid:"8"`
 
 	// Non-visible things
 
 	// What is ino of our parent (directory-only)
-	ParentIno uint64
+	ParentIno uint64 `zid:"9"`
 }
 
 type InodeMeta struct {
 	InodeMetaData
+	Data []byte `zid:"10"`
+
 	// dynamic: st_rdev
 	// static but from elsewhere: st_blksize
 
 	// Data contains e.g. symlink target, mini-file
 	// content; at most path-max-len (~ 1kb?)
-	Data []byte
 }
 
 //type FsData struct {

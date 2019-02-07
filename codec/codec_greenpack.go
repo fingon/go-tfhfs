@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 16:42:58 2017 mstenber
- * Last modified: Mon Dec 25 00:37:13 2017 mstenber
- * Edit time:     4 min
+ * Last modified: Thu Feb  7 09:47:10 2019 mstenber
+ * Edit time:     5 min
  *
  */
 
@@ -19,11 +19,10 @@ package codec
 // sight, so to speak.
 
 type EncryptedData struct {
-	// nonce used for AES GCM
-	Nonce []byte `zid:"0"`
-
-	// EncryptedData is AES GCM encrypted CompressedData
+	Nonce         []byte `zid:"0"`
 	EncryptedData []byte `zid:"1"`
+	// nonce used for AES GCM
+	// EncryptedData is AES GCM encrypted CompressedData
 }
 
 type CompressionType byte

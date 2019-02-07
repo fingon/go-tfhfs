@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Sun Dec 24 08:37:14 2017 mstenber
- * Last modified: Mon Jan 15 18:43:51 2018 mstenber
- * Edit time:     21 min
+ * Last modified: Thu Feb  7 09:49:20 2019 mstenber
+ * Edit time:     22 min
  *
  */
 
@@ -65,5 +65,5 @@ type BlockMetadata struct {
 }
 
 type NameMapBlock struct {
-	NameToBlockId map[string]string
+	NameToBlockId map[string]string `zid:"0"`
 }

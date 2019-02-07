@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Feb  7 10:54:23 2019 mstenber
-# Edit time:     149 min
+# Last modified: Thu Feb  7 11:26:07 2019 mstenber
+# Edit time:     151 min
 #
 #
 
@@ -45,7 +45,8 @@ bench: .done.buildable
 cover: .done.cover
 
 html-cover: .done.cover
-	go tool cover -html=.done.cover
+	grep -v '_gen.go:' .done.cover > .done.cover.nongen
+	go tool cover -html=.done.cover.nongen
 
 get: .done.getprebuild
 

@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Feb  7 09:53:42 2019 mstenber
-# Edit time:     148 min
+# Last modified: Thu Feb  7 10:54:23 2019 mstenber
+# Edit time:     149 min
 #
 #
 
@@ -16,6 +16,8 @@ GREENPACK_OPTS=-alltuple
 GENERATED=\
 	ibtree/hugger/treerootpointer_gen.go \
 	fs/inodemetapointer_gen.go \
+	fs/deletenotifylist_gen.go \
+	fs/deletenotifyichannel_gen.go \
 	storage/blockpointerfuture_gen.go \
 	util/bytesliceatomiclist_gen.go \
 	util/byteslicefuture_gen.go \
@@ -104,6 +106,20 @@ util/stringlist_gen.go: Makefile xxx/list.go
 	( echo "package util" ; \
 		egrep -A 9999 '^import' xxx/list.go | \
 		sed 's/YYYType/string/g;s/YYY/String/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+fs/deletenotifylist_gen.go: Makefile xxx/list.go
+	( echo "package fs" ; \
+		egrep -A 9999 '^import' xxx/list.go | \
+		sed 's/YYYType/deleteNotify/g;s/YYY/deleteNotify/g' | \
+		cat ) > $@.new
+	mv $@.new $@
+
+fs/deletenotifyichannel_gen.go: Makefile xxx/ichannel.go
+	( echo "package fs" ; \
+		egrep -A 9999 '^import' xxx/ichannel.go | \
+		sed 's/YYYType/deleteNotify/g;s/YYY/deleteNotify/g' | \
 		cat ) > $@.new
 	mv $@.new $@
 

@@ -4,8 +4,8 @@
  * Copyright (c) 2017 Markus Stenberg
  *
  * Created:       Thu Dec 28 11:20:29 2017 mstenber
- * Last modified: Thu Feb  7 10:08:02 2019 mstenber
- * Edit time:     397 min
+ * Last modified: Thu Feb  7 10:56:36 2019 mstenber
+ * Edit time:     401 min
  *
  */
 
@@ -47,7 +47,7 @@ type Fs struct {
 	inodeTracker
 	hugger.Hugger
 	closing       chan chan struct{}
-	deleted       chan deleteNotify
+	deleted       deleteNotifyIChannel
 	flushInterval time.Duration
 	server        *fuse.Server
 	storage       *storage.Storage
@@ -128,7 +128,6 @@ func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	(&fs.Hugger).Init(cacheSize)
 	fs.Ops.fs = fs
 	fs.closing = make(chan chan struct{})
-	fs.deleted = make(chan deleteNotify, 10)
 	fs.flushInterval = 1 * time.Second
 	fs.inodeTracker.Init(fs)
 	fs.writeLimiter.LimitPerCPU = 3 // somewhat IO bound
@@ -153,7 +152,7 @@ func NewFs(st *storage.Storage, RootName string, cacheSize int) *Fs {
 	go func() { // ok, singleton per fs
 		for {
 			select {
-			case deleted := <-fs.deleted:
+			case deleted := <-fs.deleted.Channel():
 				if fs.server != nil {
 					fs.server.DeleteNotify(deleted.Parent,
 						deleted.Child,
@@ -188,7 +187,7 @@ func (self *Fs) iterateReferencesCallback(id string, data []byte, cb storage.Blo
 }
 
 func (self *Fs) deleteNotify(parent, child uint64, name string) {
-	self.deleted <- deleteNotify{Parent: parent, Child: child, Name: name}
+	self.deleted.Send(deleteNotify{Parent: parent, Child: child, Name: name})
 }
 
 func BytesToNodeData(bd []byte) *ibtree.NodeData {

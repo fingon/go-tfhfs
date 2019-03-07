@@ -4,8 +4,8 @@
 # Copyright (c) 2017 Markus Stenberg
 #
 # Created:       Fri Aug 11 16:08:26 2017 mstenber
-# Last modified: Thu Feb  7 11:26:07 2019 mstenber
-# Edit time:     151 min
+# Last modified: Thu Mar  7 14:38:07 2019 mstenber
+# Edit time:     152 min
 #
 #
 
@@ -173,10 +173,6 @@ tfhfs-linux: .done.test tfhfs
 tfhfs-connector: cmd/tfhfs-connector/tfhfs-connector.go $(wildcard */*.go)
 	go build -o ./tfhfs-connector cmd/tfhfs-connector/tfhfs-connector.go
 
-update-deps:
-	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -t -u . ); done
-	for LINE in `cat go-get-deps.txt`; do go get -u $$LINE; done
-
 .done.cover: .done.buildable $(wildcard %/*.go) $(wildcard %/*.go)
 	go test ./... -coverprofile=.done.cover.new
 	mv .done.cover.new .done.cover
@@ -190,16 +186,11 @@ update-deps:
 	for LINE in `cat go-get-deps.txt`; do go get $$LINE; done
 	touch $@
 
-.done.get2: Makefile $(wildcard %/*.go)
-	for SUBDIR in $(SUBDIRS); do (cd $$SUBDIR && go get -t . ); done
-	touch $@
-
-
 .done.greenpack: .done.getprebuild $(GREENPACKS)
 	for FILE in $(GREENPACKS); do greenpack $(GREENPACK_OPTS) -file $$FILE ; done
 	touch $@
 
-.done.buildable: .done.greenpack .done.protoc  .done.generated .done.mlog .done.get2
+.done.buildable: .done.greenpack .done.protoc  .done.generated .done.mlog
 	touch $@
 
 .done.generated: $(GENERATED)
